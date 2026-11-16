@@ -65,43 +65,43 @@ async function legenda(texto, ms = 2200) {
 }
 
 await page.goto(base, { waitUntil: 'networkidle' });
-await legenda('Acesso com credenciais de demonstração', 2600);
+await legenda('Acesso com credenciais de demonstração', 7000);
 await page.fill('#form-login input[name="email"]', 'admin@imobiliaria.local');
 await page.fill('#form-login input[name="senha"]', senha);
 await page.click('#form-login button[type="submit"]');
 await page.waitForSelector('#app:not([hidden])');
 await page.waitForTimeout(600);
 
-await legenda('Painel: caixa, inadimplência, ocupação e evolução', 3200);
+await legenda('Painel: caixa, inadimplência, ocupação e evolução', 7000);
 await page.evaluate(() => { location.hash = '#/painel'; });
 await page.waitForTimeout(2200);
 
-await legenda('Carteira: imóveis, contratos, garantias e reajustes', 3000);
+await legenda('Carteira: imóveis, contratos, garantias e reajustes', 7000);
 await page.evaluate(() => { location.hash = '#/contratos'; });
 await page.waitForTimeout(2400);
 
-await legenda('Cobranças: geração em lote, baixa, juros e aging', 3200);
+await legenda('Cobranças: geração em lote, baixa, juros e aging', 7000);
 await page.evaluate(() => { location.hash = '#/cobrancas'; });
 await page.waitForTimeout(2600);
 
-await legenda('Conciliação: importa extrato e sugere o vínculo', 2800);
+await legenda('Conciliação: importa extrato e sugere o vínculo', 7000);
 await page.evaluate(() => { location.hash = '#/conciliacao'; });
 await page.waitForTimeout(2200);
 
-await legenda('Repasses: snapshot da taxa e extrato por contrato', 3200);
+await legenda('Repasses: snapshot da taxa e extrato por contrato', 7000);
 await page.evaluate(() => { location.hash = '#/repasses'; });
 await page.waitForTimeout(2600);
 
-await legenda('Relatórios em CSV, Excel e PDF', 2400);
+await legenda('Relatórios em CSV, Excel e PDF', 7000);
 await page.evaluate(() => { location.hash = '#/relatorios'; });
 await page.waitForTimeout(2000);
 
-await legenda('Tudo funciona no celular', 2600);
+await legenda('Tudo funciona no celular', 7000);
 await page.setViewportSize({ width: 390, height: 844 });
 await page.evaluate(() => { location.hash = '#/cobrancas'; });
 await page.waitForTimeout(2600);
 
-await legenda('Demonstração isolada, dados fictícios, sem dados reais', 2600);
+await legenda('Demonstração isolada, dados fictícios, sem dados reais', 7000);
 
 await context.close();
 await browser.close();

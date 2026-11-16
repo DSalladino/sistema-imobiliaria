@@ -66,6 +66,20 @@ atual — a demonstração nunca “envelhece”.
 As imagens ficam em [`docs/assets/telas/`](assets/telas/) e são geradas a partir
 da própria demonstração, para não envelhecerem:
 
+| Login | Painel |
+|---|---|
+| ![Login](assets/telas/01-login.png) | ![Painel](assets/telas/02-painel.png) |
+| **Contratos** | **Cobranças** |
+| ![Contratos](assets/telas/03-contratos.png) | ![Cobranças](assets/telas/04-cobrancas.png) |
+| **Repasses** | **Conciliação** |
+| ![Repasses](assets/telas/05-repasses.png) | ![Conciliação](assets/telas/06-conciliacao.png) |
+| **Relatórios** | **Alertas** |
+| ![Relatórios](assets/telas/07-relatorios.png) | ![Alertas](assets/telas/08-alertas.png) |
+| **Painel no celular** | **Cobranças no celular** |
+| ![Painel no celular](assets/telas/09-painel-celular.png) | ![Cobranças no celular](assets/telas/10-cobrancas-celular.png) |
+
+Para regerar depois de mudar a interface:
+
 ```bash
 npm i -D playwright
 npx playwright install chromium
@@ -77,13 +91,14 @@ O script usa `APP_URL` (padrão `http://127.0.0.1:3009`) e `DEMO_SENHA`. Ele
 captura login, painel, contratos, cobranças, repasses, conciliação, relatórios,
 alertas e duas telas no celular.
 
-> As imagens são produzidas localmente e versionadas apenas quando você quiser
-> publicá-las. Nenhuma captura é enviada para fora da máquina.
+> As imagens são produzidas localmente. Nenhuma captura é enviada para fora da
+> máquina.
 
 ## Vídeo curto
 
-O roteiro de ~90 segundos segue o mesmo caminho do tour acima, com legendas
-sobrepostas (sem áudio, para funcionar em qualquer lugar):
+O [vídeo de ~90 s](assets/demonstracao.webm) segue o mesmo caminho do tour
+acima, com legendas sobrepostas (sem áudio, para funcionar em qualquer lugar).
+Para regravá-lo:
 
 ```bash
 npm run demo:servir                 # em outro terminal
@@ -91,7 +106,7 @@ node scripts/gravar-demo.mjs        # gera docs/assets/demonstracao.webm
 ```
 
 O arquivo `.webm` abre direto no navegador. Para MP4, converta com
-`ffmpeg -i docs/assets/demonstracao.webm -c:v libvpx-vp9 -b:v 0 -crf 32 demonstracao.webm`
+`ffmpeg -i docs/assets/demonstracao.webm -c:v libx264 -pix_fmt yuv420p demonstracao.mp4`
 ou publique o `.webm` como está (Chrome, Firefox e Edge reproduzem).
 
 ## Testes automatizados
