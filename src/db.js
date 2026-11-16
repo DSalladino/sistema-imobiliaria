@@ -400,7 +400,7 @@ if (qtdProps === 0 && podeSemearDemo) seedDemo();
 
 export function seedDemo() {
   const hoje = new Date();
-  const iso = (d) => d.toISOString().slice(0, 10);
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const addDias = (dias) => { const d = new Date(hoje); d.setDate(d.getDate() + dias); return iso(d); };
   const compAtual = iso(hoje).slice(0, 7);
 

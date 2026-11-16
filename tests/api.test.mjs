@@ -46,6 +46,13 @@ test('fluxo principal da API', async (t) => {
     return { res, data };
   };
 
+  await t.test('health responde sem autenticação e verifica o banco', async () => {
+    const { res, data } = await req('/api/health');
+    assert.equal(res.status, 200);
+    assert.equal(data.ok, true);
+    assert.ok(data.versao);
+  });
+
   await t.test('rejeita credenciais inválidas', async () => {
     const { res } = await req('/api/login', { method: 'POST', body: { email: 'admin@imobiliaria.local', senha: 'errada' } });
     assert.equal(res.status, 401);
@@ -86,6 +93,14 @@ test('fluxo principal da API', async (t) => {
     assert.equal(antigo.res.status, 401);
   });
 
+  await t.test('não permite ficar sem administrador ativo', async () => {
+    const me = await req('/api/me');
+    assert.equal(me.res.status, 200);
+    const r = await req(`/api/usuarios/${me.data.usuario.id}`, { method: 'PUT', body: { papel: 'operador' } });
+    assert.equal(r.res.status, 400);
+    assert.match(r.data.erro, /administrador/i);
+  });
+
   await t.test('CRUD com auditoria e precedência de taxa', async () => {
     const prop = await req('/api/proprietarios', { method: 'POST', body: {
       nome: 'Proprietário Teste', cpf_cnpj: '000.000.000-00', email: 'teste@exemplo.com', telefone: '11999999999', taxa_admin_pct: 6,
@@ -111,6 +126,13 @@ test('fluxo principal da API', async (t) => {
     const imoveis = await req('/api/imoveis');
     const criado = imoveis.data.find(i => i.id === imovel.data.id);
     assert.equal(criado.proprietario_nome, 'Proprietário Teste');
+
+    const duplicado = await req('/api/contratos', { method: 'POST', body: {
+      codigo: 'CT-TESTE-2', imovel_id: imovel.data.id, inquilino_id: inq.data.id,
+      inicio: `${comp}-01`, aluguel_centavos: 100000, dia_vencimento: 10,
+    } });
+    assert.equal(duplicado.res.status, 400);
+    assert.match(duplicado.data.erro, /contrato ativo/i);
   });
 
   await t.test('rejeita dados inválidos e origem cruzada', async () => {

@@ -34,10 +34,16 @@ export function diffDias(dataISO) {
   return Math.round((alvo - hoje) / 86400000);
 }
 
+function isoLocal(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function addMeses(dataISO, meses) {
   const d = new Date(dataISO + 'T00:00:00');
   d.setMonth(d.getMonth() + meses);
-  return d.toISOString().slice(0, 10);
+  // Formata pelos componentes locais: `toISOString()` pode voltar um dia em
+  // servidores com fuso horário positivo (ex.: Europa), alterando vencimentos.
+  return isoLocal(d);
 }
 
 export function competenciaDe(dataISO) {
@@ -78,10 +84,14 @@ export function contratosDoProprietario(proprietarioId) {
     FROM contratos c
     JOIN imoveis i ON i.id = c.imovel_id
     JOIN inquilinos q ON q.id = c.inquilino_id
-    WHERE i.proprietario_id = ? AND c.status = 'ativo'
+    WHERE i.proprietario_id = ?
     ORDER BY c.id
   `).all(proprietarioId);
 }
+// Inclui contratos encerrados/suspensos de propósito: se houve aluguel
+// recebido na competência, o proprietário precisa receber o repasse mesmo que o
+// contrato tenha sido encerrado depois do pagamento. O filtro real é a receita
+// encontrada dentro do laço de cálculo.
 
 export function calcularRepasse(competencia, proprietarioId) {
   const prop = db.prepare('SELECT * FROM proprietarios WHERE id = ?').get(proprietarioId);
@@ -126,9 +136,11 @@ export function calcularRepasse(competencia, proprietarioId) {
     SELECT id, data, categoria, descricao, valor_centavos
     FROM lancamentos
     WHERE proprietario_id = ? AND competencia = ? AND tipo = 'despesa'
-      AND caixa = 'proprietarios' AND status = 'ativo'
+      AND caixa = 'proprietarios' AND status = 'ativo' AND repasse_id IS NULL
     ORDER BY data
   `).all(proprietarioId, competencia);
+  // O pagamento do próprio repasse também é uma despesa no caixa dos
+  // proprietários, mas nunca pode ser descontado de uma nova apuração.
   const despesasTotal = despesas.reduce((s, d) => s + d.valor_centavos, 0);
 
   const excecoes = db.prepare(`
@@ -165,17 +177,20 @@ export function gerarRepasses(competencia, usuarioNome) {
   const resultados = [];
   for (const p of props) {
     const calc = calcularRepasse(competencia, p.id);
-    if (calc.aluguel_centavos === 0 && calc.despesas_centavos === 0 && calc.descontos_centavos === 0 && calc.acrescimos_centavos === 0) continue;
+    const semMovimento = calc.aluguel_centavos === 0 && calc.despesas_centavos === 0
+      && calc.descontos_centavos === 0 && calc.acrescimos_centavos === 0;
     const existente = db.prepare('SELECT * FROM repasses WHERE competencia = ? AND proprietario_id = ?').get(competencia, p.id);
     if (existente && existente.status === 'pago') { resultados.push({ ...calc, id: existente.id, status: 'pago', ignorado: true }); continue; }
     if (existente) {
+      // Se os lançamentos foram estornados, o repasse pendente precisa ser
+      // zerado; caso contrário continuaria pagável com valores que não existem mais.
       db.prepare(`UPDATE repasses SET aluguel_centavos=?, taxa_pct=?, taxa_centavos=?, despesas_centavos=?,
                   descontos_centavos=?, acrescimos_centavos=?, valor_centavos=?, detalhe_json=?, status='calculado'
                   WHERE id=?`)
         .run(calc.aluguel_centavos, calc.taxa_pct, calc.taxa_centavos, calc.despesas_centavos,
           calc.descontos_centavos, calc.acrescimos_centavos, calc.valor_centavos, JSON.stringify(calc.detalhe), existente.id);
-      resultados.push({ ...calc, id: existente.id, status: 'calculado' });
-    } else {
+      resultados.push({ ...calc, id: existente.id, status: 'calculado', ignorado: semMovimento });
+    } else if (!semMovimento) {
       const r = db.prepare(`INSERT INTO repasses (competencia, proprietario_id, aluguel_centavos, taxa_pct, taxa_centavos,
                   despesas_centavos, descontos_centavos, acrescimos_centavos, valor_centavos, detalhe_json, status)
                   VALUES (?,?,?,?,?,?,?,?,?,?,'calculado')`)
@@ -305,10 +320,12 @@ export function alertas() {
     const venc = `${comp}-${String(diaVenc).padStart(2, '0')}`;
     const diasAtraso = diffDias(venc) * -1;
     if (diasAtraso >= getSettingNum('dias_alerta_atraso', 1)) {
-      const pago = db.prepare(`SELECT COUNT(*) AS n FROM lancamentos
+      const pago = db.prepare(`SELECT COALESCE(SUM(valor_centavos),0) AS total FROM lancamentos
         WHERE contrato_id = ? AND competencia = ? AND tipo='receita' AND categoria='Aluguel' AND status='ativo'`)
-        .get(c.id, comp).n;
-      if (!pago) {
+        .get(c.id, comp).total;
+      // Pagamento parcial também é inadimplência: compara valores, não a
+      // quantidade de lançamentos.
+      if (pago < (c.aluguel_centavos || 0)) {
         lista.push({
           tipo: 'atraso', nivel: diasAtraso > 10 ? 'urgente' : 'atencao',
           titulo: `Aluguel em atraso: ${endereco}`,
