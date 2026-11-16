@@ -197,19 +197,28 @@ export function construirRelatorio(tipo, { de, ate, competencia, proprietario_id
   if (tipo === 'inadimplencia') {
     const comp = competencia || ate;
     const venc = ultimoDia(comp);
+    const hoje = hojeISO();
     const linhas = db.prepare(`
       SELECT c.*, i.endereco, i.numero, i.complemento, i.proprietario_id,
              p.nome AS proprietario_nome, q.nome AS inquilino_nome, q.telefone AS inquilino_telefone,
-             (SELECT COUNT(*) FROM lancamentos l WHERE l.contrato_id=c.id AND l.competencia=? AND l.tipo='receita' AND l.categoria='Aluguel' AND l.status='ativo') AS pago
+             (SELECT COALESCE(SUM(l.valor_centavos),0) FROM lancamentos l WHERE l.contrato_id=c.id AND l.competencia=? AND l.tipo='receita' AND l.categoria='Aluguel' AND l.status='ativo') AS pago
       FROM contratos c
       JOIN imoveis i ON i.id = c.imovel_id
       JOIN proprietarios p ON p.id = i.proprietario_id
       JOIN inquilinos q ON q.id = c.inquilino_id
       WHERE c.status='ativo' AND c.inicio <= ? AND (c.fim IS NULL OR c.fim >= ?)${filtrar(propId)}
       ORDER BY p.nome, i.endereco
-    `).all(comp, venc, `${comp}-01`).filter(c => !c.pago);
-    const total = linhas.reduce((s, c) => s + c.aluguel_centavos, 0);
-    const hoje = hojeISO();
+    `).all(comp, venc, `${comp}-01`).map(c => {
+      const vencimento = `${comp}-${String(Math.min(c.dia_vencimento || 5, Number(ultimoDia(comp).slice(-2)))).padStart(2, '0')}`;
+      const dias = Math.max(Math.round((new Date(hoje) - new Date(vencimento)) / 86400000), 0);
+      return {
+        ...c,
+        vencimento,
+        dias,
+        saldo_centavos: Math.max((c.aluguel_centavos || 0) - (c.pago || 0), 0),
+      };
+    }).filter(c => c.dias > 0 && c.saldo_centavos > 0);
+    const total = linhas.reduce((s, c) => s + c.saldo_centavos, 0);
     return {
       ...base,
       titulo: 'Inadimplência',
@@ -223,17 +232,14 @@ export function construirRelatorio(tipo, { de, ate, competencia, proprietario_id
         { key: 'dias', titulo: 'Dias', largura: 6, tipo: 'int', align: 'right' },
         { key: 'aluguel_centavos', titulo: 'Valor', largura: 10, tipo: 'money', align: 'right' },
       ],
-      linhas: linhas.map(c => {
-        const vencimento = `${comp}-${String(Math.min(c.dia_vencimento || 5, Number(ultimoDia(comp).slice(-2)))).padStart(2, '0')}`;
-        const dias = Math.max(Math.round((new Date(hoje) - new Date(vencimento)) / 86400000), 0);
-        return {
-          ...c,
-          imovel: `${c.endereco}${c.numero ? ', ' + c.numero : ''}${c.complemento ? ' - ' + c.complemento : ''}`,
-          telefone: c.inquilino_telefone || '—',
-          vencimento: vencimento.split('-').reverse().join('/'),
-          dias,
-        };
-      }),
+      linhas: linhas.map(c => ({
+        ...c,
+        imovel: `${c.endereco}${c.numero ? ', ' + c.numero : ''}${c.complemento ? ' - ' + c.complemento : ''}`,
+        telefone: c.inquilino_telefone || '—',
+        vencimento: c.vencimento.split('-').reverse().join('/'),
+        aluguel_centavos: c.saldo_centavos,
+        dias: c.dias,
+      })),
       resumo: [
         { rotulo: 'Contratos em atraso', valor: String(linhas.length), bruto: linhas.length },
         { rotulo: 'Valor em aberto', valor: money(total), bruto: total },
@@ -327,11 +333,14 @@ function filtrar(propId) {
 /* ---------------- CSV ---------------- */
 
 function celulaCSV(v, proteger = true) {
-  let s = v == null ? '' : String(v);
+  const s = v == null ? '' : String(v);
   // Mitiga injeção de fórmula em planilhas (CSV injection): uma célula de texto
-  // que comece com =, +, -, @, tab ou CR não pode ser interpretada pelo Excel.
-  if (proteger && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  // que comece com =, +, @, tab ou CR não pode ser interpretada pelo Excel.
+  // Números negativos legítimos (ex.: -1.234,56) continuam numéricos.
+  const numeroNegativo = /^-\d[\d.,]*$/.test(s);
+  const formula = /^[=+@\t\r]/.test(s) || (/^-/.test(s) && !numeroNegativo);
+  const seguro = proteger && formula ? "'" + s : s;
+  return /[";\n]/.test(seguro) ? `"${seguro.replace(/"/g, '""')}"` : seguro;
 }
 
 export function gerarCSV(rel) {
@@ -345,16 +354,18 @@ export function gerarCSV(rel) {
   for (const l of rel.linhas) {
     linhas.push(rel.colunas.map(c => {
       const v = l[c.key];
-      if (c.tipo === 'money') return celulaCSV(money(v), false);
-      if (c.tipo === 'pct') return celulaCSV(v == null ? '—' : num(v, 2), false);
-      if (c.tipo === 'date') return celulaCSV(v || '—', false);
-      return celulaCSV(v == null ? '' : v);
+      if (c.tipo === 'money') return money(v);
+      if (c.tipo === 'pct') return v == null ? '—' : num(v, 2);
+      if (c.tipo === 'date') return v || '—';
+      return v == null ? '' : String(v);
     }));
   }
   linhas.push([]);
   linhas.push(['Resumo']);
   for (const r of rel.resumo) linhas.push([r.rotulo, r.valor]);
-  return '\uFEFF' + linhas.map(l => l.map(celulaCSV).join(';')).join('\r\n');
+  // A proteção e o escape acontecem uma única vez, no final. Antes, texto com
+  // ponto e vírgula era escapado duas vezes ("a;b" virava """a;b""").
+  return '\uFEFF' + linhas.map(l => l.map(c => celulaCSV(c)).join(';')).join('\r\n');
 }
 
 /* ---------------- XLSX ---------------- */
