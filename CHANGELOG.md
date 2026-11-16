@@ -5,6 +5,11 @@ semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
 ## [Não publicado]
 
+### Documentação
+- README revisado, com índice de documentação e badge de CI.
+- Adicionados `CONTRIBUTING.md` e `SECURITY.md`.
+- Guia interno de publicação removido; o conteúdo operacional permanece em `deploy/README.md`.
+
 ### Segurança
 - Senha inicial do administrador gerada aleatoriamente (ou definida por `ADMIN_SENHA`), sem credencial publicada.
 - Produção começa com base vazia; demonstração exige `SEED_DEMO=1`.
