@@ -1,107 +1,100 @@
-# Análise de funcionalidades — o que acrescentar e em que ordem
+# Roadmap
 
-Este documento parte do que o sistema já faz e propõe o que traz mais retorno para uma imobiliária
-de pequeno/médio porte. A ordem combina **impacto operacional**, **risco** e **esforço**.
+Prioridades de evolução do produto. A ordem combina **impacto operacional**,
+**risco** e **esforço**. Itens concluídos saem daqui e entram no
+[CHANGELOG](../CHANGELOG.md).
 
-## Onde o sistema está hoje
+> **Versão atual:** 0.6.0 · **Última revisão:** novembro de 2026
 
-Já resolvido: cadastros, contratos com precedência de taxas, dois caixas, repasses com extrato,
-fechamento mensal, alertas, auditoria, dashboard analítico com gráficos comparativos, importação de
-planilhas, relatórios em Excel/PDF, documentos com versionamento/preview, envio manual de
-WhatsApp/e-mail, **cobranças com geração em lote e régua**, **conciliação OFX/CSV**, **2FA**, e
-**exportação/anonimização LGPD**.
+## Onde estamos
 
-O que ainda gera trabalho manual todos os meses:
+Já está pronto e em uso:
 
-1. lançar os aluguéis recebidos contrato a contrato;
-2. conferir o extrato bancário;
-3. calcular e comunicar reajustes;
-4. cobrar inadimplentes sem uma régua organizada;
-5. anexar e versionar documentos;
-6. avisar proprietários e inquilinos.
+- cadastros, contratos e precedência de taxas;
+- cobranças com geração em lote, baixa, multa/juros, estorno, aging e régua;
+- conciliação bancária OFX/CSV com confirmação humana;
+- dois caixas, repasses com snapshot, fechamento mensal;
+- documentos versionados com pré-visualização e validade;
+- importação de planilhas, relatórios CSV/XLSX/PDF;
+- painel analítico, alertas, comunicação manual por WhatsApp/e-mail;
+- 2FA, auditoria, LGPD, backup com verificação de integridade.
 
-As prioridades abaixo atacam exatamente esses pontos.
+O trabalho manual que ainda sobra:
 
-## Entregue nesta rodada
+1. comunicar reajustes e rescisões com documentos gerados;
+2. controlar contas a pagar e prever caixa;
+3. acompanhar manutenção e orçamentos;
+4. atender proprietários e inquilinos sem acesso ao sistema;
+5. operar com permissões mais finas e possibilidade de filiais.
 
-- Camada de **cobranças** com geração mensal em lote, baixa integral/parcial, multa e juros,
-  estorno, cancelamento, aging e régua de cobrança com próxima ação.
-- **Conciliação OFX/CSV** com sugestão de cobrança/repasse/lançamento e confirmação humana.
-- **2FA TOTP** com QR Code, códigos de recuperação e reset pelo admin.
-- **Documentos** com versões, pré-visualização de PDF/imagem e validade.
-- **LGPD**: exportação do titular em JSON, anonimização preservando o financeiro e CPF mascarado
-  para o perfil consulta.
-- **Backup** em `.zip` com banco + documentos e verificação de integridade.
+## Fase 1 — Consolidação (0.7)
 
-## Prioridades que continuam abertas
+Foco: fechar ciclos do contrato e reduzir trabalho manual recorrente.
 
-| # | Funcionalidade | Por que | Esforço |
+| Item | Por que | Esforço | Status |
 |---|---|---|---|
-| 1 | **Geração mensal de aluguéis em lote** | Hoje cada recebimento é lançado manualmente. Um botão “gerar competência” cria as parcelas previstas de todos os contratos ativos, e a baixa é feita uma a uma. | Baixo |
-| 2 | **Baixa e conciliação de pagamentos** | Marcar “pago” com data, valor e forma; base para inadimplência confiável. | Baixo |
-| 3 | **Régua de cobrança** | Status por contrato (a vencer, vencido, em cobrança, acordo, jurídico), histórico de contatos e próxima ação. Transforma alerta em processo. | Médio |
-| 4 | **Multa e juros no cálculo** | As configurações já existem, mas ainda não entram no valor devido. Fecha o ciclo financeiro. | Baixo |
-| 5 | **Reajuste assistido** | Informar o índice do período, calcular o novo aluguel, gerar o termo e atualizar o contrato com trilha. | Médio |
-| 6 | **Anexos com versionamento e pré-visualização** | O upload já existe por proprietário, imóvel, inquilino e contrato. Falta versionar, visualizar PDF/imagem no navegador e permitir anexar no e-mail. | Médio |
-| 7 | **Backup automático agendado** | Backup manual depende de alguém lembrar. Agendar, enviar para storage externo e avisar falha. | Baixo |
+| **Reajuste assistido em lote** | Calcular pelo índice, gerar termo e atualizar contrato com trilha | Médio | planejado |
+| **Rescisão de contrato** | Multa, saldo, vistoria, devolução de caução e encerramento correto | Alto | planejado |
+| **Contas a pagar/receber** | Vencimentos, recorrência e previsão de caixa de 12 meses | Médio | planejado |
+| **Modelos de documento** | Recibo, extrato, termo de reajuste e aviso de rescisão em PDF | Médio | planejado |
+| **Notificações automáticas** | Vencimento, atraso e reajuste por e-mail; WhatsApp via API oficial | Médio | planejado |
+| **DRE por proprietário/imóvel** | Resultado e rateio de despesas por carteira | Médio | planejado |
 
-## Prioridade 1 — 60 a 90 dias
+## Fase 2 — Transparência (0.8)
 
-| # | Funcionalidade | Por que | Esforço |
+Foco: reduzir atendimento e dar autonomia a proprietários e inquilinos.
+
+| Item | Por que | Esforço | Status |
 |---|---|---|---|
-| 8 | **Contas a pagar e a receber** | Hoje o financeiro é por competência. Vencimentos, parcelas e previsão de caixa mudam a gestão. | Médio |
-| 9 | **Importação de extrato bancário (OFX/CSV)** | Conciliação semiautomática: o sistema sugere o contrato pelo valor e nome. Reduz digitação e erro. | Médio |
-| 10 | **Portal do proprietário** | Extrato, documentos e informe mensal sem pedir por WhatsApp. Reduz atendimento e aumenta transparência. | Alto |
-| 11 | **Portal do inquilino** | Segunda via, informe de rendimentos, abertura de chamados e histórico. | Alto |
-| 12 | **Manutenção com aprovação digital** | Orçamento, aprovação do proprietário acima do limite, fornecedor e ordem de serviço. O limite já está configurado. | Médio |
-| 13 | **Comissões e metas** | Se houver corretores: comissão por contrato, repasse e painel de metas. | Médio |
-| 14 | **Notificações automáticas** | O envio manual de WhatsApp/e-mail já funciona. A automação (vencimento, atraso e reajuste) ainda exige e-mail transacional e API oficial do WhatsApp. | Médio |
-| 15 | **Relatórios comparativos avançados** | Ano a ano, por bairro, tipo de imóvel, proprietário e inadimplência por carteira. | Baixo |
-| 16 | **Previsão de receita e caixa** | Projeção com base nos contratos ativos, reajustes e despesas recorrentes. Ajuda a decidir com antecedência. | Médio |
+| **Portal do proprietário** | Extrato, documentos e informe mensal sem pedir por WhatsApp | Alto | planejado |
+| **Portal do inquilino** | Segunda via, informe de rendimentos e chamados | Alto | planejado |
+| **Central de manutenção** | Orçamento, aprovação acima do limite, fornecedor e ordem de serviço | Médio | planejado |
+| **Histórico do imóvel** | Linha do tempo de contratos, reajustes, manutenções e documentos | Baixo | planejado |
+| **Dashboard por bairro/tipo** | Decisão de carteira e pipeline de renovação | Baixo | planejado |
+| **Acessibilidade e PWA** | Navegação por teclado, contraste, uso offline de leitura | Médio | planejado |
 
-## Prioridade 2 — evolução estrutural
+## Fase 3 — Escala e integrações (0.9+)
 
-| # | Funcionalidade | Por que | Esforço |
+Foco: atender mais operações e integrar o ecossistema.
+
+| Item | Por que | Esforço | Status |
 |---|---|---|---|
-| 17 | **Multiempresa / filiais** | Separar caixas, usuários e relatórios por unidade. Muda o modelo de dados. | Alto |
-| 18 | **Aplicativo/PWA** | Uso em campo, vistoria com fotos e assinatura offline. | Alto |
-| 19 | **Assinatura digital de contratos** | Integração com provedor (Clicksign, D4Sign, DocuSign). Reduz papel e prazo. | Médio/Alto |
-| 20 | **Integração contábil** | Exportação no layout do contador, conciliação de contas e plano de contas. | Médio |
-| 21 | **API pública e webhooks** | Integrar site, portais imobiliários e CRM. | Médio |
-| 22 | **2FA e políticas de acesso** | Segundo fator, expiração de sessão, política de senha e bloqueio por tentativas. | Médio |
-| 23 | **LGPD operacional** | Base legal, consentimento, retenção, exportação e exclusão de dados, registro de tratamento. | Médio |
-| 24 | **Auditoria com diff visual e restauração** | Ver o antes/depois de cada campo e restaurar um registro. Hoje o log já guarda o JSON. | Baixo/Médio |
+| **Multiempresa/filiais** | Separar caixas, usuários e relatórios por unidade | Alto | planejado |
+| **Permissões granulares** | Restringir por módulo, proprietário ou carteira | Médio | planejado |
+| **Comissões e metas** | Comissão por contrato e painel de metas | Médio | planejado |
+| **Assinatura digital** | Clicksign/D4Sign/DocuSign | Médio | planejado |
+| **Integração contábil** | Exportação no layout do contador e plano de contas | Médio | planejado |
+| **API pública e webhooks** | Integrar site, portais imobiliários e CRM | Médio | planejado |
+| **Observabilidade** | Logs estruturados, métricas e alertas de erro | Baixo | planejado |
 
-## Melhorias de produto recomendadas
+## Melhorias contínuas (qualquer fase)
 
-- **Qualidade de dados**: validar CPF/CNPJ, evitar duplicidade por documento e preencher endereço por CEP.
-- **Central de pendências**: uma tela que junta contrato vencendo, aluguel em aberto, garantia
-  acabando e repasse não pago, com responsável e prazo.
-- **Modelos de documentos**: recibo, extrato, termo de reajuste e aviso de rescisão em PDF.
-- **Histórico do imóvel**: contratos anteriores, reajustes, manutenções e documentos em uma linha do tempo.
-- **Acessibilidade**: navegação por teclado, contraste e textos alternativos nos gráficos.
-- **Modo offline de leitura** para consulta de contratos e vencimentos em campo.
+- Validar CPF/CNPJ e evitar duplicidade por documento.
+- Preencher endereço por CEP.
+- Antivírus no upload e criptografia dos arquivos em repouso.
+- Backup offsite automático com teste de restauração.
+- Testes end-to-end de navegador e acessibilidade automatizada.
+- Paginação e busca full-text em listas grandes.
+- Lint/formatador e verificação de tipos (JSDoc ou TypeScript).
+- Logs de auditoria com diff visual e restauração de registro.
 
-## Itens não recomendados no momento
+## Não recomendado agora
 
-- **Boleto/Pix próprio**: exige banco/adquirente, conciliação e responsabilidade financeira. Melhor
-  integrar um provedor especializado quando houver volume.
-- **WhatsApp 100% automático antes da régua de cobrança**: automatizar um processo mal definido só
-  acelera o erro. Primeiro o fluxo, depois a automação paga.
-- **App nativo**: o sistema já é responsivo. Um PWA resolve o uso em campo com muito menos custo.
-- **Microserviços**: com este volume, um processo Node + SQLite é mais simples, barato e fácil de
-  fazer backup. Separar só quando houver necessidade real de escala ou times distintos.
+| Ideia | Motivo |
+|---|---|
+| **Boleto/Pix próprio** | Exige banco/adquirente, conciliação e responsabilidade financeira. Melhor integrar um provedor especializado quando houver volume. |
+| **WhatsApp 100% automático antes da régua** | Automatizar um processo mal definido acelera o erro. Primeiro o fluxo, depois a API paga. |
+| **App nativo** | O sistema já é responsivo; um PWA resolve o uso em campo com menos custo. |
+| **Microserviços** | Com este volume, um processo Node + SQLite é mais simples, barato e fácil de fazer backup. |
+| **Multi-tenant antes de ter clientes** | Complexidade e risco de vazamento entre empresas sem demanda real. |
 
-## Sequência de implantação
+## Como priorizar uma nova ideia
 
-**30 dias** — geração mensal em lote, baixa de pagamentos, multa/juros e backup automático.
-Isso reduz a operação manual e torna a inadimplência confiável.
+1. Ela elimina trabalho manual recorrente?
+2. Ela reduz risco financeiro ou de conformidade?
+3. Ela melhora a confiança do proprietário/inquilino?
+4. Ela cabe em uma entrega testável e documentada?
+5. Ela mantém a operação simples para uma equipe pequena?
 
-**60 dias** — régua de cobrança, reajuste assistido, anexos versionados e contas a receber.
-Isso organiza o ciclo completo do contrato.
-
-**90 dias** — conciliação bancária, portal do proprietário e notificações automáticas.
-Isso diminui atendimento e aumenta a percepção de profissionalismo.
-
-Cada entrega deve vir com teste automatizado e uso em paralelo com a planilha, como já previsto no
-plano de implantação.
+Se a resposta for “não” para a maioria, a ideia entra em “ideias futuras”, não no
+roadmap ativo.

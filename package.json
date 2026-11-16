@@ -1,16 +1,38 @@
 {
   "name": "sistema-imobiliaria",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Sistema de gestão para imobiliária familiar: cadastros, contratos, cobranças, conciliação, repasses, documentos e relatórios.",
+  "keywords": [
+    "imobiliaria",
+    "gestao",
+    "nodejs",
+    "sqlite",
+    "financeiro",
+    "cobrancas",
+    "lgpd",
+    "portfolio"
+  ],
+  "homepage": "https://github.com/DSalladino/sistema-imobiliaria#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DSalladino/sistema-imobiliaria.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DSalladino/sistema-imobiliaria/issues"
+  },
+  "author": "DSalladino",
+  "license": "MIT",
   "engines": {
     "node": ">=22.13"
   },
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "check": "node scripts/verificar-sintaxe.mjs",
     "test": "node --test tests/api.test.mjs tests/rules.test.mjs tests/ui.test.mjs tests/seed.test.mjs",
+    "test:coverage": "node --test --experimental-test-coverage tests/api.test.mjs tests/rules.test.mjs tests/ui.test.mjs tests/seed.test.mjs",
     "demo": "node src/demo.js",
     "demo:preparar": "node src/demo-preparar.js",
     "demo:servir": "node src/demo-server.js",

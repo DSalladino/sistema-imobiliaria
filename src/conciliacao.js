@@ -144,7 +144,7 @@ function candidato(t) {
     for (const c of cobrancas) {
       const enc = calcularEncargos(c, t.data);
       const saldo = Math.max(
-        (c.valor_original_centavos || 0) + (c.multa_centavos || enc.multa) + (c.juros_centavos || enc.juros)
+        (c.valor_original_centavos || 0) + enc.multa + enc.juros
           - (c.desconto_centavos || 0) - (c.valor_pago_centavos || 0),
         0
       );

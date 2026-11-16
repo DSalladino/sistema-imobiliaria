@@ -6,7 +6,7 @@ Correções de segurança são aplicadas na versão estável publicada em `main`
 
 | Versão | Suporte |
 |---|---|
-| 0.5.x | Sim |
+| 0.6.x | Sim |
 | Anteriores | Recomenda-se atualizar |
 
 ## Como reportar uma vulnerabilidade
@@ -47,6 +47,7 @@ Fazem parte do escopo:
 - Escape de saída no frontend e Content Security Policy restritiva.
 - Upload com limite de tamanho, extensões permitidas, nome aleatório e download autenticado.
 - Banco, uploads e backups com permissões restritas no sistema operacional.
+- Backup em ZIP inclui banco, documentos e, quando existir, `.app-key`; o arquivo é tratado como confidencial.
 - Auditoria de login, alterações, estornos, fechamentos, importações, backups e LGPD.
 - Exportações CSV protegidas contra injeção de fórmula.
 
@@ -54,7 +55,8 @@ Fazem parte do escopo:
 
 - Publicar atrás de HTTPS (Caddy ou proxy equivalente).
 - Manter `HOST=127.0.0.1` e usar `TRUST_PROXY=1` somente atrás do proxy.
-- Definir `APP_SECRET` forte e guardá-lo com o backup.
+- Definir `APP_SECRET` forte e guardá-lo no gerenciador de senhas. Se não for
+  definido, o sistema cria `data/.app-key`; perder esse arquivo quebra o 2FA.
 - Configurar `PUBLIC_URL` para os links de recuperação de senha.
 - Executar backup externo diário e testar a restauração periodicamente.
 - Manter `npm audit` limpo e atualizar dependências.

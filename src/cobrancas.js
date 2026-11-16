@@ -32,11 +32,10 @@ export function calcularEncargos(c, ref = hojeISO()) {
   const jurosDiaPct = getSettingNum('juros_atraso_dia_pct', 0.033);
   const multa = Math.round((c.valor_original_centavos || 0) * multaPct / 100);
   const juros = Math.round((c.valor_original_centavos || 0) * jurosDiaPct / 100 * dias);
-  return {
-    multa: c.multa_centavos || multa,
-    juros: c.juros_centavos || juros,
-    dias,
-  };
+  // Para cobranças ainda abertas (inclusive pagas em parte), multa e juros são
+  // recalculados até a data de referência. Usar o valor armazenado congelaria
+  // os juros no dia da primeira baixa parcial.
+  return { multa, juros, dias };
 }
 
 export function statusEfetivo(c) {
@@ -87,8 +86,8 @@ function baseSelect() {
 function enriquecer(c) {
   if (!c) return c;
   const enc = calcularEncargos(c);
-  const multa = c.multa_centavos || enc.multa;
-  const juros = c.juros_centavos || enc.juros;
+  const multa = enc.multa;
+  const juros = enc.juros;
   const saldoFinal = Math.max(
     (c.valor_original_centavos || 0) + multa + juros - (c.desconto_centavos || 0) - (c.valor_pago_centavos || 0),
     0
@@ -177,7 +176,8 @@ function ajustarVencimento(dataISO) {
   const dia = d.getDay();
   if (dia === 6) d.setDate(d.getDate() + 2);
   else if (dia === 0) d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+  // Componentes locais: toISOString() pode recuar um dia em fusos positivos.
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function previewGeracao(competencia) {

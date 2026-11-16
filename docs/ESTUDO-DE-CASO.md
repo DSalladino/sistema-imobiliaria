@@ -80,14 +80,48 @@ limit, CSRF, CSP, upload, path traversal, dependências, auditoria e LGPD. O res
 Tabelas largas não funcionam no celular. Cobranças e conciliação usam cartões; as demais tabelas têm
 rolagem horizontal; os gráficos reduzem rótulos em telas estreitas.
 
+## Antes e depois
+
+| Antes | Depois |
+|---|---|
+| Aluguel anotado quando entrava | Cobrança gerada por contrato e competência, com baixa total/parcial |
+| Repasse calculado em planilha | Cálculo com snapshot, origem da taxa e extrato por contrato |
+| Extrato conferido linha a linha | Conciliação OFX/CSV com sugestão e confirmação humana |
+| Documentos em pastas e WhatsApp | Upload versionado, fora da pasta pública, com validade |
+| Nenhuma trilha de alteração | Auditoria de escrita, estorno, fechamento, backup e LGPD |
+| Acesso único no computador | SPA responsiva, com perfis e 2FA |
+
 ## Resultados
 
 - Fluxo único para cadastro, cobrança, caixa, repasse e relatório.
-- Repasse explicável linha a linha.
-- Inadimplência medida por cobrança, com aging.
-- Histórico de alterações e estornos.
+- Repasse explicável linha a linha, com snapshot e origem da regra.
+- Inadimplência medida por cobrança, com aging e pagamento parcial.
+- Histórico de alterações, estornos e fechamento mensal.
 - Operação possível pelo navegador do celular.
 - Implantação de baixo custo (VPS pequena + backup externo).
+- Base auditável para LGPD: exportação e anonimização do titular.
+
+Não há métricas de produção inventadas neste estudo. Os números de teste,
+versão e cobertura estão no [CHANGELOG](../CHANGELOG.md) e em
+[QUALIDADE.md](QUALIDADE.md).
+
+## Competências demonstradas
+
+Este projeto exercita, de ponta a ponta:
+
+- **Modelagem de domínio:** contratos, competência, repasse, dois caixas,
+  precedência de taxas e snapshot.
+- **Backend sem framework:** HTTP nativo, roteamento, validação, permissões,
+  transações e auditoria.
+- **Segurança aplicada:** scrypt, sessão com hash, CSRF, CSP, rate limit, 2FA,
+  upload privado e LGPD.
+- **Frontend sem build:** SPA, componentes, gráficos SVG, responsividade e
+  acessibilidade básica.
+- **Qualidade:** testes com `node:test`, banco temporário, CI em duas versões de
+  Node, checklist manual e documentação viva.
+- **Operação:** systemd, Caddy/HTTPS, backup, restauração e runbooks.
+- **Comunicação técnica:** README, ADRs, modelo de dados, API, roadmap e
+  estudo de caso.
 
 ## Lições aprendidas
 
@@ -97,8 +131,22 @@ rolagem horizontal; os gráficos reduzem rótulos em telas estreitas.
 - Segurança precisa ser checklist, não inspiração.
 - Documentação e testes são parte do produto, não extras.
 
+## O que eu faria diferente
+
+- Começar com um teste de restauração de backup automatizado, não apenas com a
+  verificação de integridade.
+- Separar desde o início uma camada de repositório para consultas analíticas;
+  hoje `api.js` concentra muita orquestração.
+- Adicionar lint/formatador e verificação de tipos antes do volume de código
+  crescer.
+- Modelar multiempresa apenas quando houvesse um segundo cliente real; a
+  simplicidade single-tenant foi acertada para o estágio atual.
+
 ## Próximos passos
 
-Contas a pagar/receber com previsão de caixa, reajuste em lote, rescisão, DRE, comissões, manutenção,
-permissões granulares, notificações automáticas, portal do proprietário e OCR de documentos. O roadmap
-está em `docs/roadmap.md`; o estado atual, em `docs/ESTADO-ATUAL.md`.
+Contas a pagar/receber com previsão de caixa, reajuste em lote, rescisão, DRE,
+comissões, manutenção, permissões granulares, notificações automáticas, portal
+do proprietário e OCR de documentos. O roadmap está em
+[docs/roadmap.md](roadmap.md); o estado atual, em
+[docs/ESTADO-ATUAL.md](ESTADO-ATUAL.md); as decisões, em
+[docs/DECISOES.md](DECISOES.md).
