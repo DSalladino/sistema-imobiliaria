@@ -17,6 +17,8 @@ fica cada módulo e quais pendências permanecem.
 - Testes: `npm test` (API, regras, interface jsdom e seed).
 - Sintaxe: `npm run check`.
 - Dados de exemplo: `npm run demo` (12 meses, cobranças e repasses).
+- Demonstração com credenciais conhecidas: `npm run demo:preparar` e
+  `npm run demo:servir` (ver [DEMONSTRACAO.md](DEMONSTRACAO.md)).
 
 ## Onde está cada coisa
 

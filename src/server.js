@@ -192,7 +192,10 @@ server.listen(PORT, HOST, () => {
   db.prepare("DELETE FROM password_resets WHERE expira_em < ? OR (usado_em IS NOT NULL AND usado_em < datetime('now','-30 days'))")
     .run(new Date().toISOString());
   const porta = server.address()?.port || PORT;
+  const trocaPendente = db.prepare('SELECT COUNT(*) AS n FROM usuarios WHERE deve_trocar_senha = 1').get().n;
   console.log(`\n  Sistema de Gestão da Imobiliária`);
   console.log(`  Rodando em http://${HOST}:${porta}`);
-  console.log(`  Acesso inicial: admin@imobiliaria.local (troca de senha obrigatória)\n`);
+  console.log(trocaPendente
+    ? '  Acesso inicial: admin@imobiliaria.local (troca de senha obrigatória)\n'
+    : '  Acesso: admin@imobiliaria.local\n');
 });

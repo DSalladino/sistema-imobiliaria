@@ -21,6 +21,7 @@
 </p>
 
 <p align="center">
+  <a href="#demonstração">Demonstração</a> ·
   <a href="#começando">Começar</a> ·
   <a href="#uma-volta-pelo-produto">Produto</a> ·
   <a href="#arquitetura">Arquitetura</a> ·
@@ -65,6 +66,27 @@ build, testes automatizados e documentação de ponta a ponta.
   gráficos SVG sem biblioteca externa.
 - **Segurança de verdade.** Sessão server-side, CSRF, CSP, rate limit, 2FA TOTP,
   upload privado, LGPD e backup com verificação de integridade.
+
+## Demonstração
+
+A forma mais rápida de avaliar o projeto é a instância de demonstração: base
+**isolada**, **dados fictícios**, sem informação comercial nem credencial real.
+
+```bash
+npm ci
+npm run demo:preparar   # cria data-demo/ com 12 meses de histórico
+npm run demo:servir     # http://127.0.0.1:3009
+```
+
+| Campo | Valor |
+|---|---|
+| E-mail | `admin@imobiliaria.local` |
+| Senha | `Demo#2026` |
+
+A senha é fixa **apenas na base descartável**; em produção não existe senha
+padrão publicada. O roteiro de avaliação, o conteúdo da base de exemplo e as
+instruções para gerar **capturas de tela** e o **vídeo de 90 s** estão em
+[docs/DEMONSTRACAO.md](docs/DEMONSTRACAO.md).
 
 ## Uma volta pelo produto
 
@@ -151,7 +173,10 @@ demonstração.
 | `npm run check` | Verifica a sintaxe de todos os `.js`/`.mjs` |
 | `npm run test:coverage` | Testes com cobertura experimental do Node |
 | `npm run demo` | Recarrega os dados de exemplo |
+| `npm run demo:preparar` | Cria a base de demonstração com credenciais conhecidas |
 | `npm run demo:servir` | Sobe uma instância de demonstração isolada |
+| `npm run midia:capturar` | Gera as capturas de tela (requer Playwright) |
+| `npm run midia:video` | Grava o tour de 90 s (requer Playwright) |
 | `npm run admin:reset` | Redefine a senha do admin pelo terminal |
 
 ## Arquitetura
@@ -215,6 +240,7 @@ A documentação foi organizada como um produto, não como um anexo.
 | Documento | Conteúdo |
 |---|---|
 | [docs/README.md](docs/README.md) | Índice e trilhas de leitura por perfil |
+| [docs/DEMONSTRACAO.md](docs/DEMONSTRACAO.md) | Como rodar a demo, credenciais, capturas e roteiro do vídeo |
 | [docs/PRODUTO.md](docs/PRODUTO.md) | Contexto, personas, escopo, jornadas, regras e glossário |
 | [docs/FUNCIONALIDADES.md](docs/FUNCIONALIDADES.md) | Cada funcionalidade: problema, regras e onde encontrar |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | Diagramas, camadas, fluxos, segurança e limites |
