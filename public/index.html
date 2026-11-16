@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2c3634">
+  <title>Gestão Imobiliária</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232c3634'/%3E%3Cpath d='M22 54 50 28l28 26v24H57V60H43v18H22Z' fill='%23bfdccb'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<div id="boot" class="boot">
+  <div class="boot-mark">imóvel<span>gestão</span></div>
+  <div class="spinner" aria-label="Carregando"></div>
+</div>
+
+<!-- ============ LOGIN / RECUPERAÇÃO ============ -->
+<section id="auth" class="auth" hidden>
+  <div class="auth-brand">
+    <div class="auth-brand-top">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 100 100"><path d="M22 54 50 28l28 26v24H57V60H43v18H22Z" fill="currentColor"/></svg>
+      </div>
+      <span class="brand-name">imóvel<span>gestão</span></span>
+    </div>
+    <div class="auth-brand-copy">
+      <p class="eyebrow">Gestão de imobiliária</p>
+      <h1>Tudo o que a carteira precisa, em um só lugar.</h1>
+      <p>Proprietários, contratos, cobranças, repasses e documentos — com histórico, auditoria e relatórios prontos.</p>
+    </div>
+    <ul class="auth-list">
+      <li><span class="dot sage"></span> Cobranças com régua e inadimplência por idade</li>
+      <li><span class="dot sky"></span> Repasses com snapshot da taxa aplicada</li>
+      <li><span class="dot butter"></span> Dois caixas: imobiliária e proprietários</li>
+    </ul>
+    <p class="auth-foot">Node.js + SQLite · dados sob seu controle</p>
+  </div>
+
+  <div class="auth-panel">
+    <div class="auth-card">
+      <!-- Login -->
+      <div id="pane-login">
+        <h2>Entrar</h2>
+        <p class="muted">Use seu e-mail e senha para acessar o sistema.</p>
+        <form id="form-login" class="stack" novalidate>
+          <label class="field">
+            <span>E-mail</span>
+            <input name="email" type="email" autocomplete="username" required placeholder="voce@imobiliaria.com">
+          </label>
+          <label class="field">
+            <span>Senha</span>
+            <input name="senha" type="password" autocomplete="current-password" required placeholder="••••••••">
+          </label>
+          <div id="login-error" class="form-error" role="alert" hidden></div>
+          <button class="btn primary block" type="submit">Entrar</button>
+        </form>
+        <div class="auth-links">
+          <button class="link" type="button" data-auth="forgot">Esqueci minha senha</button>
+          <button class="link" type="button" data-auth="register">Solicitar acesso</button>
+        </div>
+        <p id="primeiro-acesso" class="hint" hidden></p>
+      </div>
+
+      <!-- 2FA -->
+      <div id="pane-2fa" hidden>
+        <h2>Verificação em duas etapas</h2>
+        <p class="muted">Informe o código de 6 dígitos do seu aplicativo autenticador ou um código de recuperação.</p>
+        <form id="form-2fa" class="stack">
+          <label class="field">
+            <span>Código</span>
+            <input name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required placeholder="000000">
+          </label>
+          <div id="tfa-error" class="form-error" role="alert" hidden></div>
+          <button class="btn primary block" type="submit">Confirmar</button>
+        </form>
+        <div class="auth-links"><button class="link" type="button" data-auth="login">Voltar ao login</button></div>
+      </div>
+
+      <!-- Esqueci a senha -->
+      <div id="pane-forgot" hidden>
+        <h2>Recuperar senha</h2>
+        <p class="muted">Enviaremos um link de uso único para o e-mail de recuperação configurado.</p>
+        <form id="form-forgot" class="stack">
+          <label class="field">
+            <span>E-mail da conta</span>
+            <input name="email" type="email" required autocomplete="username">
+          </label>
+          <div id="forgot-msg" class="form-note" hidden></div>
+          <button class="btn primary block" type="submit">Enviar instruções</button>
+        </form>
+        <div class="auth-links"><button class="link" type="button" data-auth="login">Voltar ao login</button></div>
+      </div>
+
+      <!-- Redefinir senha -->
+      <div id="pane-reset" hidden>
+        <h2>Definir nova senha</h2>
+        <p class="muted" id="reset-ident"></p>
+        <form id="form-reset" class="stack">
+          <label class="field">
+            <span>Nova senha</span>
+            <input name="senha" type="password" minlength="8" required autocomplete="new-password">
+          </label>
+          <label class="field">
+            <span>Repetir nova senha</span>
+            <input name="senha2" type="password" minlength="8" required autocomplete="new-password">
+          </label>
+          <div id="reset-msg" class="form-error" role="alert" hidden></div>
+          <button class="btn primary block" type="submit">Salvar nova senha</button>
+        </form>
+      </div>
+
+      <!-- Solicitar acesso -->
+      <div id="pane-register" hidden>
+        <h2>Solicitar acesso</h2>
+        <p class="muted">O administrador precisa aprovar o cadastro antes do primeiro acesso.</p>
+        <form id="form-register" class="stack">
+          <label class="field"><span>Nome</span><input name="nome" required></label>
+          <label class="field"><span>E-mail</span><input name="email" type="email" required></label>
+          <label class="field"><span>Senha</span><input name="senha" type="password" minlength="8" required autocomplete="new-password"></label>
+          <div id="register-msg" class="form-note" hidden></div>
+          <button class="btn primary block" type="submit">Enviar solicitação</button>
+        </form>
+        <div class="auth-links"><button class="link" type="button" data-auth="login">Voltar ao login</button></div>
+      </div>
+    </div>
+    <p class="auth-copyright">Gestão Imobiliária · {{ano}}</p>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<div id="app" class="app" hidden>
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-head">
+      <div class="brand-mark small" aria-hidden="true">
+        <svg viewBox="0 0 100 100"><path d="M22 54 50 28l28 26v24H57V60H43v18H22Z" fill="currentColor"/></svg>
+      </div>
+      <div class="brand-text">
+        <strong id="brand-name">Imobiliária</strong>
+        <span>gestão integrada</span>
+      </div>
+      <button class="icon-btn sidebar-close" type="button" data-action="close-menu" aria-label="Fechar menu">✕</button>
+    </div>
+    <nav id="nav" class="nav" aria-label="Navegação principal"></nav>
+    <div class="sidebar-foot">
+      <button class="user-chip" type="button" data-action="profile" id="user-chip"></button>
+      <button class="icon-btn" type="button" data-action="logout" title="Sair" aria-label="Sair">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
+  </aside>
+  <div id="scrim" class="scrim" data-action="close-menu"></div>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" type="button" data-action="open-menu" aria-label="Abrir menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="topbar-title">
+        <p class="eyebrow" id="page-kicker">Visão geral</p>
+        <h1 id="page-title">Painel</h1>
+      </div>
+      <div class="topbar-actions" id="topbar-actions"></div>
+    </header>
+    <main id="view" class="view" tabindex="-1"></main>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root" class="toasts" aria-live="polite"></div>
+
+<script type="module" src="/charts.js"></script>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+node_modules/
+data/
+data-demo/
+data-*/
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.pid
+*.pem
+*.key
+.DS_Store
+coverage/
+.tmp*/

@@ -1,0 +1,15 @@
+# Troque SEU-DOMINIO pelo endereço gratuito (DuckDNS ou sslip.io).
+# O Caddy emite e renova o certificado HTTPS automaticamente.
+SEU-DOMINIO {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+	}
+	log {
+		output file /var/log/caddy/imobiliaria.log
+		format console
+	}
+}

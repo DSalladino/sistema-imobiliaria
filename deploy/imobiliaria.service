@@ -1,0 +1,22 @@
+[Unit]
+Description=Sistema de Gestão da Imobiliária
+After=network.target
+
+[Service]
+Type=simple
+User=imobiliaria
+Group=imobiliaria
+WorkingDirectory=/opt/imobiliaria
+EnvironmentFile=/etc/imobiliaria.env
+ExecStart=/usr/bin/node src/server.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/imobiliaria/data
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
