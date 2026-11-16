@@ -72,7 +72,8 @@ o passado.
 - Contrato tem vigência, aluguel, vencimento, índice e data de reajuste, garantia e link do PDF.
 
 **Regras:** exceção de contrato exige justificativa. Competência já calculada não muda quando a taxa é
-editada depois. Contrato encerrado não entra em novas cobranças.
+editada depois. Contrato encerrado não entra em novas cobranças. Um imóvel não pode ter dois contratos
+ativos ao mesmo tempo, e o código do contrato é único na base.
 
 **Onde:** menu **Contratos**; cálculo em `src/regras.js`.
 
@@ -92,7 +93,9 @@ editada depois. Contrato encerrado não entra em novas cobranças.
 
 **Regras:** mês fechado não gera cobrança; cobrança paga não é apagada; correção por estorno.
 Vencimento em fim de semana pode ser prorrogado (configurável). Contrato que começa no meio do mês pode
-ser proporcional (configurável).
+ser proporcional (configurável). Pagamento parcial continua contando como inadimplência enquanto houver
+saldo — nos alertas e no relatório de inadimplência, o sistema compara **valores**, não a quantidade
+de lançamentos. Multa e juros continuam sendo recalculados sobre o saldo em aberto até a quitação.
 
 **Onde:** menu **Cobranças**; backend em `src/cobrancas.js`.
 
@@ -148,7 +151,9 @@ com a origem da taxa por contrato. O pagamento cria o lançamento do repasse e d
 **versões** (v1, v2…), validade, pré-visualização de PDF/imagem, download e exclusão.
 
 **Regras:** arquivos ficam em `data/uploads` (fora da pasta pública), download exige login e é auditado.
-Limite de 10 MB; extensões permitidas. Nova versão preserva a anterior.
+Limite de 10 MB; extensões permitidas. Nova versão preserva a anterior. Ao remover a versão atual, a
+versão anterior volta a ser a ativa — o histórico não é apagado; a interface avisa isso antes de
+confirmar. Para remover todas as versões, remova uma a uma.
 
 **Onde:** menu **Documentos** e botão **Docs** em cada cadastro.
 
@@ -190,7 +195,8 @@ contratos. Datas em `dd/mm/aaaa` e valores em reais são convertidos.
 **Problema:** prestar contas ao proprietário e ao contador.
 
 **Como funciona:** sete relatórios (resumo financeiro, lançamentos, repasses, contratos, inadimplência,
-proprietários e imóveis) em **CSV, Excel e PDF**. O PDF tem cabeçalho, KPIs, tabela e paginação.
+proprietários e imóveis) em **CSV, Excel e PDF**. O PDF tem cabeçalho, KPIs, tabela e paginação. Há
+também exportações CSV rápidas de lançamentos, cobranças, repasses e contratos.
 
 **Regras:** filtros por período/proprietário; perfil consulta não exporta. CSV protegido contra injeção
 de fórmula.
@@ -230,11 +236,13 @@ empresa.
 
 ## 15. Backup e continuidade
 
-**Como funciona:** download em `.zip` com banco + documentos; verificação de integridade que abre o
-banco gerado e confere as tabelas. Em produção, um script diário envia o backup para fora do servidor.
+**Como funciona:** download em `.zip` com banco + documentos + `.app-key` (quando existir); verificação
+de integridade que abre o banco gerado e confere as tabelas. Em produção, um script diário envia o
+backup para fora do servidor.
 
 **Regras:** backup só para admin; restaurar em cópia/staging; testar mensalmente. Guardar `APP_SECRET`
-separadamente (criptografa segredos de 2FA).
+separadamente. O ZIP contém dados pessoais e possivelmente a chave que decifra o 2FA; trate-o como
+segredo e guarde-o criptografado.
 
 **Onde:** menu **Relatórios → Backup**.
 
@@ -264,7 +272,8 @@ separadamente (criptografa segredos de 2FA).
   desativa o 2FA e força a troca.
 
 **Regras:** o link é de uso único, o token é gravado como hash e o pedido tem rate limit. O envio de
-e-mail depende do SMTP configurado; sem SMTP, a solicitação aparece em **Manutenção**.
+e-mail depende do SMTP configurado; sem SMTP, a solicitação aparece em **Usuários → Solicitações de
+acesso e recuperação** para o admin atender.
 
 ## 18. Manutenção e base de demonstração
 

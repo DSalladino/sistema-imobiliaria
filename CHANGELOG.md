@@ -5,9 +5,49 @@ semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
 ## [Não publicado]
 
+### Planejado
+- Reajuste assistido em lote, rescisão de contrato e contas a pagar/receber.
+- Portal do proprietário/inquilino e central de manutenção.
+
+## [0.6.0] — 2026-11
+
+### Adicionado
+- Exportação CSV de **cobranças** da competência (`/api/export/cobrancas`).
+- Endpoint público `/api/health` com versão, uptime e verificação do banco.
+- Script `npm run check` para verificação de sintaxe de `src`, `public`, `tests` e `scripts`.
+- Script `npm run test:coverage` com cobertura experimental do Node.
+- Templates de issue, pull request, código de conduta, licença MIT e metadados do pacote.
+- CI em matriz Node 22 e 24, com `npm run check` antes dos testes.
+- Documentação reorganizada: produto, modelo de dados, API, qualidade, operação e ADRs.
+- Banner e índice de documentação com trilhas de leitura por perfil.
+
+### Corrigido
+- Repasse agora inclui contrato encerrado que teve aluguel recebido na competência.
+- Pagamento de repasse não é mais descontado como despesa em uma nova apuração.
+- Repasse pendente é zerado quando não há mais movimentos na competência.
+- Alertas e relatório de inadimplência consideram pagamento parcial pelo valor, não pela quantidade de lançamentos.
+- Multa e juros continuam sendo recalculados em cobranças pagas parcialmente.
+- Relatório de inadimplência lista apenas vencimentos já atrasados e mostra o saldo em aberto.
+- CSV não escapa ponto e vírgula duas vezes e preserva números negativos.
+- Importação reutiliza inquilino criado nas linhas anteriores da mesma planilha.
+- Sistema não permite remover/rebaixar o último administrador ativo.
+- Backup inclui `.app-key` quando existir, evitando perder o acesso ao 2FA na restauração.
+- Datas de vencimento e seed usam componentes locais, sem recuar um dia em fusos positivos.
+- Lançamentos manuais validam categoria/caixa e coerência entre contrato, imóvel e proprietário.
+- Contrato com código duplicado ou segundo contrato ativo para o mesmo imóvel é rejeitado.
+- Limite da auditoria é validado (1 a 1.000 registros).
+
+### Alterado
+- README reescrito para portfólio: banner, badges, tour do produto, arquitetura, stack e trilhas de documentação.
+- `deploy/backup.sh` passa a gerar `dados-*.tar.gz` com uploads e `.app-key`.
+- Guia de operação ganhou runbooks de incidente, atualização e teste de restauração.
+- Checklist de segurança atualizado com o estado real do 2FA, backup e pendências.
+- Versão do pacote elevada para 0.6.0.
+
 ### Documentação
-- README revisado, com índice de documentação e badge de CI.
-- Adicionados `CONTRIBUTING.md` e `SECURITY.md`.
+- README revisado, com banner, badges, tour do produto e índice de documentação.
+- Adicionados `docs/README.md`, `docs/PRODUTO.md`, `docs/MODELO-DE-DADOS.md`, `docs/API.md`, `docs/QUALIDADE.md`, `docs/OPERACAO.md`, `docs/DECISOES.md` e `docs/AUDITORIA.md`.
+- Adicionados `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `LICENSE` e templates do GitHub.
 - Guia interno de publicação removido; o conteúdo operacional permanece em `deploy/README.md`.
 
 ### Segurança
@@ -20,18 +60,6 @@ semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 - Neutralização de fórmulas em exportações CSV.
 - Anonimização LGPD remove documentos pessoais e detalhes de auditoria do titular.
 - Dependências atualizadas (`xlsx` 0.20.3, `nodemailer` 10.x, `archiver` 8.x); `npm audit` sem vulnerabilidades.
-
-### Planejado
-- Contas a pagar/receber com recorrência e previsão de caixa de 12 meses.
-- Reajuste em lote pelo índice, com termo gerado.
-- Rescisão de contrato, vistoria e devolução de caução.
-- DRE por proprietário/imóvel, rateio e comissões.
-- Central de manutenção com orçamento e aprovação.
-- Histórico do imóvel em linha do tempo.
-- Dashboard por bairro/tipo, metas e pipeline de renovação.
-- Permissões granulares por módulo/proprietário.
-- Criptografia dos documentos em repouso e antivírus no upload.
-- Notificações automáticas e portal do proprietário/inquilino.
 
 ## [0.5.0] — 2026-11
 
