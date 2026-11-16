@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Política de segurança
+    url: https://github.com/DSalladino/sistema-imobiliaria/blob/main/SECURITY.md
+    about: Não abra issue pública para vulnerabilidades. Siga o canal privado descrito na política.

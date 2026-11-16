@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Backup diário: banco + documentos, com envio externo via rclone.
+# Backup diário: banco + documentos (+ chave local de 2FA, se existir),
+# com envio externo via rclone.
 # Instale em /usr/local/bin/imobiliaria-backup.sh e agende no cron.
 set -euo pipefail
 umask 077
@@ -18,7 +19,7 @@ mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
 DB="$BACKUP_DIR/imobiliaria-$STAMP.db"
-UPLOADS="$BACKUP_DIR/uploads-$STAMP.tar.gz"
+ARQUIVOS="$BACKUP_DIR/dados-$STAMP.tar.gz"
 
 echo "[$(date -Is)] iniciando backup $STAMP"
 
@@ -26,14 +27,21 @@ echo "[$(date -Is)] iniciando backup $STAMP"
 sqlite3 "$DATA_DIR/imobiliaria.db" ".backup '$DB'"
 sqlite3 "$DB" "PRAGMA integrity_check;" | grep -qx "ok"
 
-if [ -d "$DATA_DIR/uploads" ]; then
-  tar -C "$DATA_DIR" -czf "$UPLOADS" uploads
+# Inclui uploads e, quando não há APP_SECRET, a chave local que decifra o 2FA.
+ITENS=()
+[ -d "$DATA_DIR/uploads" ] && ITENS+=("uploads")
+[ -f "$DATA_DIR/.app-key" ] && ITENS+=(".app-key")
+if [ "${#ITENS[@]}" -gt 0 ]; then
+  tar -C "$DATA_DIR" -czf "$ARQUIVOS" "${ITENS[@]}"
+else
+  echo "[$(date -Is)] AVISO: sem uploads nem .app-key para arquivar" >&2
+  : > "$ARQUIVOS"
 fi
 
 if [ -n "$RCLONE_REMOTE" ]; then
   if rclone copy "$BACKUP_DIR" "$RCLONE_REMOTE" \
       --include "imobiliaria-$STAMP.db" \
-      --include "uploads-$STAMP.tar.gz"; then
+      --include "dados-$STAMP.tar.gz"; then
     echo "[$(date -Is)] enviado para $RCLONE_REMOTE"
   else
     echo "[$(date -Is)] ERRO: falha no envio para $RCLONE_REMOTE" >&2
