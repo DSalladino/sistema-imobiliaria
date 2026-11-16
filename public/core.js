@@ -40,7 +40,8 @@ export function dataBR(iso) {
 }
 export function dataHoraBR(iso) {
   if (!iso) return '—';
-  return String(iso).replace('T', ' ').slice(0, 16).split('-').reverse().join('/').replace('/', '/').replace('/', '/');
+  const [data, hora] = String(iso).replace('T', ' ').slice(0, 16).split(' ');
+  return `${dataBR(data)}${hora ? ` ${hora}` : ''}`;
 }
 export function compBR(comp) {
   if (!comp) return '—';

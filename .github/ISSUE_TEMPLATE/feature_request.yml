@@ -1,0 +1,46 @@
+name: Sugerir uma melhoria
+description: Proponha uma funcionalidade ou uma evolução de algo existente.
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qual problema isso resolve?
+      description: Descreva a dor operacional antes da solução.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Solução proposta
+      description: Como você imagina o fluxo? Inclua telas, regras e casos de borda.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+      description: O que já existe hoje e por que não resolve?
+
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Impacto esperado
+      options:
+        - Alto — reduz trabalho manual ou risco financeiro
+        - Médio — melhora a operação
+        - Baixo — conforto ou estética
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: escopo
+    attributes:
+      label: Escopo
+      options:
+        - label: Afeta regra de negócio ou cálculo financeiro
+        - label: Exige mudança no banco de dados
+        - label: Exige integração externa (banco, e-mail, WhatsApp etc.)

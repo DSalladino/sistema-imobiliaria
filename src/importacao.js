@@ -328,6 +328,11 @@ function processarLinha(entidade, linha, mapa, refs, opcoes) {
     dados.indice_reajuste = ['IGP-M', 'IPCA', 'INCC', 'IGP-DI', 'Fixo'].find(i => norm(i) === norm(dados.indice_reajuste)) || (dados.indice_reajuste ? String(dados.indice_reajuste).toUpperCase() : 'IGP-M');
     const st = norm(dados.status);
     dados.status = st.startsWith('encerr') ? 'encerrado' : st.startsWith('susp') ? 'suspenso' : 'ativo';
+    if (dados.imovel_id && dados.status === 'ativo') {
+      const outro = db.prepare("SELECT id, codigo FROM contratos WHERE imovel_id = ? AND status = 'ativo' AND id <> ?")
+        .get(dados.imovel_id, dados._existente?.id ?? -1);
+      if (outro) erros.push(`O imóvel já tem contrato ativo (${outro.codigo || '#' + outro.id}).`);
+    }
     if (dados.taxa_admin_pct != null && (dados.taxa_admin_pct < 0 || dados.taxa_admin_pct > 100)) erros.push('Taxa deve ficar entre 0 e 100.');
   }
 
@@ -387,7 +392,21 @@ function atualizarInquilino(id, d) {
   if (sets.length) db.prepare(`UPDATE inquilinos SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
 }
 
-function inserirContrato(d) {
+function registrarInquilinoNovo(refs, d, id) {
+  if (!refs) return;
+  const novo = {
+    id,
+    nome: d.inquilino,
+    cpf_cnpj: d.inquilino_cpf || null,
+    telefone: d.inquilino_telefone || null,
+    email: d.inquilino_email || null,
+  };
+  refs.inqPorNome.set(norm(novo.nome), novo);
+  const doc = soDigitos(novo.cpf_cnpj);
+  if (doc) refs.inqPorDoc.set(doc, novo);
+}
+
+function inserirContrato(d, refs) {
   let inquilinoId = d.inquilino_id;
   if (!inquilinoId && d._novoInquilino) {
     inquilinoId = inserirInquilino({
@@ -396,6 +415,10 @@ function inserirContrato(d) {
       telefone: d.inquilino_telefone,
       email: d.inquilino_email,
     });
+    // Sem atualizar as referências, a segunda linha da mesma planilha criaria
+    // um inquilino duplicado com o mesmo nome/documento.
+    d.inquilino_id = inquilinoId;
+    registrarInquilinoNovo(refs, d, inquilinoId);
   }
   const r = db.prepare(`INSERT INTO contratos (codigo, imovel_id, inquilino_id, inicio, fim, aluguel_centavos, dia_vencimento,
       indice_reajuste, ultimo_reajuste, garantia_tipo, garantia_valor_centavos, garantia_fim, taxa_admin_pct, status, observacoes)
@@ -408,12 +431,14 @@ function inserirContrato(d) {
   return id;
 }
 
-function atualizarContrato(id, d) {
+function atualizarContrato(id, d, refs) {
   let inquilinoId = d.inquilino_id;
   if (!inquilinoId && d._novoInquilino) {
     inquilinoId = inserirInquilino({
       nome: d.inquilino, cpf_cnpj: d.inquilino_cpf, telefone: d.inquilino_telefone, email: d.inquilino_email,
     });
+    d.inquilino_id = inquilinoId;
+    registrarInquilinoNovo(refs, d, inquilinoId);
   }
   const sets = [];
   const vals = [];
@@ -517,8 +542,8 @@ export function importar({ entidade, arquivo_base64, opcoes = {}, usuario }) {
           if (d._existente) { atualizarInquilino(d._existente.id, d); atualizados++; }
           else { inserirInquilino(d); inseridos++; }
         } else if (entidade === 'contratos') {
-          if (d._existente) { atualizarContrato(d._existente.id, d); atualizados++; }
-          else { inserirContrato(d); inseridos++; }
+          if (d._existente) { atualizarContrato(d._existente.id, d, refs); atualizados++; }
+          else { inserirContrato(d, refs); inseridos++; }
         }
       } catch (e) {
         erros.push({ linha: i + 2, erros: [e.message] });

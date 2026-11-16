@@ -1,0 +1,79 @@
+<svg width="1280" height="360" viewBox="0 0 1280 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titulo subtitulo">
+  <title id="titulo">Sistema de Gestão Imobiliária</title>
+  <desc id="subtitulo">Do contrato ao repasse: uma operação imobiliária inteira em um só lugar.</desc>
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="1280" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#20312C"/>
+      <stop offset="0.55" stop-color="#2E4A40"/>
+      <stop offset="1" stop-color="#5C8571"/>
+    </linearGradient>
+    <radialGradient id="brilho" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1030 70) rotate(125) scale(420 300)">
+      <stop stop-color="#D9EADF" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#D9EADF" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grade" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0H0V44" stroke="#FFFFFF" stroke-opacity="0.05"/>
+    </pattern>
+    <filter id="sombra" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#0D1714" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="360" rx="0" fill="url(#fundo)"/>
+  <rect width="1280" height="360" fill="url(#brilho)"/>
+  <rect width="1280" height="360" fill="url(#grade)"/>
+
+  <g opacity="0.22" stroke="#DCEAE2" stroke-width="1">
+    <circle cx="1100" cy="70" r="150"/>
+    <circle cx="1100" cy="70" r="210"/>
+    <circle cx="1100" cy="70" r="270"/>
+  </g>
+
+  <g transform="translate(74 58)">
+    <rect width="52" height="52" rx="15" fill="#DCEAE2" fill-opacity="0.14" stroke="#DCEAE2" stroke-opacity="0.32"/>
+    <path d="M13 29 26 17l13 12v12H30V31h-8v10H13Z" fill="#DCEAE2"/>
+  </g>
+
+  <text x="146" y="94" fill="#F7F3EC" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="-0.7">imóvel<tspan fill="#A9C9B6">gestão</tspan></text>
+  <text x="147" y="119" fill="#C7D8CF" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="13" letter-spacing="2.4">GESTÃO IMOBILIÁRIA DE PONTA A PONTA</text>
+
+  <text x="74" y="204" fill="#FFFFFF" font-family="Fraunces, Georgia, serif" font-size="48" font-weight="600" letter-spacing="-1.2">Do contrato ao repasse,</text>
+  <text x="74" y="256" fill="#FFFFFF" font-family="Fraunces, Georgia, serif" font-size="48" font-weight="600" letter-spacing="-1.2">uma operação inteira.</text>
+  <text x="76" y="294" fill="#CFE0D6" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="17">Cadastros, cobranças, conciliação bancária, repasses, documentos e relatórios —</text>
+  <text x="76" y="318" fill="#CFE0D6" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="17">com auditoria, controle de acesso e backup verificado.</text>
+
+  <g transform="translate(836 58)" filter="url(#sombra)">
+    <rect width="368" height="244" rx="22" fill="#FBF8F3"/>
+    <rect x="22" y="22" width="324" height="18" rx="9" fill="#E9E3D9"/>
+    <rect x="22" y="22" width="116" height="18" rx="9" fill="#5C8571"/>
+    <g transform="translate(22 62)">
+      <rect width="92" height="64" rx="12" fill="#E7F0EA"/>
+      <rect x="12" y="14" width="46" height="7" rx="3.5" fill="#A9C9B6"/>
+      <rect x="12" y="30" width="60" height="13" rx="5" fill="#2E4A40"/>
+      <rect x="12" y="49" width="34" height="5" rx="2.5" fill="#A9C9B6"/>
+      <rect x="104" width="92" height="64" rx="12" fill="#F7EFE2"/>
+      <rect x="116" y="14" width="46" height="7" rx="3.5" fill="#E2C99D"/>
+      <rect x="116" y="30" width="52" height="13" rx="5" fill="#5E4A2E"/>
+      <rect x="116" y="49" width="34" height="5" rx="2.5" fill="#E2C99D"/>
+      <rect x="208" width="96" height="64" rx="12" fill="#F3E9E9"/>
+      <rect x="220" y="14" width="46" height="7" rx="3.5" fill="#D9B2B2"/>
+      <rect x="220" y="30" width="62" height="13" rx="5" fill="#6B3F43"/>
+      <rect x="220" y="49" width="34" height="5" rx="2.5" fill="#D9B2B2"/>
+    </g>
+    <g transform="translate(22 146)">
+      <rect width="324" height="74" rx="12" fill="#F4EFE7"/>
+      <path d="M18 54 52 38l30 10 34-22 32 8 38-18 32 10 34-14 32 6 34-20" stroke="#5C8571" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="326" cy="28" r="5" fill="#5C8571"/>
+    </g>
+    <rect x="22" y="230" width="88" height="0" fill="none"/>
+  </g>
+
+  <g transform="translate(76 340)" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="12" fill="#B8CEC2" letter-spacing="0.6">
+    <text>NODE.JS</text>
+    <text x="92">SQLITE</text>
+    <text x="164">SPA SEM BUILD</text>
+    <text x="300">AUDITORIA</text>
+    <text x="385">LGPD</text>
+    <text x="437">BACKUP VERIFICADO</text>
+  </g>
+</svg>

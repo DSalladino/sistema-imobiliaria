@@ -99,6 +99,9 @@ export function salvarDocumento({ entidade, entidade_id, nome, mime, base64, cat
   if (substituir_id) {
     const antigo = db.prepare('SELECT * FROM documentos WHERE id = ? AND ativo = 1').get(Number(substituir_id));
     if (!antigo) throw Object.assign(new Error('Documento a substituir não encontrado.'), { status: 404 });
+    if (antigo.entidade !== entidade || Number(antigo.entidade_id) !== id) {
+      throw Object.assign(new Error('O documento a substituir pertence a outro cadastro.'), { status: 400 });
+    }
     grupo = antigo.grupo || crypto.randomUUID();
     if (!antigo.grupo) db.prepare('UPDATE documentos SET grupo = ? WHERE id = ?').run(grupo, antigo.id);
     db.prepare('UPDATE documentos SET atual = 0 WHERE grupo = ?').run(grupo);

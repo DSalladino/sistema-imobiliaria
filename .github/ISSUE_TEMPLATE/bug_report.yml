@@ -1,0 +1,67 @@
+name: Relatar um problema
+description: Descreva um comportamento incorreto, com passos para reproduzir.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por ajudar a melhorar o projeto. Não inclua dados pessoais reais,
+        senhas, tokens ou arquivos de produção neste formulário.
+
+  - type: textarea
+    id: descricao
+    attributes:
+      label: O que aconteceu?
+      description: Explique o comportamento observado e o que você esperava.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproducao
+    attributes:
+      label: Passos para reproduzir
+      placeholder: |
+        1. Acesse ...
+        2. Clique em ...
+        3. Informe ...
+        4. Veja o erro ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área afetada
+      options:
+        - Login / sessão / 2FA
+        - Painel e relatórios
+        - Cadastros e contratos
+        - Cobranças e repasses
+        - Conciliação bancária
+        - Documentos e comunicação
+        - Importação de planilhas
+        - Backup / LGPD / manutenção
+        - Interface / responsividade
+        - Outra
+    validations:
+      required: true
+
+  - type: input
+    id: versao
+    attributes:
+      label: Versão ou commit
+      placeholder: "0.6.0 ou hash do commit"
+
+  - type: input
+    id: ambiente
+    attributes:
+      label: Ambiente
+      placeholder: "Node 24, Windows 11, Chrome 130"
+
+  - type: textarea
+    id: evidencias
+    attributes:
+      label: Logs, capturas ou evidências
+      description: Remova qualquer dado sensível antes de colar.
+      render: shell

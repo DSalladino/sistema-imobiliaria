@@ -31,6 +31,8 @@ import {
   pagarRepasse, alertas, resumoDashboard, saldos, mesFechado, exigirMesAberto, brl,
 } from './regras.js';
 
+const PKG = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+
 const json = (res, status, data) => {
   const body = JSON.stringify(data);
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -86,6 +88,16 @@ function texto(v) {
 function bool(v, padrao = 1) {
   if (v == null || v === '') return padrao;
   return (v === true || v === 1 || v === '1' || v === 'true') ? 1 : 0;
+}
+
+const CATEGORIAS_CANONICAS = {
+  aluguel: 'Aluguel',
+  'taxa de administracao': 'Taxa de administração',
+  'repasse ao proprietario': 'Repasse ao proprietário',
+};
+function categoriaCanonica(valor) {
+  const n = String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  return CATEGORIAS_CANONICAS[n] || texto(valor);
 }
 
 function exigirCampos(obj, campos) {
@@ -318,8 +330,11 @@ function erroValidacao(msg) {
   return Object.assign(new Error(msg), { status: 400 });
 }
 
-function validarDados(entidade, dados) {
+function validarDados(entidade, dados, idAtual = null) {
   const tem = (campo) => Object.prototype.hasOwnProperty.call(dados, campo);
+  const atual = entidade === 'contratos' && idAtual
+    ? db.prepare('SELECT * FROM contratos WHERE id = ?').get(idAtual)
+    : null;
   const taxa = ['proprietarios', 'imoveis', 'contratos'].includes(entidade) && tem('taxa_admin_pct');
   if (taxa && (dados.taxa_admin_pct == null || dados.taxa_admin_pct < 0 || dados.taxa_admin_pct > 100)) {
     throw erroValidacao('A taxa deve ficar entre 0 e 100.');
@@ -356,6 +371,19 @@ function validarDados(entidade, dados) {
       throw erroValidacao('Valor de garantia inválido.');
     }
     if (tem('status') && !STATUS_CONTRATO.includes(dados.status)) throw erroValidacao('Status do contrato inválido.');
+    if (tem('codigo') && dados.codigo) {
+      const outro = db.prepare('SELECT id FROM contratos WHERE lower(codigo) = lower(?) AND id <> ?').get(dados.codigo, idAtual ?? -1);
+      if (outro) throw erroValidacao('Já existe um contrato com este código.');
+    }
+    // Um imóvel não pode ter dois contratos ativos ao mesmo tempo: isso geraria
+    // cobranças duplicadas e um repasse ambíguo.
+    const statusFinal = tem('status') ? dados.status : (atual?.status || 'ativo');
+    const imovelFinal = tem('imovel_id') ? dados.imovel_id : atual?.imovel_id;
+    if (statusFinal === 'ativo' && imovelFinal) {
+      const outro = db.prepare("SELECT id, codigo FROM contratos WHERE imovel_id = ? AND status = 'ativo' AND id <> ?")
+        .get(imovelFinal, idAtual ?? -1);
+      if (outro) throw erroValidacao(`Este imóvel já tem um contrato ativo (${outro.codigo || '#' + outro.id}). Encerre-o antes de criar outro.`);
+    }
   }
   if (entidade === 'excecoes') {
     if (tem('competencia') && !COMPETENCIA.test(String(dados.competencia))) throw erroValidacao('Competência inválida. Use AAAA-MM.');
@@ -400,7 +428,7 @@ function criar(entidade, body, user, ip) {
   const ent = ENTIDADES[entidade];
   const dados = normalizar(ent, body);
   exigirCampos(dados, ent.obrigatorios);
-  validarDados(entidade, dados);
+  validarDados(entidade, dados, null);
   const cols = Object.keys(dados);
   const sql = `INSERT INTO ${ent.tabela} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`;
   const r = db.prepare(sql).run(...cols.map(c => dados[c]));
@@ -414,9 +442,9 @@ function atualizar(entidade, id, body, user, ip) {
   const dados = normalizar(ent, body);
   const cols = Object.keys(dados);
   if (!cols.length) throw Object.assign(new Error('Nada para atualizar.'), { status: 400 });
-  validarDados(entidade, dados);
   const antes = db.prepare(`SELECT * FROM ${ent.tabela} WHERE id = ?`).get(id);
   if (!antes) throw Object.assign(new Error('Registro não encontrado.'), { status: 404 });
+  validarDados(entidade, dados, id);
   db.prepare(`UPDATE ${ent.tabela} SET ${cols.map(c => `${c} = ?`).join(', ')} WHERE id = ?`)
     .run(...cols.map(c => dados[c]), id);
   registrar(user, 'alterar', entidade, id, { antes, depois: dados }, ip);
@@ -464,7 +492,7 @@ function criarLancamento(body, user, ip) {
     data: texto(body.data) || hojeISO(),
     competencia: texto(body.competencia) || (texto(body.data) || hojeISO()).slice(0, 7),
     tipo: texto(body.tipo),
-    categoria: texto(body.categoria),
+    categoria: categoriaCanonica(body.categoria),
     descricao: texto(body.descricao),
     valor_centavos: int(body.valor_centavos, 0),
     caixa: texto(body.caixa) || 'imobiliaria',
@@ -481,6 +509,26 @@ function criarLancamento(body, user, ip) {
   for (const [campo, tabela] of [['proprietario_id', 'proprietarios'], ['imovel_id', 'imoveis'], ['contrato_id', 'contratos']]) {
     if (dados[campo] != null && !db.prepare(`SELECT id FROM ${tabela} WHERE id = ?`).get(dados[campo])) {
       throw Object.assign(new Error(`Registro vinculado não encontrado: ${campo}.`), { status: 400 });
+    }
+  }
+  // Categorias que alimentam o repasse e o resultado têm caixa definido. Um
+  // aluguel lançado no caixa da imobiliária desapareceria do repasse do dono.
+  const caixaPorCategoria = {
+    'Aluguel': 'proprietarios',
+    'Taxa de administração': 'imobiliaria',
+    'Repasse ao proprietário': 'proprietarios',
+  };
+  if (caixaPorCategoria[dados.categoria] && dados.caixa !== caixaPorCategoria[dados.categoria]) {
+    throw Object.assign(new Error(`A categoria ${dados.categoria} deve usar o caixa ${caixaPorCategoria[dados.categoria]}.`), { status: 400 });
+  }
+  if (dados.contrato_id) {
+    const ct = db.prepare('SELECT imovel_id FROM contratos WHERE id = ?').get(dados.contrato_id);
+    const im = ct ? db.prepare('SELECT proprietario_id FROM imoveis WHERE id = ?').get(ct.imovel_id) : null;
+    if (dados.imovel_id && ct && ct.imovel_id !== dados.imovel_id) {
+      throw Object.assign(new Error('O contrato não pertence ao imóvel informado.'), { status: 400 });
+    }
+    if (dados.proprietario_id && im && im.proprietario_id !== dados.proprietario_id) {
+      throw Object.assign(new Error('O contrato não pertence ao proprietário informado.'), { status: 400 });
     }
   }
   exigirMesAberto(dados.competencia);
@@ -601,6 +649,12 @@ function atualizarUsuario(id, body, user, ip) {
   if (!EMAIL.test(String(email || ''))) throw Object.assign(new Error('E-mail inválido.'), { status: 400 });
   if (!['admin', 'operador', 'consulta'].includes(papel)) throw Object.assign(new Error('Papel inválido.'), { status: 400 });
   if (id === user.id && ativo === 0) throw Object.assign(new Error('Você não pode desativar seu próprio usuário.'), { status: 400 });
+  // Evita deixar o sistema sem administrador ativo, o que exigiria intervenção
+  // manual no servidor para recuperar o acesso.
+  if (u.papel === 'admin' && u.ativo && (papel !== 'admin' || ativo === 0)) {
+    const outros = db.prepare("SELECT COUNT(*) AS n FROM usuarios WHERE papel='admin' AND ativo=1 AND id<>?").get(id).n;
+    if (!outros) throw Object.assign(new Error('O sistema precisa de pelo menos um administrador ativo.'), { status: 400 });
+  }
   const duplicado = db.prepare('SELECT id FROM usuarios WHERE lower(email) = ? AND id <> ?').get(email, id);
   if (duplicado) throw Object.assign(new Error('E-mail já cadastrado.'), { status: 409 });
   db.prepare('UPDATE usuarios SET nome=?, email=?, papel=?, ativo=? WHERE id=?').run(nome, email, papel, ativo, id);
@@ -658,6 +712,26 @@ function exportar(tipo, url, res) {
       { titulo: 'Status', valor: l => l.status },
     ], linhas);
   }
+  if (tipo === 'cobrancas') {
+    const linhas = listarCobrancas({ competencia: comp });
+    return csv(res, `cobrancas-${comp}.csv`, [
+      { titulo: 'Competência', valor: c => c.competencia },
+      { titulo: 'Contrato', valor: c => c.contrato_codigo || c.contrato_id },
+      { titulo: 'Imóvel', valor: c => `${c.endereco}${c.numero ? ', ' + c.numero : ''}` },
+      { titulo: 'Proprietário', valor: c => c.proprietario_nome },
+      { titulo: 'Inquilino', valor: c => c.inquilino_nome },
+      { titulo: 'Vencimento', valor: c => c.vencimento },
+      { titulo: 'Valor original (R$)', valor: c => (c.valor_original_centavos / 100).toFixed(2).replace('.', ',') },
+      { titulo: 'Multa (R$)', valor: c => (c.multa_calculada_centavos / 100).toFixed(2).replace('.', ',') },
+      { titulo: 'Juros (R$)', valor: c => (c.juros_calculados_centavos / 100).toFixed(2).replace('.', ',') },
+      { titulo: 'Desconto (R$)', valor: c => (c.desconto_centavos / 100).toFixed(2).replace('.', ',') },
+      { titulo: 'Pago (R$)', valor: c => (c.valor_pago_centavos / 100).toFixed(2).replace('.', ',') },
+      { titulo: 'Saldo (R$)', valor: c => (c.saldo_centavos / 100).toFixed(2).replace('.', ',') },
+      { titulo: 'Status', valor: c => c.status_efetivo },
+      { titulo: 'Régua', valor: c => c.cobranca_status },
+      { titulo: 'Próxima ação', valor: c => c.proxima_data },
+    ], linhas);
+  }
   if (tipo === 'repasses') {
     const linhas = db.prepare(`SELECT r.*, p.nome AS proprietario_nome FROM repasses r
       JOIN proprietarios p ON p.id=r.proprietario_id WHERE r.competencia=? ORDER BY p.nome`).all(comp);
@@ -709,6 +783,15 @@ export async function handleApi(req, res, url, user, ip, body) {
     }
     contarTentativa('api:' + ip);
 
+    if (p === '/health' && m === 'GET') {
+      db.prepare('SELECT 1 AS ok').get();
+      return json(res, 200, {
+        ok: true,
+        versao: PKG.version,
+        uptime_s: Math.round(process.uptime()),
+        em: new Date().toISOString(),
+      });
+    }
     if (p === '/login' && m === 'POST') return login(req, res, body, ip);
     if (p === '/login/2fa' && m === 'POST') return login2fa(req, res, body, ip);
 
@@ -762,9 +845,11 @@ export async function handleApi(req, res, url, user, ip, body) {
 
     if (p === '/primeiro-acesso' && m === 'GET') {
       const admin = db.prepare("SELECT email FROM usuarios WHERE papel = 'admin' AND ativo = 1 ORDER BY id LIMIT 1").get();
+      const mostrar = String(getSetting('primeiro_acesso', '1')) === '1';
       return json(res, 200, {
-        mostrar: String(getSetting('primeiro_acesso', '1')) === '1',
-        email: admin?.email || 'admin@imobiliaria.local',
+        mostrar,
+        // Só revela o e-mail enquanto a dica de primeiro acesso está ativa.
+        email: mostrar ? (admin?.email || 'admin@imobiliaria.local') : '',
       });
     }
 
@@ -943,7 +1028,8 @@ export async function handleApi(req, res, url, user, ip, body) {
 
     if (p === '/auditoria' && m === 'GET') {
       exigir(user, 'admin');
-      const limite = Math.min(Number(url.searchParams.get('limite') || 200), 1000);
+      const bruto = Number(url.searchParams.get('limite') || 200);
+      const limite = Number.isFinite(bruto) ? Math.min(Math.max(Math.trunc(bruto), 1), 1000) : 200;
       return json(res, 200, db.prepare('SELECT * FROM auditoria ORDER BY id DESC LIMIT ?').all(limite));
     }
 
@@ -1411,11 +1497,17 @@ export async function handleApi(req, res, url, user, ip, body) {
       archive.pipe(res);
       archive.file(tmp, { name: 'imobiliaria.db' });
       if (fs.existsSync(UPLOADS)) archive.directory(UPLOADS, 'documentos');
+      const chaveLocal = path.join(DATA_DIR, '.app-key');
+      const temChaveLocal = fs.existsSync(chaveLocal);
+      if (temChaveLocal) archive.file(chaveLocal, { name: '.app-key' });
       archive.append(
         'Backup do Sistema de Gestão da Imobiliária\n\n' +
-        'Conteúdo:\n- imobiliaria.db: banco de dados\n- documentos/: arquivos enviados\n\n' +
-        'Para restaurar: pare o servidor, substitua data/imobiliaria.db pelo arquivo imobiliaria.db ' +
-        'e copie a pasta documentos para data/uploads. Depois suba o servidor novamente.\n',
+        'Conteúdo:\n- imobiliaria.db: banco de dados\n- documentos/: arquivos enviados\n' +
+        (temChaveLocal ? '- .app-key: chave local que decifra os segredos de 2FA (guarde este ZIP como senha)\n' : '') +
+        '\nATENÇÃO: este ZIP pode conter dados pessoais e segredos. Guarde-o criptografado e fora do servidor.\n\n' +
+        'Para restaurar: pare o servidor, substitua data/imobiliaria.db pelo arquivo imobiliaria.db, ' +
+        'copie a pasta documentos para data/uploads e, se existir, o arquivo .app-key para data/.app-key. ' +
+        'Depois suba o servidor novamente.\n',
         { name: 'LEIA-ME.txt' }
       );
       archive.finalize();
