@@ -1,9 +1,9 @@
 # Estudo de caso — Sistema de Gestão da Imobiliária
 
-> Projeto real para uma imobiliária familiar de pequeno porte, desenvolvido do zero para substituir
-> planilhas e conversas por um sistema único, auditável e acessível pelo celular.
+> Sistema desenvolvido para uma imobiliária familiar de pequeno porte, com o objetivo de substituir
+> planilhas e mensagens por uma fonte única, auditável e acessível pelo celular.
 
-## Contexto
+## Cenário
 
 A empresa administra imóveis de terceiros, calcula repasses e precisa prestar contas aos proprietários.
 O processo anterior dependia de planilhas, mensagens e conhecimento tácito: taxas diferentes por

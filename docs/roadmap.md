@@ -72,7 +72,7 @@ As prioridades abaixo atacam exatamente esses pontos.
 | 23 | **LGPD operacional** | Base legal, consentimento, retenção, exportação e exclusão de dados, registro de tratamento. | Médio |
 | 24 | **Auditoria com diff visual e restauração** | Ver o antes/depois de cada campo e restaurar um registro. Hoje o log já guarda o JSON. | Baixo/Médio |
 
-## Melhorias de produto que valem a pena
+## Melhorias de produto recomendadas
 
 - **Qualidade de dados**: validar CPF/CNPJ, evitar duplicidade por documento e preencher endereço por CEP.
 - **Central de pendências**: uma tela que junta contrato vencendo, aluguel em aberto, garantia
@@ -82,7 +82,7 @@ As prioridades abaixo atacam exatamente esses pontos.
 - **Acessibilidade**: navegação por teclado, contraste e textos alternativos nos gráficos.
 - **Modo offline de leitura** para consulta de contratos e vencimentos em campo.
 
-## O que eu não recomendaria fazer agora
+## Itens não recomendados no momento
 
 - **Boleto/Pix próprio**: exige banco/adquirente, conciliação e responsabilidade financeira. Melhor
   integrar um provedor especializado quando houver volume.
@@ -92,7 +92,7 @@ As prioridades abaixo atacam exatamente esses pontos.
 - **Microserviços**: com este volume, um processo Node + SQLite é mais simples, barato e fácil de
   fazer backup. Separar só quando houver necessidade real de escala ou times distintos.
 
-## Sequência sugerida
+## Sequência de implantação
 
 **30 dias** — geração mensal em lote, baixa de pagamentos, multa/juros e backup automático.
 Isso reduz a operação manual e torna a inadimplência confiável.

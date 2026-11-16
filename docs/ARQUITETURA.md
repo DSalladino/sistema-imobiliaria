@@ -5,7 +5,7 @@
 Aplicação **Node.js monolítica** com **SQLite em disco**, servida por HTTP e protegida por Caddy/HTTPS,
 com frontend SPA em JavaScript puro e geração própria de gráficos SVG.
 
-## Diagrama de contexto
+## Visão geral
 
 ```mermaid
 flowchart LR

@@ -1,6 +1,6 @@
 # Funcionalidades do sistema
 
-Documento de referência para estudo, portfólio e evolução. Cada seção explica **o problema**, **como
+Documento de referência funcional e de evolução. Cada seção explica **o problema**, **como
 funciona**, **as regras** e **onde encontrar** no sistema.
 
 ## Visão geral
@@ -15,7 +15,7 @@ Perfis: **admin**, **operador** e **consulta**. Toda regra crítica é aplicada 
 
 ## 1. Painel analítico
 
-**Problema:** a informação estava espalhada em planilhas e conversas; não havia visão consolidada.
+**Problema:** a informação estava espalhada em planilhas e mensagens; não havia visão consolidada.
 
 **Como funciona:**
 - KPIs de receita da imobiliária, aluguéis administrados, repasses, inadimplência, taxa média e carteira.
@@ -142,7 +142,7 @@ com a origem da taxa por contrato. O pagamento cria o lançamento do repasse e d
 
 ## 9. Documentos
 
-**Problema:** contratos e documentos espalhados em pastas e conversas.
+**Problema:** contratos e documentos espalhados em pastas e mensagens.
 
 **Como funciona:** upload vinculado a proprietário, imóvel, inquilino ou contrato; categorias;
 **versões** (v1, v2…), validade, pré-visualização de PDF/imagem, download e exclusão.

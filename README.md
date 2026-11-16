@@ -1,21 +1,25 @@
 # Sistema de Gestão da Imobiliária
 
+[![CI](https://github.com/DSalladino/sistema-imobiliaria/actions/workflows/ci.yml/badge.svg)](https://github.com/DSalladino/sistema-imobiliaria/actions/workflows/ci.yml)
+
 Sistema web para gestão de proprietários, imóveis, inquilinos, contratos, financeiro, repasses e
 relatórios — com dashboard analítico, importação de planilhas e exportação em Excel/PDF.
 
 Interface em tons pastéis, gráficos próprios em SVG (sem biblioteca de charts) e layout responsivo.
 Backend em **Node.js + SQLite** (`node:sqlite`), com `xlsx`, `pdfkit`, `nodemailer`, `archiver` e `qrcode`.
 
-## Documentação e portfólio
+## Documentação
 
 | Documento | Conteúdo |
 |---|---|
 | [`docs/FUNCIONALIDADES.md`](docs/FUNCIONALIDADES.md) | Cada funcionalidade explicada: problema, regras e onde encontrar |
 | [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) | Diagramas, modelo de dados, fluxos e decisões técnicas |
-| [`docs/ESTUDO-DE-CASO.md`](docs/ESTUDO-DE-CASO.md) | Contexto, desafios e resultados (visão de portfólio) |
+| [`docs/ESTUDO-DE-CASO.md`](docs/ESTUDO-DE-CASO.md) | Cenário, decisões técnicas e resultados |
 | [`docs/ESTADO-ATUAL.md`](docs/ESTADO-ATUAL.md) | Estado atual, módulos, rotas e pendências técnicas |
 | [`docs/roadmap.md`](docs/roadmap.md) | Próximas funcionalidades e prioridades |
-| [`docs/checklist-seguranca.md`](docs/checklist-seguranca.md) | Auditoria de 21 pontos de segurança |
+| [`docs/checklist-seguranca.md`](docs/checklist-seguranca.md) | Checklist de 21 pontos de segurança |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Ambiente de desenvolvimento, testes e fluxo de contribuição |
+| [`SECURITY.md`](SECURITY.md) | Política de segurança e canal de reporte |
 | [`deploy/README.md`](deploy/README.md) | Publicação em VPS, domínio, HTTPS, backup e restauração |
 | [`CHANGELOG.md`](CHANGELOG.md) | Evolução por versão (SemVer) |
 
