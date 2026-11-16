@@ -28,9 +28,11 @@ export function statusManutencao() {
 
 function backupAntes() {
   const dir = path.join(DATA_DIR, 'backups');
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  try { fs.chmodSync(dir, 0o700); } catch {}
   const arquivo = path.join(dir, `pre-operacao-${new Date().toISOString().replace(/[:.]/g, '-')}.db`);
   db.exec(`VACUUM INTO '${arquivo.replace(/'/g, "''")}'`);
+  try { fs.chmodSync(arquivo, 0o600); } catch {}
   const antigos = fs.readdirSync(dir).filter(f => f.startsWith('pre-operacao-')).sort();
   while (antigos.length > 10) {
     try { fs.unlinkSync(path.join(dir, antigos.shift())); } catch {}

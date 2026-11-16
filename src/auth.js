@@ -18,11 +18,21 @@ export function novoToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// O token de sessão só é guardado no banco em forma de hash. Assim, uma cópia
+// do banco não permite reutilizar sessões ativas.
+export function hashToken(token) {
+  return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+}
+
 export function parseCookies(header = '') {
   const out = {};
   for (const parte of header.split(';')) {
     const i = parte.indexOf('=');
-    if (i > -1) out[parte.slice(0, i).trim()] = decodeURIComponent(parte.slice(i + 1).trim());
+    if (i > -1) {
+      const valor = parte.slice(i + 1).trim();
+      try { out[parte.slice(0, i).trim()] = decodeURIComponent(valor); }
+      catch { out[parte.slice(0, i).trim()] = valor; }
+    }
   }
   return out;
 }

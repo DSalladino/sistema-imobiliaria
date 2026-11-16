@@ -89,7 +89,7 @@ rolagem horizontal; os gráficos reduzem rótulos em telas estreitas.
 - Operação possível pelo navegador do celular.
 - Implantação de baixo custo (VPS pequena + backup externo).
 
-## O que eu aprendi
+## Lições aprendidas
 
 - Regra de negócio bem modelada vale mais que tela.
 - “Nada se apaga” simplifica auditoria e confiança.

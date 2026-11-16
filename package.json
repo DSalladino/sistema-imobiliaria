@@ -17,13 +17,17 @@
     "admin:reset": "node src/reset-admin.js"
   },
   "dependencies": {
-    "archiver": "^7.0.1",
-    "nodemailer": "^6.9.16",
+    "archiver": "^8.0.0",
+    "nodemailer": "^10.6.0",
     "pdfkit": "^0.15.1",
     "qrcode": "^1.5.4",
-    "xlsx": "0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "jsdom": "^25.0.1"
+  },
+  "overrides": {
+    "readdir-glob": "^4.0.0",
+    "minimatch": "^11.0.8"
   }
 }

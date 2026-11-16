@@ -162,6 +162,8 @@ export function topContratos(propId = null) {
 
 export function analytics({ de, ate, comparar = false, propId = null } = {}) {
   const compAtual = competenciaAtual();
+  const pid = Number(propId);
+  propId = Number.isFinite(pid) && pid > 0 ? pid : null;
   const regex = /^\d{4}-\d{2}$/;
   if (!regex.test(ate || '')) ate = compAtual;
   if (!regex.test(de || '')) de = addMesesComp(ate, -11);

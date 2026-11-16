@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
-import { parseCookies } from './auth.js';
+import { parseCookies, hashToken } from './auth.js';
 import { handleApi } from './api.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -39,6 +39,10 @@ function requisicaoSegura(req) {
 }
 
 function origemPermitida(req) {
+  // Navegadores modernos enviam Sec-Fetch-Site. Requisições cross-site são
+  // sempre recusadas, mesmo que não tragam o cabeçalho Origin.
+  const fetchSite = String(req.headers['sec-fetch-site'] || '').toLowerCase();
+  if (fetchSite === 'cross-site') return false;
   const origem = req.headers.origin;
   if (!origem) return true;
   try {
@@ -60,19 +64,20 @@ function ipCliente(req) {
 function usuarioDaRequisicao(req) {
   const cookies = parseCookies(req.headers.cookie || '');
   const token = cookies.sid;
-  if (!token) return { user: null, token: null };
+  if (!token) return { user: null, token: null, tokenHash: null };
+  const tokenHash = hashToken(token);
   const row = db.prepare(`SELECT u.id, u.nome, u.email, u.papel, u.ativo, u.deve_trocar_senha, u.totp_ativo, s.expira_em
-    FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id WHERE s.token = ?`).get(token);
-  if (!row || !row.ativo) return { user: null, token };
+    FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id WHERE s.token = ?`).get(tokenHash);
+  if (!row || !row.ativo) return { user: null, token, tokenHash };
   if (new Date(row.expira_em) < new Date()) {
-    db.prepare('DELETE FROM sessoes WHERE token = ?').run(token);
-    return { user: null, token };
+    db.prepare('DELETE FROM sessoes WHERE token = ?').run(tokenHash);
+    return { user: null, token, tokenHash };
   }
   return {
     user: {
       id: row.id, nome: row.nome, email: row.email, papel: row.papel,
       deve_trocar_senha: !!row.deve_trocar_senha, totp_ativo: !!row.totp_ativo,
-    }, token,
+    }, token, tokenHash,
   };
 }
 
@@ -124,6 +129,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
   res.setHeader('Content-Security-Policy', CSP);
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   if (requisicaoSegura(req)) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
@@ -140,8 +146,9 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ erro: 'Envie JSON com Content-Type application/json.' }));
       }
     }
-    const { user, token } = usuarioDaRequisicao(req);
+    const { user, token, tokenHash } = usuarioDaRequisicao(req);
     req._sid = token;
+    req._sidHash = tokenHash;
     let body = {};
     if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
       try { body = await lerCorpo(req); }
@@ -164,6 +171,8 @@ server.requestTimeout = 30000;
 // sobrescrever dados reais. Use SEED_COMPLETO=0 para desativar (testes/CI).
 async function completarDemoInicial() {
   if (process.env.SEED_COMPLETO === '0') return;
+  // Nunca injeta dados de demonstração em produção sem autorização explícita.
+  if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO !== '1') return;
   try {
     const cobs = db.prepare('SELECT COUNT(*) AS n FROM cobrancas').get().n;
     const aud = db.prepare('SELECT COUNT(*) AS n FROM auditoria').get().n;
@@ -180,6 +189,8 @@ await completarDemoInicial();
 
 server.listen(PORT, HOST, () => {
   db.prepare('DELETE FROM sessoes WHERE expira_em < ?').run(new Date().toISOString());
+  db.prepare("DELETE FROM password_resets WHERE expira_em < ? OR (usado_em IS NOT NULL AND usado_em < datetime('now','-30 days'))")
+    .run(new Date().toISOString());
   const porta = server.address()?.port || PORT;
   console.log(`\n  Sistema de Gestão da Imobiliária`);
   console.log(`  Rodando em http://${HOST}:${porta}`);

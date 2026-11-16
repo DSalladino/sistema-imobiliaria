@@ -261,6 +261,9 @@ export function confirmarConciliacao(id, { acao, cobranca_id, repasse_id, lancam
 
   if (acao === 'vincular-lancamento' && (c.sugestao_id || lancamento?.lancamento_id)) {
     const alvo = Number(lancamento?.lancamento_id || c.sugestao_id);
+    if (!db.prepare('SELECT id FROM lancamentos WHERE id = ?').get(alvo)) {
+      throw Object.assign(new Error('Lançamento não encontrado.'), { status: 404 });
+    }
     db.prepare("UPDATE conciliacoes SET status='conciliado', lancamento_id=? WHERE id=?").run(alvo, c.id);
     return { ok: true, status: 'conciliado' };
   }
@@ -274,6 +277,12 @@ export function confirmarConciliacao(id, { acao, cobranca_id, repasse_id, lancam
     const caixa = lancamento?.caixa || (tipo === 'receita' ? 'proprietarios' : 'imobiliaria');
     if (!['imobiliaria', 'proprietarios'].includes(caixa)) throw Object.assign(new Error('Caixa inválido.'), { status: 400 });
     const categoria = lancamento?.categoria || (tipo === 'receita' ? 'Aluguel' : 'Outros');
+    for (const [campo, tabela] of [['proprietario_id', 'proprietarios'], ['imovel_id', 'imoveis'], ['contrato_id', 'contratos']]) {
+      const valorRef = lancamento?.[campo];
+      if (valorRef !== '' && valorRef != null && !db.prepare(`SELECT id FROM ${tabela} WHERE id = ?`).get(Number(valorRef))) {
+        throw Object.assign(new Error(`Registro vinculado não encontrado: ${campo}.`), { status: 400 });
+      }
+    }
     const r = db.prepare(`INSERT INTO lancamentos (data, competencia, tipo, categoria, descricao, valor_centavos, caixa,
         proprietario_id, imovel_id, contrato_id, criado_por)
         VALUES (?,?,?,?,?,?,?,?,?,?,?)`)

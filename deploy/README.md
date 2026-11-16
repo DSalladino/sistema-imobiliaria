@@ -161,7 +161,9 @@ O endereço de `SMTP_FROM` precisa ser do domínio e estar autorizado no provedo
 
 ### 8. Primeiro acesso
 
-- Login: `admin@imobiliaria.local` / `admin123`
+- Login: `admin@imobiliaria.local`
+- A senha inicial é gerada na primeira execução e mostrada uma única vez no log do serviço
+  (`journalctl -u imobiliaria`). Em instalações automatizadas, defina `ADMIN_SENHA` no ambiente.
 - O sistema exige a criação de uma senha nova.
 - Crie os demais usuários em **Usuários**.
 - Recomendado: 2 administradores, 2 operadores e 1 consulta. Quatro admins funciona, mas aumenta o risco.
@@ -203,8 +205,8 @@ npm run admin:reset -- --email admin@imobiliaria.local
 ```
 
 O comando gera uma senha temporária, desativa o 2FA, invalida as sessões e força a troca no login.
-Para usar o fluxo “Esqueci minha senha”, configure o SMTP e o e-mail de recuperação em
-**Configurações → Segurança**.
+Para usar o fluxo “Esqueci minha senha”, configure o SMTP, o e-mail de recuperação e a
+**URL pública** em **Configurações → Segurança** (ou `PUBLIC_URL` no ambiente).
 
 No Gmail, use uma senha de aplicativo:
 
