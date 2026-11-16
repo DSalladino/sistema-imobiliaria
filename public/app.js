@@ -179,7 +179,6 @@ function forcarTrocaSenha() {
 }
 
 async function boot() {
-  document.querySelectorAll('*').forEach(el => { /* noop */ });
   const anoEl = document.querySelector('.auth-copyright');
   if (anoEl) anoEl.textContent = `Gestão Imobiliária · ${new Date().getFullYear()}`;
 

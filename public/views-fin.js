@@ -212,7 +212,7 @@ export async function viewCobrancas(root, params) {
   root.querySelector('[data-busca]').addEventListener('input', (e) => { busca = e.target.value; clearTimeout(window.__cobT); window.__cobT = setTimeout(carregar, 350); });
   root.querySelector('[data-limpar]')?.addEventListener('click', () => { location.hash = '#/cobrancas'; });
   root.querySelector('[data-gerar]')?.addEventListener('click', () => abrirGerarCobrancas(carregar));
-  root.querySelector("[data-exportar]")?.addEventListener("click", () => download(`/export/lancamentos?competencia=${comp}`));
+  root.querySelector("[data-exportar]")?.addEventListener("click", () => download(`/export/cobrancas?competencia=${comp}`));
   await carregar();
 }
 
@@ -371,8 +371,8 @@ export async function viewLancamentos(root) {
     { name: 'data', label: 'Data', type: 'date', required: true },
     { name: 'competencia', label: 'Competência', type: 'month', required: true },
     { name: 'tipo', label: 'Tipo', type: 'select', required: true, options: [['receita', 'Receita'], ['despesa', 'Despesa']] },
-    { name: 'caixa', label: 'Caixa', type: 'select', required: true, options: [['imobiliaria', 'Imobiliária'], ['proprietarios', 'Proprietários']] },
-    { name: 'categoria', label: 'Categoria', required: true, placeholder: 'Aluguel, Taxa, Manutenção…' },
+    { name: 'caixa', label: 'Caixa', type: 'select', required: true, options: [['imobiliaria', 'Imobiliária'], ['proprietarios', 'Proprietários']], hint: 'Aluguel e repasse usam Proprietários; taxa de administração usa Imobiliária.' },
+    { name: 'categoria', label: 'Categoria', required: true, placeholder: 'Aluguel, Taxa de administração, Manutenção…' },
     { name: 'valor_centavos', label: 'Valor (R$)', type: 'money', required: true },
     { name: 'descricao', label: 'Descrição', type: 'textarea', span: 2 },
     { name: 'proprietario_id', label: 'Proprietário', type: 'select', options: props.map(p => ({ value: p.id, label: p.nome })) },
