@@ -88,6 +88,16 @@ padrão publicada. O roteiro de avaliação, o conteúdo da base de exemplo e as
 instruções para gerar **capturas de tela** e o **vídeo de 90 s** estão em
 [docs/DEMONSTRACAO.md](docs/DEMONSTRACAO.md).
 
+| Painel | Cobranças |
+|---|---|
+| ![Painel analítico](docs/assets/telas/02-painel.png) | ![Cobranças com aging e baixa](docs/assets/telas/04-cobrancas.png) |
+| **Repasses com snapshot da taxa** | **No celular** |
+| ![Repasses](docs/assets/telas/05-repasses.png) | ![Painel no celular](docs/assets/telas/09-painel-celular.png) |
+
+[▶ Vídeo de 90 s](docs/assets/demonstracao.webm) ·
+[todas as capturas](docs/assets/telas/) ·
+[roteiro de avaliação](docs/DEMONSTRACAO.md#roteiro-de-avaliação-10-minutos)
+
 ## Uma volta pelo produto
 
 | Módulo | O que resolve |
