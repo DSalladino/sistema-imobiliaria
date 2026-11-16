@@ -4,7 +4,8 @@ import crypto from 'node:crypto';
 import { db, DATA_DIR } from './db.js';
 
 export const UPLOADS = path.join(DATA_DIR, 'uploads');
-fs.mkdirSync(UPLOADS, { recursive: true });
+fs.mkdirSync(UPLOADS, { recursive: true, mode: 0o700 });
+try { fs.chmodSync(UPLOADS, 0o700); } catch {}
 
 const ENTIDADES = {
   proprietarios: 'proprietarios',

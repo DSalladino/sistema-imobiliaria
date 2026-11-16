@@ -32,7 +32,7 @@ export async function viewCobrancas(root, params) {
       ${podeFinanceiro() ? `<button class="btn" data-exportar>${icon('download')} CSV</button>` : ''}`) +
     `<div data-resumo>${loadingBox()}</div>
      <div class="filters mt-2">
-       <label class="field"><span>Competência</span><input type="month" data-comp value="${comp}"></label>
+       <label class="field"><span>Competência</span><input type="month" data-comp value="${esc(comp)}"></label>
        <label class="field"><span>Status</span><select data-status>
          <option value="abertas">Em aberto</option><option value="vencidas">Vencidas</option>
          <option value="pagas">Pagas</option><option value="">Todas</option>

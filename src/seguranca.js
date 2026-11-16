@@ -115,15 +115,23 @@ export function gerarRecovery() {
     return `${bruto.slice(0, 5)}-${bruto.slice(5)}`;
   });
   const salt = crypto.randomBytes(16).toString('hex');
-  const hashes = codigos.map(c => crypto.createHash('sha256').update(salt + normalizarCodigo(c)).digest('hex'));
-  return { codigos, armazenado: JSON.stringify({ salt, hashes }) };
+  // HMAC com a chave da aplicação: uma cópia isolada do banco não permite
+  // testar códigos de recuperação offline sem conhecer APP_SECRET/.app-key.
+  const hashes = codigos.map(c => hmacRecovery(salt + normalizarCodigo(c)));
+  return { codigos, armazenado: JSON.stringify({ v: 2, salt, hashes }) };
+}
+
+function hmacRecovery(valor) {
+  return crypto.createHmac('sha256', chave()).update(valor).digest('hex');
 }
 
 export function usarRecovery(armazenado, codigo) {
   if (!armazenado) return { ok: false };
   let dados;
   try { dados = JSON.parse(armazenado); } catch { return { ok: false }; }
-  const alvo = crypto.createHash('sha256').update(dados.salt + normalizarCodigo(codigo)).digest('hex');
+  const alvo = dados.v === 2
+    ? hmacRecovery(dados.salt + normalizarCodigo(codigo))
+    : crypto.createHash('sha256').update(dados.salt + normalizarCodigo(codigo)).digest('hex');
   const idx = dados.hashes.indexOf(alvo);
   if (idx < 0) return { ok: false };
   dados.hashes.splice(idx, 1);

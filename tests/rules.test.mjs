@@ -7,11 +7,13 @@ import path from 'node:path';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'imob-regras-'));
 process.env.DATA_DIR = dir;
 process.env.APP_SECRET = 'segredo-de-teste-com-mais-de-32-caracteres';
+process.env.ADMIN_SENHA = 'admin123';
 
 const { db } = await import('../src/db.js');
 const { resolverTaxa, calcularRepasse, gerarRepasses, competenciaAtual, mesFechado } = await import('../src/regras.js');
 const { hashSenha, verificaSenha } = await import('../src/auth.js');
 const { validarSenha } = await import('../src/seguranca.js');
+const { gerarCSV } = await import('../src/reports.js');
 
 test.after(() => {
   try { db.close(); } catch {}
@@ -68,4 +70,17 @@ test('senha usa scrypt e política mínima', () => {
 
 test('competência atual começa aberta', () => {
   assert.equal(mesFechado(competenciaAtual()), false);
+});
+
+test('CSV neutraliza fórmulas injetadas em campos de texto', () => {
+  const rel = {
+    empresa: 'Imobiliária', titulo: 'Teste', gerado_em: '01/01/2026',
+    colunas: [{ key: 'nome', titulo: 'Nome', tipo: 'text' }],
+    linhas: [{ nome: '=HYPERLINK("http://malicioso")' }, { nome: '-1+1' }],
+    resumo: [],
+  };
+  const csv = gerarCSV(rel);
+  assert.ok(csv.includes("'=HYPERLINK"));
+  assert.ok(csv.includes("'-1+1"));
+  assert.ok(!csv.includes(';=HYPERLINK'));
 });

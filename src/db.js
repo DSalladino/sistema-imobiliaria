@@ -1,14 +1,29 @@
 import { DatabaseSync } from 'node:sqlite';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { hashSenha } from './auth.js';
 
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
-fs.mkdirSync(DATA_DIR, { recursive: true });
+fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+
+// Protege o banco e os arquivos auxiliares contra leitura por outros usuários do
+// sistema operacional. Em Windows o chmod é inofensivo (sem efeito prático).
+function proteger(caminho) {
+  try { if (fs.existsSync(caminho)) fs.chmodSync(caminho, 0o600); } catch {}
+}
+try { fs.chmodSync(DATA_DIR, 0o700); } catch {}
 
 export const db = new DatabaseSync(path.join(DATA_DIR, 'imobiliaria.db'));
+proteger(path.join(DATA_DIR, 'imobiliaria.db'));
 db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');
+// Sobrescreve o conteúdo de páginas removidas, reduzindo resíduos de dados
+// pessoais em arquivos de banco e backups.
+db.exec('PRAGMA secure_delete = ON;');
+proteger(path.join(DATA_DIR, 'imobiliaria.db'));
+proteger(path.join(DATA_DIR, 'imobiliaria.db-wal'));
+proteger(path.join(DATA_DIR, 'imobiliaria.db-shm'));
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS settings (
@@ -360,12 +375,28 @@ for (const s of SETTINGS_PADRAO) insSetting.run(...s);
 
 const qtdUsuarios = db.prepare('SELECT COUNT(*) AS n FROM usuarios').get().n;
 if (qtdUsuarios === 0) {
+  // Não existe senha padrão conhecida. A senha inicial vem de ADMIN_SENHA ou é
+  // aleatória e exibida uma única vez no terminal da primeira execução.
+  const senhaInformada = String(process.env.ADMIN_SENHA || '').trim();
+  const senhaInicial = senhaInformada.length >= 8
+    ? senhaInformada
+    : `Imob-${crypto.randomBytes(9).toString('base64url')}#26`;
   db.prepare('INSERT INTO usuarios (nome, email, senha_hash, papel, deve_trocar_senha) VALUES (?,?,?,?,1)')
-    .run('Administrador', 'admin@imobiliaria.local', hashSenha('admin123'), 'admin');
+    .run('Administrador', 'admin@imobiliaria.local', hashSenha(senhaInicial), 'admin');
+  if (!senhaInformada) {
+    console.log(`\n  Primeiro acesso: admin@imobiliaria.local`);
+    console.log(`  Senha inicial gerada: ${senhaInicial}`);
+    console.log('  Guarde-a e troque no primeiro login.\n');
+  } else {
+    console.log('\n  Usuário inicial admin@imobiliaria.local criado com a senha de ADMIN_SENHA.');
+  }
 }
 
 const qtdProps = db.prepare('SELECT COUNT(*) AS n FROM proprietarios').get().n;
-if (qtdProps === 0) seedDemo();
+// Em produção a base começa vazia. A demonstração só é carregada em
+// desenvolvimento ou quando SEED_DEMO=1 é definido explicitamente.
+const podeSemearDemo = process.env.SEED_DEMO === '1' || process.env.NODE_ENV !== 'production';
+if (qtdProps === 0 && podeSemearDemo) seedDemo();
 
 export function seedDemo() {
   const hoje = new Date();

@@ -2,6 +2,7 @@
 # Backup diário: banco + documentos, com envio externo via rclone.
 # Instale em /usr/local/bin/imobiliaria-backup.sh e agende no cron.
 set -euo pipefail
+umask 077
 
 APP_DIR="/opt/imobiliaria"
 DATA_DIR="$APP_DIR/data"

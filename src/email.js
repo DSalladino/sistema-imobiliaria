@@ -84,7 +84,10 @@ export async function enviarEmail({ para, assunto, mensagem }) {
   const nomeRemetente = getSetting('email_remetente_nome', '') || empresa;
   const remetenteSetting = getSetting('email_remetente', '');
   const c = smtpConfig();
-  const de = remetenteSetting || c.from;
+  const de = String(remetenteSetting || c.from || '').replace(/[\r\n<>"']/g, '').trim();
+  if (!emailValido(de)) {
+    throw Object.assign(new Error('Remetente de e-mail inválido. Confira SMTP_FROM e Configurações → Comunicação.'), { status: 400 });
+  }
   const assinatura = getSetting('email_assinatura', '');
 
   const info = await transporteAtual().sendMail({

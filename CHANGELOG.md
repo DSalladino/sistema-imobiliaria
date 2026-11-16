@@ -5,6 +5,17 @@ semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
 ## [Não publicado]
 
+### Segurança
+- Senha inicial do administrador gerada aleatoriamente (ou definida por `ADMIN_SENHA`), sem credencial publicada.
+- Produção começa com base vazia; demonstração exige `SEED_DEMO=1`.
+- Tokens de sessão gravados no banco apenas como hash SHA-256.
+- Códigos de recuperação de 2FA protegidos com HMAC da chave da aplicação.
+- Validação de `Sec-Fetch-Site`, permissões `0700`/`0600` para banco, uploads e backups.
+- Validação de referências, datas, taxas e valores antes de gravar cadastros e lançamentos.
+- Neutralização de fórmulas em exportações CSV.
+- Anonimização LGPD remove documentos pessoais e detalhes de auditoria do titular.
+- Dependências atualizadas (`xlsx` 0.20.3, `nodemailer` 10.x, `archiver` 8.x); `npm audit` sem vulnerabilidades.
+
 ### Planejado
 - Contas a pagar/receber com recorrência e previsão de caixa de 12 meses.
 - Reajuste em lote pelo índice, com termo gerado.

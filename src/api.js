@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { db, DATA_DIR } from './db.js';
 import { analytics } from './analytics.js';
 import { RELATORIOS, construirRelatorio, gerarCSV, gerarXLSX, gerarPDF } from './reports.js';
@@ -24,7 +24,7 @@ import { statusManutencao, limparBase, carregarDemo } from './manutencao.js';
 import {
   UPLOADS, listarDocumentos, salvarDocumento, obterDocumento, caminhoFisico, removerDocumento, nomeArquivoSeguro, versoesDocumento,
 } from './documentos.js';
-import { hashSenha, verificaSenha, novoToken } from './auth.js';
+import { hashSenha, verificaSenha, novoToken, hashToken } from './auth.js';
 import { auditar, exigir, pode } from './permissoes.js';
 import {
   hojeISO, competenciaAtual, getSetting, setSetting, calcularRepasse, gerarRepasses,
@@ -42,6 +42,26 @@ const erro = (res, status, msg) => json(res, status, { erro: msg });
 function mascararCpf(valor) {
   if (!valor) return valor;
   return String(valor).replace(/\d(?=\d{2})/g, '*');
+}
+
+function anonimizarDocumentosEDetalhes({ entidade, entidadeId, contratoIds = [] }) {
+  const ph = contratoIds.map(() => '?').join(',') || 'NULL';
+  const docs = db.prepare(`SELECT id, caminho FROM documentos
+    WHERE (entidade = ? AND entidade_id = ?)${contratoIds.length ? ` OR (entidade = 'contratos' AND entidade_id IN (${ph}))` : ''}`)
+    .all(entidade, entidadeId, ...contratoIds);
+  for (const doc of docs) {
+    try { fs.unlinkSync(caminhoFisico(doc)); } catch {}
+  }
+  if (docs.length) {
+    const ids = docs.map(d => d.id);
+    db.prepare(`UPDATE documentos SET ativo = 0, nome = 'documento removido', descricao = NULL
+      WHERE id IN (${ids.map(() => '?').join(',')})`).run(...ids);
+  }
+  // Remove nomes, documentos e detalhes pessoais dos logs de auditoria,
+  // mantendo a existência da ação para fins de segurança.
+  db.prepare(`UPDATE auditoria SET detalhe = 'Conteúdo removido por anonimização LGPD.'
+    WHERE (entidade = ? AND entidade_id = ?)${contratoIds.length ? ` OR (entidade = 'contratos' AND entidade_id IN (${ph}))` : ''}`)
+    .run(entidade, entidadeId, ...contratoIds);
 }
 
 function aplicarMascara(entidade, dados, user) {
@@ -94,6 +114,15 @@ const desafios2fa = new Map();
 const JANELA_LOGIN_MS = 5 * 60 * 1000;
 const MAX_LOGIN = 10;
 
+function limparDesafios2fa() {
+  const agora = Date.now();
+  for (const [chave, d] of desafios2fa) {
+    if (d.expira < agora) desafios2fa.delete(chave);
+  }
+  // Evita crescimento sem limite em caso de muitas senhas válidas.
+  while (desafios2fa.size >= 1000) desafios2fa.delete(desafios2fa.keys().next().value);
+}
+
 function limitar(chave, max, janelaMs) {
   const agora = Date.now();
   const atual = tentativas.get(chave);
@@ -120,10 +149,26 @@ function cookieSeguro(req) {
   return !!(req.socket?.encrypted || proto === 'https');
 }
 
+function baseUrlPublica(req) {
+  const configurada = String(getSetting('url_publica', '') || process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+  if (/^https?:\/\//i.test(configurada)) return configurada;
+  // Nunca usa o cabeçalho Host livre em produção: ele pode ser forjado para
+  // desviar o link de redefinição de senha. Em desenvolvimento, aceita apenas
+  // endereços locais.
+  const host = String(req.headers?.host || '');
+  if (process.env.NODE_ENV !== 'production' && /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host)) {
+    const proto = (req.socket?.encrypted || String(req.headers?.['x-forwarded-proto'] || '').split(',')[0].trim() === 'https') ? 'https' : 'http';
+    return `${proto}://${host}`;
+  }
+  return '';
+}
+
 function criarSessao(req, res, u, ip) {
   const token = novoToken();
   const expira = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
-  db.prepare('INSERT INTO sessoes (token, usuario_id, expira_em) VALUES (?,?,?)').run(token, u.id, expira);
+  // Remove sessões expiradas antes de criar outra, mantendo a tabela pequena.
+  db.prepare('DELETE FROM sessoes WHERE expira_em < ?').run(new Date().toISOString());
+  db.prepare('INSERT INTO sessoes (token, usuario_id, expira_em) VALUES (?,?,?)').run(hashToken(token), u.id, expira);
   auditar({ id: u.id, nome: u.nome }, 'login', 'usuarios', u.id, null, ip);
   const secure = cookieSeguro(req) ? '; Secure' : '';
   res.setHeader('Set-Cookie', `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 7}${secure}`);
@@ -158,6 +203,7 @@ function login(req, res, body, ip) {
   }
   tentativas.delete(chave);
   if (u.totp_ativo) {
+    limparDesafios2fa();
     const desafio = novoToken();
     desafios2fa.set(desafio, { userId: u.id, expira: Date.now() + 5 * 60 * 1000, tentativas: 0 });
     return json(res, 200, { requer_2fa: true, desafio });
@@ -195,13 +241,13 @@ function login2fa(req, res, body, ip) {
     return erro(res, 401, 'Código inválido.');
   }
   desafios2fa.delete(desafio);
+  tentativas.delete(chave);
   if (novoRecovery) db.prepare('UPDATE usuarios SET totp_recovery = ? WHERE id = ?').run(novoRecovery, u.id);
   return json(res, 200, criarSessao(req, res, u, ip));
 }
 
 function logout(req, res, user, ip) {
-  const token = req._sid;
-  if (token) db.prepare('DELETE FROM sessoes WHERE token = ?').run(token);
+  if (req._sidHash) db.prepare('DELETE FROM sessoes WHERE token = ?').run(req._sidHash);
   if (user) auditar(user, 'logout', 'usuarios', user.id, null, ip);
   const secure = cookieSeguro(req) ? '; Secure' : '';
   res.setHeader('Set-Cookie', `sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`);
@@ -263,6 +309,66 @@ function normalizar(ent, body) {
   return out;
 }
 
+const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+const COMPETENCIA = /^\d{4}-\d{2}$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const STATUS_CONTRATO = ['ativo', 'encerrado', 'suspenso'];
+
+function erroValidacao(msg) {
+  return Object.assign(new Error(msg), { status: 400 });
+}
+
+function validarDados(entidade, dados) {
+  const tem = (campo) => Object.prototype.hasOwnProperty.call(dados, campo);
+  const taxa = ['proprietarios', 'imoveis', 'contratos'].includes(entidade) && tem('taxa_admin_pct');
+  if (taxa && (dados.taxa_admin_pct == null || dados.taxa_admin_pct < 0 || dados.taxa_admin_pct > 100)) {
+    throw erroValidacao('A taxa deve ficar entre 0 e 100.');
+  }
+  if (tem('email') && dados.email && !EMAIL.test(String(dados.email))) {
+    throw erroValidacao('E-mail inválido.');
+  }
+  if (entidade === 'imoveis' && tem('proprietario_id')) {
+    if (!Number.isFinite(dados.proprietario_id) || dados.proprietario_id <= 0) throw erroValidacao('Proprietário inválido.');
+    if (!db.prepare('SELECT id FROM proprietarios WHERE id = ?').get(dados.proprietario_id)) {
+      throw erroValidacao('Proprietário não encontrado.');
+    }
+  }
+  if (entidade === 'contratos') {
+    if (tem('imovel_id')) {
+      if (!Number.isFinite(dados.imovel_id) || dados.imovel_id <= 0) throw erroValidacao('Imóvel inválido.');
+      if (!db.prepare('SELECT id FROM imoveis WHERE id = ?').get(dados.imovel_id)) throw erroValidacao('Imóvel não encontrado.');
+    }
+    if (tem('inquilino_id')) {
+      if (!Number.isFinite(dados.inquilino_id) || dados.inquilino_id <= 0) throw erroValidacao('Inquilino inválido.');
+      if (!db.prepare('SELECT id FROM inquilinos WHERE id = ?').get(dados.inquilino_id)) throw erroValidacao('Inquilino não encontrado.');
+    }
+    for (const campo of ['inicio', 'fim', 'ultimo_reajuste', 'garantia_fim']) {
+      if (tem(campo) && dados[campo] && !DATA_ISO.test(String(dados[campo]))) throw erroValidacao(`Data inválida: ${campo}.`);
+    }
+    if (dados.inicio && dados.fim && dados.fim < dados.inicio) throw erroValidacao('A data final não pode ser anterior ao início.');
+    if (tem('dia_vencimento') && (!Number.isInteger(dados.dia_vencimento) || dados.dia_vencimento < 1 || dados.dia_vencimento > 31)) {
+      throw erroValidacao('Dia de vencimento deve ficar entre 1 e 31.');
+    }
+    if (tem('aluguel_centavos') && (!Number.isFinite(dados.aluguel_centavos) || dados.aluguel_centavos < 0)) {
+      throw erroValidacao('Aluguel inválido.');
+    }
+    if (tem('garantia_valor_centavos') && (!Number.isFinite(dados.garantia_valor_centavos) || dados.garantia_valor_centavos < 0)) {
+      throw erroValidacao('Valor de garantia inválido.');
+    }
+    if (tem('status') && !STATUS_CONTRATO.includes(dados.status)) throw erroValidacao('Status do contrato inválido.');
+  }
+  if (entidade === 'excecoes') {
+    if (tem('competencia') && !COMPETENCIA.test(String(dados.competencia))) throw erroValidacao('Competência inválida. Use AAAA-MM.');
+    if (tem('tipo') && !['desconto', 'acrescimo'].includes(dados.tipo)) throw erroValidacao('Tipo de exceção inválido.');
+    if (tem('valor_centavos') && (!Number.isFinite(dados.valor_centavos) || dados.valor_centavos < 0)) throw erroValidacao('Valor inválido.');
+    if (tem('contrato_id')) {
+      if (!Number.isFinite(dados.contrato_id) || !db.prepare('SELECT id FROM contratos WHERE id = ?').get(dados.contrato_id)) {
+        throw erroValidacao('Contrato não encontrado.');
+      }
+    }
+  }
+}
+
 function listar(entidade) {
   const ent = ENTIDADES[entidade];
   if (entidade === 'imoveis') {
@@ -294,6 +400,7 @@ function criar(entidade, body, user, ip) {
   const ent = ENTIDADES[entidade];
   const dados = normalizar(ent, body);
   exigirCampos(dados, ent.obrigatorios);
+  validarDados(entidade, dados);
   const cols = Object.keys(dados);
   const sql = `INSERT INTO ${ent.tabela} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`;
   const r = db.prepare(sql).run(...cols.map(c => dados[c]));
@@ -307,6 +414,7 @@ function atualizar(entidade, id, body, user, ip) {
   const dados = normalizar(ent, body);
   const cols = Object.keys(dados);
   if (!cols.length) throw Object.assign(new Error('Nada para atualizar.'), { status: 400 });
+  validarDados(entidade, dados);
   const antes = db.prepare(`SELECT * FROM ${ent.tabela} WHERE id = ?`).get(id);
   if (!antes) throw Object.assign(new Error('Registro não encontrado.'), { status: 404 });
   db.prepare(`UPDATE ${ent.tabela} SET ${cols.map(c => `${c} = ?`).join(', ')} WHERE id = ?`)
@@ -368,6 +476,13 @@ function criarLancamento(body, user, ip) {
   if (!['receita', 'despesa'].includes(dados.tipo)) throw Object.assign(new Error('Tipo inválido.'), { status: 400 });
   if (!['imobiliaria', 'proprietarios'].includes(dados.caixa)) throw Object.assign(new Error('Caixa inválido.'), { status: 400 });
   if (dados.valor_centavos <= 0) throw Object.assign(new Error('Valor deve ser maior que zero.'), { status: 400 });
+  if (!DATA_ISO.test(String(dados.data))) throw Object.assign(new Error('Data inválida. Use AAAA-MM-DD.'), { status: 400 });
+  if (!COMPETENCIA.test(String(dados.competencia))) throw Object.assign(new Error('Competência inválida. Use AAAA-MM.'), { status: 400 });
+  for (const [campo, tabela] of [['proprietario_id', 'proprietarios'], ['imovel_id', 'imoveis'], ['contrato_id', 'contratos']]) {
+    if (dados[campo] != null && !db.prepare(`SELECT id FROM ${tabela} WHERE id = ?`).get(dados[campo])) {
+      throw Object.assign(new Error(`Registro vinculado não encontrado: ${campo}.`), { status: 400 });
+    }
+  }
   exigirMesAberto(dados.competencia);
   const r = db.prepare(`INSERT INTO lancamentos (data, competencia, tipo, categoria, descricao, valor_centavos, caixa,
       proprietario_id, imovel_id, contrato_id, criado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
@@ -462,6 +577,7 @@ function criarUsuario(body, user, ip) {
   const senha = String(body.senha || '');
   const papel = texto(body.papel) || 'operador';
   exigirCampos({ nome, email, senha }, ['nome', 'email', 'senha']);
+  if (!EMAIL.test(email)) throw Object.assign(new Error('E-mail inválido.'), { status: 400 });
   validarSenha(senha, email);
   if (!['admin', 'operador', 'consulta'].includes(papel)) throw Object.assign(new Error('Papel inválido.'), { status: 400 });
   if (db.prepare('SELECT id FROM usuarios WHERE lower(email) = ?').get(email)) {
@@ -481,8 +597,12 @@ function atualizarUsuario(id, body, user, ip) {
   const email = body.email != null ? texto(body.email)?.toLowerCase() : u.email;
   const papel = body.papel != null ? texto(body.papel) : u.papel;
   const ativo = body.ativo != null ? bool(body.ativo) : u.ativo;
+  if (!nome) throw Object.assign(new Error('Informe o nome.'), { status: 400 });
+  if (!EMAIL.test(String(email || ''))) throw Object.assign(new Error('E-mail inválido.'), { status: 400 });
   if (!['admin', 'operador', 'consulta'].includes(papel)) throw Object.assign(new Error('Papel inválido.'), { status: 400 });
   if (id === user.id && ativo === 0) throw Object.assign(new Error('Você não pode desativar seu próprio usuário.'), { status: 400 });
+  const duplicado = db.prepare('SELECT id FROM usuarios WHERE lower(email) = ? AND id <> ?').get(email, id);
+  if (duplicado) throw Object.assign(new Error('E-mail já cadastrado.'), { status: 409 });
   db.prepare('UPDATE usuarios SET nome=?, email=?, papel=?, ativo=? WHERE id=?').run(nome, email, papel, ativo, id);
   if (body.senha) {
     validarSenha(body.senha, email);
@@ -496,15 +616,27 @@ function atualizarUsuario(id, body, user, ip) {
 
 /* ---------------- EXPORTAÇÃO CSV ---------------- */
 
+function nomeDownload(valor, padrao = 'arquivo') {
+  const limpo = String(valor || '')
+    .replace(/[^\w.\-]+/g, '_')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 120);
+  return limpo || padrao;
+}
+
 function csv(res, nome, colunas, linhas) {
+  nome = nomeDownload(nome, 'exportacao.csv');
   const esc = (v) => {
-    const s = v == null ? '' : String(v);
+    let s = v == null ? '' : String(v);
+    // Evita que dados cadastrados virem fórmulas ao abrir o CSV no Excel.
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
     return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const conteudo = '\uFEFF' + [colunas.map(c => c.titulo).join(';'), ...linhas.map(l => colunas.map(c => esc(c.valor(l))).join(';'))].join('\r\n');
   res.writeHead(200, {
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': `attachment; filename="${nome}"`,
+    'Cache-Control': 'no-store',
   });
   res.end(conteudo);
 }
@@ -591,10 +723,8 @@ export async function handleApi(req, res, url, user, ip, body) {
       if (r.usuario) {
         const padrao = String(r.usuario.email || '').endsWith('.local') ? '' : r.usuario.email;
         const destino = getSetting('email_recuperacao', '') || padrao;
-        if (destino && emailConfigurado()) {
-          const proto = (req.socket?.encrypted || String(req.headers?.['x-forwarded-proto'] || '').split(',')[0].trim() === 'https') ? 'https' : 'http';
-          const host = req.headers?.host || 'localhost';
-          const base = getSetting('url_publica', '').replace(/\/+$/, '') || `${proto}://${host}`;
+        const base = baseUrlPublica(req);
+        if (destino && emailConfigurado() && base) {
           const link = `${base}/#/redefinir?token=${r.token}`;
           try {
             await enviarEmail({
@@ -605,6 +735,8 @@ export async function handleApi(req, res, url, user, ip, body) {
           } catch (e) {
             console.error('[recuperacao] falha ao enviar e-mail:', e.message);
           }
+        } else if (destino && emailConfigurado()) {
+          console.warn('[recuperacao] Configure url_publica ou PUBLIC_URL para enviar o link de redefinição.');
         } else {
           console.warn('[recuperacao] SMTP não configurado; solicitação registrada para', email);
         }
@@ -679,7 +811,7 @@ export async function handleApi(req, res, url, user, ip, body) {
       validarSenha(nova, u.email);
       db.prepare('UPDATE usuarios SET senha_hash = ?, deve_trocar_senha = 0 WHERE id = ?').run(hashSenha(nova), user.id);
       setSetting('primeiro_acesso', '0');
-      db.prepare('DELETE FROM sessoes WHERE usuario_id = ? AND token != ?').run(user.id, req._sid || '');
+      db.prepare('DELETE FROM sessoes WHERE usuario_id = ? AND token != ?').run(user.id, req._sidHash || '');
       registrar(user, 'alterar_senha', 'usuarios', user.id, null, ip);
       return json(res, 200, { ok: true });
     }
@@ -960,7 +1092,8 @@ export async function handleApi(req, res, url, user, ip, body) {
         const conteudo = gerarCSV(rel);
         res.writeHead(200, {
           'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${slug}.csv"`,
+          'Content-Disposition': `attachment; filename="${nomeDownload(slug, 'relatorio')}.csv"`,
+          'Cache-Control': 'no-store',
         });
         return res.end(conteudo);
       }
@@ -968,8 +1101,9 @@ export async function handleApi(req, res, url, user, ip, body) {
         const buf = gerarXLSX(rel);
         res.writeHead(200, {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename="${slug}.xlsx"`,
+          'Content-Disposition': `attachment; filename="${nomeDownload(slug, 'relatorio')}.xlsx"`,
           'Content-Length': buf.length,
+          'Cache-Control': 'no-store',
         });
         return res.end(buf);
       }
@@ -977,8 +1111,9 @@ export async function handleApi(req, res, url, user, ip, body) {
         const buf = await gerarPDF(rel);
         res.writeHead(200, {
           'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="${slug}.pdf"`,
+          'Content-Disposition': `attachment; filename="${nomeDownload(slug, 'relatorio')}.pdf"`,
           'Content-Length': buf.length,
+          'Cache-Control': 'no-store',
         });
         return res.end(buf);
       }
@@ -1200,13 +1335,27 @@ export async function handleApi(req, res, url, user, ip, body) {
         db.prepare(`UPDATE proprietarios SET nome = ?, cpf_cnpj = NULL, email = NULL, telefone = NULL, endereco = NULL,
           banco = NULL, agencia = NULL, conta = NULL, pix = NULL, observacoes = NULL, documento_url = NULL WHERE id = ?`)
           .run(`Titular anonimizado #${id}`, id);
-        db.prepare("UPDATE comunicacoes SET destinatario = NULL, destinatario_nome = 'Titular anonimizado' WHERE destinatario = ? OR destinatario_nome = ?").run(t.email || '', t.nome);
+        db.prepare("UPDATE comunicacoes SET destinatario = NULL, destinatario_nome = 'Titular anonimizado', mensagem = '[conteúdo removido por anonimização]' WHERE destinatario = ? OR destinatario_nome = ?").run(t.email || '', t.nome);
+        const contratos = db.prepare('SELECT id FROM contratos WHERE imovel_id IN (SELECT id FROM imoveis WHERE proprietario_id = ?)').all(id);
+        const ids = contratos.map(c => c.id);
+        if (ids.length) {
+          const ph = ids.map(() => '?').join(',');
+          db.prepare(`UPDATE contratos SET observacoes = NULL, documento_url = NULL WHERE id IN (${ph})`).run(...ids);
+        }
+        anonimizarDocumentosEDetalhes({ entidade: 'proprietarios', entidadeId: id, contratoIds: ids });
       } else if (tipo === 'inquilino') {
         const t = db.prepare('SELECT nome, email, telefone FROM inquilinos WHERE id = ?').get(id);
         if (!t) return erro(res, 404, 'Inquilino não encontrado.');
         db.prepare('UPDATE inquilinos SET nome = ?, cpf_cnpj = NULL, email = NULL, telefone = NULL, observacoes = NULL WHERE id = ?')
           .run(`Titular anonimizado #${id}`, id);
-        db.prepare("UPDATE comunicacoes SET destinatario = NULL, destinatario_nome = 'Titular anonimizado' WHERE destinatario = ? OR destinatario_nome = ?").run(t.email || '', t.nome);
+        db.prepare("UPDATE comunicacoes SET destinatario = NULL, destinatario_nome = 'Titular anonimizado', mensagem = '[conteúdo removido por anonimização]' WHERE destinatario = ? OR destinatario_nome = ?").run(t.email || '', t.nome);
+        const contratos = db.prepare('SELECT id FROM contratos WHERE inquilino_id = ?').all(id);
+        const ids = contratos.map(c => c.id);
+        if (ids.length) {
+          const ph = ids.map(() => '?').join(',');
+          db.prepare(`UPDATE contratos SET observacoes = NULL, documento_url = NULL WHERE id IN (${ph})`).run(...ids);
+        }
+        anonimizarDocumentosEDetalhes({ entidade: 'inquilinos', entidadeId: id, contratoIds: ids });
       } else {
         return erro(res, 400, 'Tipo inválido.');
       }
@@ -1218,6 +1367,7 @@ export async function handleApi(req, res, url, user, ip, body) {
       exigir(user, 'admin');
       const tmp = path.join(os.tmpdir(), `imob-verificar-${Date.now()}.db`);
       db.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
+      try { fs.chmodSync(tmp, 0o600); } catch {}
       let contagens = {};
       try {
         const b = new DatabaseSync(tmp);
@@ -1243,6 +1393,7 @@ export async function handleApi(req, res, url, user, ip, body) {
       exigir(user, 'admin');
       const tmp = path.join(os.tmpdir(), `imobiliaria-backup-${Date.now()}.db`);
       db.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
+      try { fs.chmodSync(tmp, 0o600); } catch {}
       setSetting('ultimo_backup', hojeISO());
       registrar(user, 'backup', 'sistema', null, { documentos: fs.existsSync(UPLOADS) }, ip);
       res.writeHead(200, {
@@ -1250,7 +1401,7 @@ export async function handleApi(req, res, url, user, ip, body) {
         'Content-Disposition': `attachment; filename="imobiliaria-backup-${hojeISO()}.zip"`,
         'Cache-Control': 'no-store',
       });
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      const archive = new ZipArchive({ zlib: { level: 9 } });
       archive.on('error', (e) => {
         console.error('[backup] erro:', e);
         try { fs.unlinkSync(tmp); } catch {}

@@ -326,9 +326,11 @@ function filtrar(propId) {
 
 /* ---------------- CSV ---------------- */
 
-function celulaCSV(v, texto = false) {
+function celulaCSV(v, proteger = true) {
   let s = v == null ? '' : String(v);
-  if (texto && /^[=+@]/.test(s)) s = "'" + s;
+  // Mitiga injeção de fórmula em planilhas (CSV injection): uma célula de texto
+  // que comece com =, +, -, @, tab ou CR não pode ser interpretada pelo Excel.
+  if (proteger && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
   return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
@@ -343,10 +345,10 @@ export function gerarCSV(rel) {
   for (const l of rel.linhas) {
     linhas.push(rel.colunas.map(c => {
       const v = l[c.key];
-      if (c.tipo === 'money') return celulaCSV(money(v));
-      if (c.tipo === 'pct') return celulaCSV(v == null ? '—' : num(v, 2));
-      if (c.tipo === 'date') return celulaCSV(v || '—');
-      return celulaCSV(v == null ? '' : v, c.tipo === 'text');
+      if (c.tipo === 'money') return celulaCSV(money(v), false);
+      if (c.tipo === 'pct') return celulaCSV(v == null ? '—' : num(v, 2), false);
+      if (c.tipo === 'date') return celulaCSV(v || '—', false);
+      return celulaCSV(v == null ? '' : v);
     }));
   }
   linhas.push([]);

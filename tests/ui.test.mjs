@@ -23,7 +23,7 @@ test('todas as telas renderizam com dados reais', async (t) => {
   let base = '';
   const proc = spawn(process.execPath, ['src/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, DATA_DIR: dir, PORT: '0', SEED_COMPLETO: '0', HOST: '127.0.0.1', APP_SECRET: 'teste-ui-36-caracteres-aleatorios-x' },
+    env: { ...process.env, DATA_DIR: dir, PORT: '0', SEED_COMPLETO: '0', HOST: '127.0.0.1', APP_SECRET: 'teste-ui-36-caracteres-aleatorios-x', ADMIN_SENHA: 'admin123' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(() => { try { proc.kill('SIGKILL'); } catch {} try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} });

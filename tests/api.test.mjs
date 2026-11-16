@@ -25,7 +25,7 @@ test('fluxo principal da API', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'imob-api-'));
   const proc = spawn(process.execPath, ['src/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, DATA_DIR: dir, PORT: '0', SEED_COMPLETO: '0', HOST: '127.0.0.1', APP_SECRET: 'test-secret-38-caracteres-para-o-teste' },
+    env: { ...process.env, DATA_DIR: dir, PORT: '0', SEED_COMPLETO: '0', HOST: '127.0.0.1', APP_SECRET: 'test-secret-38-caracteres-para-o-teste', ADMIN_SENHA: 'admin123' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(() => {
@@ -58,6 +58,13 @@ test('fluxo principal da API', async (t) => {
     const setCookie = res.headers.getSetCookie?.()[0] || res.headers.get('set-cookie');
     assert.ok(setCookie?.includes('sid='));
     cookie = setCookie.split(';')[0];
+
+    const { DatabaseSync } = await import('node:sqlite');
+    const b = new DatabaseSync(path.join(dir, 'imobiliaria.db'));
+    const salvo = b.prepare('SELECT token FROM sessoes ORDER BY rowid DESC LIMIT 1').get().token;
+    b.close();
+    assert.equal(salvo.length, 64, 'o token de sessão deve ser gravado como hash');
+    assert.notEqual(salvo, cookie.split('=')[1], 'o cookie não pode aparecer em claro no banco');
   });
 
   await t.test('troca de senha e leitura do painel', async () => {
@@ -104,6 +111,23 @@ test('fluxo principal da API', async (t) => {
     const imoveis = await req('/api/imoveis');
     const criado = imoveis.data.find(i => i.id === imovel.data.id);
     assert.equal(criado.proprietario_nome, 'Proprietário Teste');
+  });
+
+  await t.test('rejeita dados inválidos e origem cruzada', async () => {
+    const taxa = await req('/api/proprietarios', { method: 'POST', body: { nome: 'Taxa inválida', taxa_admin_pct: 150 } });
+    assert.equal(taxa.res.status, 400);
+
+    const ref = await req('/api/contratos', { method: 'POST', body: {
+      imovel_id: 999999, inquilino_id: 999999, inicio: '2026-01-01', aluguel_centavos: 1000,
+    } });
+    assert.equal(ref.res.status, 400);
+
+    const csrf = await fetch(base + '/api/proprietarios', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json', origin: 'http://evil.example' },
+      body: JSON.stringify({ nome: 'Origem cruzada' }),
+    });
+    assert.equal(csrf.status, 403);
   });
 
   await t.test('cobrança, baixa, repasse e fechamento', async () => {

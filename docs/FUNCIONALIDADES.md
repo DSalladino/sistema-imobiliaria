@@ -216,12 +216,13 @@ relevante é auditada.
 
 **Como funciona:** área **Privacidade (LGPD)** para admin com:
 - exportação dos dados de um titular em JSON;
-- anonimização de nome/CPF/contato preservando contratos e financeiro;
+- anonimização de nome/CPF/contato, remoção dos documentos pessoais e limpeza dos detalhes de auditoria, preservando contratos e financeiro;
 - configuração de encarregado, e-mail e prazos de retenção;
 - checklist do que o sistema apoia.
 
-**Regras:** a anonimização não apaga o histórico financeiro (obrigação legal). A revisão jurídica e a
-política de privacidade são responsabilidade da empresa.
+**Regras:** a anonimização remove dados pessoais e arquivos vinculados, mas não apaga o histórico
+financeiro (obrigação legal). A revisão jurídica e a política de privacidade são responsabilidade da
+empresa.
 
 **Onde:** menu **Privacidade (LGPD)** e **Configurações → LGPD**.
 

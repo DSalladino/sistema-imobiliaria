@@ -13,7 +13,7 @@ Backend em **Node.js + SQLite** (`node:sqlite`), com `xlsx`, `pdfkit`, `nodemail
 | [`docs/FUNCIONALIDADES.md`](docs/FUNCIONALIDADES.md) | Cada funcionalidade explicada: problema, regras e onde encontrar |
 | [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) | Diagramas, modelo de dados, fluxos e decisões técnicas |
 | [`docs/ESTUDO-DE-CASO.md`](docs/ESTUDO-DE-CASO.md) | Contexto, desafios e resultados (visão de portfólio) |
-| [`docs/ESTADO-ATUAL.md`](docs/ESTADO-ATUAL.md) | Handoff para continuar o desenvolvimento |
+| [`docs/ESTADO-ATUAL.md`](docs/ESTADO-ATUAL.md) | Estado atual, módulos, rotas e pendências técnicas |
 | [`docs/roadmap.md`](docs/roadmap.md) | Próximas funcionalidades e prioridades |
 | [`docs/checklist-seguranca.md`](docs/checklist-seguranca.md) | Auditoria de 21 pontos de segurança |
 | [`deploy/README.md`](deploy/README.md) | Publicação em VPS, domínio, HTTPS, backup e restauração |
@@ -32,17 +32,19 @@ Abra http://127.0.0.1:3000
 
 **Acesso inicial**
 - E-mail: `admin@imobiliaria.local`
-- Senha: `admin123`
+- Senha: gerada automaticamente na primeira execução e exibida **uma única vez** no terminal.
 
-No primeiro login o sistema **obriga a criação de uma senha própria** (mínimo 8 caracteres).
-A senha padrão não abre o painel diretamente.
+Para definir a senha inicial em uma instalação automatizada, use a variável `ADMIN_SENHA` antes do
+primeiro `npm start`. No primeiro login o sistema **obriga a criação de uma senha própria** (mínimo
+8 caracteres). Não existe senha padrão publicada.
 
 ### Recuperação de senha
 
 Na tela de login há **Esqueci minha senha**. O pedido gera um link de uso único, válido por 30 minutos, e
 envia para o **e-mail de recuperação** configurado em Configurações → Segurança. O envio depende do SMTP
-estar configurado (veja `deploy/README.md`). Sem SMTP, a solicitação fica registrada em **Manutenção**
-para outro administrador atender.
+e da **URL pública** (`url_publica` em Configurações → Segurança ou `PUBLIC_URL` no ambiente); sem ela o
+sistema não usa o cabeçalho `Host` por segurança. Sem SMTP, a solicitação fica registrada em
+**Manutenção** para outro administrador atender.
 
 Se ninguém conseguir entrar, o administrador do servidor pode redefinir pelo terminal:
 
@@ -62,7 +64,8 @@ npm run demo:servir     # cria/usa data-demo e sobe em http://127.0.0.1:3009
 ```
 
 O banco de demonstração fica em `data-demo/`, separado de `data/`. A instância usa a mesma aplicação e
-pode rodar ao mesmo tempo que a produção, em outra porta ou subdomínio.
+pode rodar ao mesmo tempo que a produção, em outra porta ou subdomínio. Em produção (`NODE_ENV=production`)
+a base começa vazia; dados de exemplo só entram com `SEED_DEMO=1` ou pelos comandos de demonstração.
 
 Dentro do sistema, **Manutenção** permite carregar a demonstração ou zerar os dados operacionais. Antes
 de qualquer uma dessas ações, o sistema cria um backup do banco em `data/backups/`.
@@ -242,8 +245,8 @@ data/
 
 ## Segurança
 
-O sistema foi auditado com base em um checklist de 21 pontos de segurança para aplicações web. O resultado
-completo, com evidências e pendências, está em [`docs/checklist-seguranca.md`](docs/checklist-seguranca.md).
+O sistema passa por um checklist de 21 pontos de segurança para aplicações web. O resultado completo,
+com evidências e pendências, está em [`docs/checklist-seguranca.md`](docs/checklist-seguranca.md).
 
 Implementado: troca de senha obrigatória no primeiro acesso, `scrypt` com salt, política de senha,
 sessão `HttpOnly`/`SameSite`/`Secure` sob HTTPS, rate limit de login/API/importação, autorização por
@@ -251,9 +254,8 @@ papel no servidor, SQL parametrizado, escape de saída, proteção CSRF por orig
 cabeçalhos de segurança, erros genéricos, limites de upload, proteção contra path traversal e
 auditoria de ações sensíveis.
 
-Pendências conhecidas: atualizar a dependência `xlsx` (advisory alta sem correção no npm), revisar
-`archiver`/`minimatch` (advisory moderada no backup), publicar com HTTPS/`TRUST_PROXY`, testar a
-restauração do backup, 2FA e revisão jurídica de LGPD.
+Pendências conhecidas: publicar com HTTPS/`TRUST_PROXY`, testar a restauração do backup periodicamente,
+revisar os fluxos de LGPD com apoio jurídico e manter as dependências atualizadas (`npm audit`).
 
 Variáveis de ambiente relevantes:
 
@@ -263,7 +265,9 @@ Variáveis de ambiente relevantes:
 | `HOST` | Interface de escuta (padrão `127.0.0.1`; use `0.0.0.0` para rede local) |
 | `DATA_DIR` | Pasta do banco (padrão `./data`) |
 | `TRUST_PROXY=1` | Usa `X-Forwarded-For`/`X-Forwarded-Proto` atrás de Nginx/Caddy |
-| `APP_SECRET` | Chave que criptografa os segredos de 2FA. Guarde com o backup |
+| `APP_SECRET` | Chave que criptografa os segredos de 2FA e os códigos de recuperação. Guarde com o backup |
+| `ADMIN_SENHA` | Senha inicial do administrador na primeira execução (opcional) |
+| `PUBLIC_URL` | URL pública usada nos links de e-mail (ex.: `https://imobiliaria.exemplo.com`) |
 
 ## Testes
 
@@ -274,7 +278,8 @@ npm test
 - `tests/api.test.mjs`: API, permissões, precedência de taxas, estorno, fechamento, analytics,
   relatórios em PDF, cobranças, repasses, backup e verificação de integridade
 - `tests/rules.test.mjs`: precedência de taxa, snapshot do repasse e política de senha
-- `tests/ui.test.mjs`: renderiza as 20 telas com dados reais em jsdom e confere o conteúdo
+- `tests/ui.test.mjs`: renderiza as telas com dados reais em jsdom e confere o conteúdo
+- `tests/seed.test.mjs`: valida a base de demonstração da primeira execução
 
 ## Backup e restauração
 
@@ -301,8 +306,8 @@ hospedagem compartilhada não servem. O guia completo está em [`deploy/README.m
 3. Automatizar backup offsite e testar a restauração.
 4. Revisar as regras de taxa com a imobiliária e validar com casos reais.
 5. Revisar LGPD e contratos com apoio jurídico.
-6. Atualizar a dependência `xlsx` para a versão oficial mais recente do SheetJS (a do npm está
-   congelada na 0.18.5) ou processar planilhas em ambiente isolado.
+6. Rodar `npm audit` e manter as dependências atualizadas. O `xlsx` usa a distribuição oficial do
+   SheetJS (0.20.3), fora do pacote congelado do npm.
 
 ## O que ainda não está incluído
 

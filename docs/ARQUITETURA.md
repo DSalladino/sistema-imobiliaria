@@ -103,10 +103,10 @@ O repasse guarda o cálculo completo. O extrato pode ser reimpresso anos depois 
 ## Segurança
 
 - Senha: `scrypt` + salt, comparação `timingSafeEqual`.
-- Sessão: token de 256 bits, `HttpOnly`, `SameSite=Lax`, `Secure` sob HTTPS, invalidação em massa.
+- Sessão: token de 256 bits guardado no banco como hash SHA-256, `HttpOnly`, `SameSite=Lax`, `Secure` sob HTTPS, invalidação em massa.
 - 2FA: TOTP, segredo cifrado com AES-256-GCM (`APP_SECRET` ou chave local).
 - Rate limit: login, 2FA, API e importação.
-- CSRF: `SameSite` + JSON obrigatório + validação de `Origin`.
+- CSRF: `SameSite` + JSON obrigatório + validação de `Origin` e `Sec-Fetch-Site`.
 - XSS: escape na renderização; CSP sem script inline.
 - SQL: consultas parametrizadas; filtros numéricos validados.
 - Upload: tamanho, extensão, nome aleatório, storage fora da pasta pública, download autenticado.
