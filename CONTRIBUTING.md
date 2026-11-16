@@ -29,25 +29,30 @@ DATA_DIR=.tmp-dev npm run dev
 ## Testes
 
 ```bash
+npm run check
 npm test
 npm audit
 ```
 
-Os testes usam bancos temporários e cobrem API, regras de negócio, interface e carga inicial.
+Os testes usam bancos temporários e cobrem API, regras de negócio, interface e
+carga inicial. `npm run test:coverage` mostra a cobertura experimental do Node.
 Antes de abrir uma alteração:
 
-1. execute `npm test`;
-2. execute `npm audit`;
-3. confirme que nenhum arquivo de `data/`, `.env` ou credencial foi incluído no commit.
+1. execute `npm run check`;
+2. execute `npm test`;
+3. execute `npm audit`;
+4. confirme que nenhum arquivo de `data/`, `.env` ou credencial foi incluído no commit.
 
 ## Estrutura
 
 ```text
 src/            backend HTTP, regras, banco, relatórios e integrações
 public/         SPA em JavaScript puro, estilos e gráficos SVG
-tests/          testes automatizados
-docs/           arquitetura, funcionalidades, segurança e roadmap
+tests/          testes automatizados (node:test + jsdom)
+docs/           produto, arquitetura, dados, API, qualidade, operação e ADRs
 deploy/         systemd, Caddy, backup e guia de publicação
+scripts/        verificação de sintaxe
+.github/        CI, templates de issue e pull request
 ```
 
 ## Padrões do projeto
@@ -68,7 +73,8 @@ deploy/         systemd, Caddy, backup e guia de publicação
 - `docs/nome-curto` para documentação.
 - `chore/nome-curto` para manutenção.
 
-Abra um pull request para `main`. O workflow de CI executa `npm ci` e `npm test`.
+Abra um pull request para `main`. O workflow de CI executa `npm ci`, `npm run check`
+e `npm test` em Node 22 e 24.
 
 ## Commits
 
@@ -88,11 +94,13 @@ funcional.
 
 ## Checklist do pull request
 
+- [ ] `npm run check` passa.
 - [ ] `npm test` passa.
 - [ ] `npm audit` não apresenta vulnerabilidades conhecidas.
 - [ ] A alteração tem teste quando muda regra de negócio.
 - [ ] Permissões e auditoria foram verificadas no servidor.
 - [ ] Documentação foi atualizada quando o comportamento mudou.
+- [ ] O `CHANGELOG.md` foi atualizado quando há mudança relevante.
 - [ ] Nenhum dado real, segredo ou arquivo de `data/` foi incluído.
 
 ## Banco de dados

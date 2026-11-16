@@ -177,6 +177,10 @@ sudo cp deploy/backup.sh /usr/local/bin/imobiliaria-backup.sh
 sudo chmod 700 /usr/local/bin/imobiliaria-backup.sh
 ```
 
+O script gera `imobiliaria-AAAA-MM-DD-HHMM.db` e `dados-AAAA-MM-DD-HHMM.tar.gz`.
+O tar inclui `uploads/` e, se existir, `.app-key` (chave local que decifra o 2FA
+quando `APP_SECRET` não está definido). Trate esses arquivos como confidenciais.
+
 Configure o `rclone` (Backblaze B2, Cloudflare R2 ou Google Drive):
 
 ```bash
@@ -221,8 +225,30 @@ SMTP_FROM=seu-email@gmail.com
 
 ### 10. Monitoramento
 
-Crie um monitor HTTP gratuito no UptimeRobot para `https://seu-endereco/` com intervalo de 5 min.
-Se cair, você recebe e-mail.
+Crie um monitor HTTP gratuito no UptimeRobot para
+`https://seu-endereco/api/health` com intervalo de 5 min. A rota verifica a
+conexão com o banco e devolve versão e uptime. Se cair, você recebe e-mail.
+
+Também vale monitorar:
+
+- espaço em disco acima de 80%;
+- falha do cron de backup;
+- certificado do Caddy (renovação automática);
+- erros no `journalctl -u imobiliaria`.
+
+### 10.1 Atualização de versão
+
+```bash
+cd /opt/imobiliaria
+sudo -u imobiliaria git pull
+sudo -u imobiliaria npm ci --omit=dev
+sudo systemctl restart imobiliaria
+curl -fsS http://127.0.0.1:3000/api/health
+```
+
+Antes de atualizar: leia o `CHANGELOG.md`, faça backup e, se a mudança envolver
+banco ou regra financeira, teste em uma cópia. O esquema usa migrações aditivas,
+mas backup nunca é opcional.
 
 ---
 
@@ -258,12 +284,16 @@ Se cair, você recebe e-mail.
 ## Restauração (teste mensal)
 
 1. Pare o serviço: `sudo systemctl stop imobiliaria`.
-2. Baixe o backup do dia (`imobiliaria-AAAA-MM-DD.db`) e o `uploads-....tar.gz`.
+2. Baixe o backup do dia (`imobiliaria-AAAA-MM-DD-HHMM.db`) e o `dados-....tar.gz`.
 3. Substitua `data/imobiliaria.db` e remova `data/imobiliaria.db-wal`/`-shm`.
 4. Extraia `uploads/` em `data/`.
-5. `sudo chown -R imobiliaria:imobiliaria /opt/imobiliaria/data`.
-6. Suba o serviço e confira: login, totais do painel, um contrato, um documento e um PDF.
-7. Registre data, responsável e resultado.
+5. Se o tar tiver `.app-key`, copie para `data/.app-key`.
+6. `sudo chown -R imobiliaria:imobiliaria /opt/imobiliaria/data`.
+7. Suba o serviço e confira: login, totais do painel, um contrato, um documento e um PDF.
+8. Registre data, responsável e resultado.
+
+> Sem o `.app-key` correto (e sem o `APP_SECRET` original), os segredos de 2FA
+> não podem ser decifrados. Usuários com 2FA precisarão de reset pelo admin.
 
 ## Checklist de go-live
 
@@ -273,8 +303,9 @@ Se cair, você recebe e-mail.
 - [ ] Senha do admin trocada
 - [ ] Usuários criados com papéis corretos
 - [ ] SMTP configurado (se for usar e-mail)
-- [ ] Backup diário rodando e enviado para fora
-- [ ] Restauração testada
+- [ ] Backup diário rodando e enviado para fora (banco + documentos + `.app-key`)
+- [ ] Restauração testada, incluindo um usuário com 2FA
+- [ ] `/api/health` monitorado
 - [ ] UptimeRobot ativo
 - [ ] Celular testado
 - [ ] Dados de demonstração removidos

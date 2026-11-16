@@ -22,14 +22,14 @@ Legenda: **OK** · **Corrigido** · **Parcial** · **Pendente** · **Risco aceit
 | 11 | CSRF | **Corrigido** | `SameSite=Lax` + exigência de `Content-Type: application/json` + validação de `Origin` e `Sec-Fetch-Site` em POST/PUT/PATCH/DELETE. Formulário cross-site não consegue enviar JSON. |
 | 12 | Cabeçalhos de segurança | **Corrigido** | `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy` e `Strict-Transport-Security` quando HTTPS. |
 | 13 | Erros não vazam detalhes | **Corrigido** | Cliente recebe “Erro interno. Tente novamente.”; o stack trace fica apenas no log do servidor. Erros de validação continuam claros e sem dados internos. |
-| 14 | Upload de arquivo seguro | **Corrigido** | Planilhas: limite de 12 MB, 5.000 linhas e 60 colunas, leitura em memória. Documentos: 10 MB por arquivo, extensões permitidas (PDF, imagem, Word, Excel, CSV, TXT), nome interno aleatório, gravação em `data/uploads` (fora de `public/`), download autenticado, versionamento e auditoria. |
+| 14 | Upload de arquivo seguro | **Corrigido** | Planilhas: limite de 12 MB, 5.000 linhas e 60 colunas, leitura em memória. Documentos: 10 MB por arquivo, extensões permitidas (PDF, imagem, Word, Excel, CSV, TXT), nome interno aleatório, gravação em `data/uploads` (fora de `public/`), download autenticado, versionamento e auditoria. Ainda não há antivírus nem criptografia em repouso. |
 | 15 | Validação de entrada | **OK** | Campos obrigatórios, tipos, datas, percentuais entre 0 e 100, valores positivos e referências existentes (proprietário/imóvel) validadas no servidor. |
 | 16 | Path traversal | **Corrigido** | Arquivos estáticos resolvidos com `path.resolve` + `path.relative`; qualquer caminho que saia de `public/` é bloqueado. Arquivo inexistente com extensão retorna 404 (não devolve o HTML). |
-| 17 | Banco e backup protegidos | **OK** | `data/` fora do diretório público e no `.gitignore`, com permissões `0700`/`0600`; backup só para admin, em `.zip` com o banco e a pasta de documentos, gerado com `VACUUM INTO`; verificação de integridade abre o banco gerado e confere as tabelas; restauração documentada no README. |
+| 17 | Banco e backup protegidos | **OK** | `data/` fora do diretório público e no `.gitignore`, com permissões `0700`/`0600`; backup só para admin, em `.zip` com banco, documentos e `.app-key` (quando existir), gerado com `VACUUM INTO`; verificação de integridade abre o banco gerado e confere as tabelas; restauração documentada em `docs/OPERACAO.md`. O ZIP é tratado como confidencial. |
 | 18 | Dependências auditadas | **OK** | `npm audit` sem vulnerabilidades conhecidas. Foram atualizados `xlsx` para o SheetJS 0.20.3 (distribuição oficial), `nodemailer` 10.x e `archiver` 8.x, com override de `minimatch` corrigido. Os limites de planilha e upload continuam aplicados. |
 | 19 | Auditoria de ações sensíveis | **OK** | Registra login, falha e bloqueio de login, criação/alteração/desativação, estorno, cálculo e pagamento de repasse, fechamento/reabertura, importação, backup e troca de senha. Tela de auditoria restrita ao admin. |
-| 20 | HTTPS, proxy e 2FA | **Parcial** | **2FA TOTP implementado** (QR Code, códigos de recuperação, reset pelo admin, segredo criptografado com `APP_SECRET`/chave local) e códigos mascarados para consulta. Em produção falta publicar atrás de HTTPS (Nginx/Caddy), definir `TRUST_PROXY=1` e ativar HSTS (já automático sob HTTPS). |
-| 21 | Backup testado, LGPD e auditoria final | **Parcial** | Backup, verificação de integridade e restauração documentada; exportação e anonimização de dados do titular implementadas; falta **executar o teste de restauração periodicamente** e concluir a revisão jurídica de LGPD. Esta tabela é a auditoria final deste ciclo. |
+| 20 | HTTPS, proxy e 2FA | **Parcial** | **2FA TOTP implementado** (QR Code, códigos de recuperação, reset pelo admin, segredo criptografado com `APP_SECRET`/chave local). O HSTS é automático sob HTTPS. A parte de infraestrutura (Caddy/HTTPS e `TRUST_PROXY=1`) está documentada em `deploy/README.md`, mas depende de cada instalação. |
+| 21 | Backup testado, LGPD e auditoria final | **Parcial** | Backup, verificação de integridade e restauração documentada; exportação e anonimização de dados do titular implementadas. Falta **executar o teste de restauração periodicamente**, configurar retenção automática de logs e concluir a revisão jurídica de LGPD. Esta tabela é a auditoria final deste ciclo. |
 
 ## O que foi alterado nesta rodada
 
@@ -42,11 +42,18 @@ Legenda: **OK** · **Corrigido** · **Parcial** · **Pendente** · **Risco aceit
 - Proteção contra timing attack no login.
 - Sessões expiradas limpas e cookie `Secure` sob HTTPS.
 - `TRUST_PROXY=1` para deployments atrás de proxy.
+- Backup passa a incluir a chave local `.app-key` (2FA) e aviso de confidencialidade.
+- Validação de categoria/caixa e de vínculos em lançamentos manuais.
+- Proteção contra remover o último administrador ativo.
+- Repasse inclui contrato encerrado com aluguel recebido e ignora pagamento de repasse anterior.
+- Alertas e relatório de inadimplência passam a considerar pagamento parcial.
+- Datas calculadas por componentes locais, sem recuo de um dia em fusos positivos.
 
 ## Como repetir a verificação
 
 ```bash
-npm test          # API, relatórios e interface (inclui login e troca de senha)
+npm run check     # sintaxe de src, public, tests e scripts
+npm test          # API, regras, interface e seed
 npm audit         # dependências
 ```
 
@@ -73,6 +80,6 @@ OK/Corrigido/Parcial/Pendente e uma lista priorizada do que corrigir primeiro.
 
 1. **Publicar com HTTPS** e `TRUST_PROXY=1`, testando HSTS e cookies `Secure`.
 2. **Testar a restauração** do backup em uma cópia e registrar o resultado.
-3. **2FA** para admin e operadores.
-4. **LGPD**: base legal, retenção, exportação/exclusão e revisão jurídica.
+3. **2FA** para admin e operadores em produção, com códigos de recuperação guardados fora do servidor.
+4. **LGPD**: base legal, retenção automática, exportação/exclusão e revisão jurídica.
 5. **Multiempresa**: escopo por empresa em todas as consultas (quando fizer sentido).
