@@ -36,6 +36,8 @@
     "demo": "node src/demo.js",
     "demo:preparar": "node src/demo-preparar.js",
     "demo:servir": "node src/demo-server.js",
+    "midia:capturar": "node scripts/capturar-telas.mjs",
+    "midia:video": "node scripts/gravar-demo.mjs",
     "admin:reset": "node src/reset-admin.js"
   },
   "dependencies": {

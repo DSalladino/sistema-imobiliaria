@@ -5,6 +5,11 @@ semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
 ## [Não publicado]
 
+### Adicionado
+- Base de demonstração com **credenciais conhecidas** (`Demo#2026`) e sem troca obrigatória de senha, sempre isolada em `data-demo/`.
+- `docs/DEMONSTRACAO.md` com roteiro de avaliação, conteúdo da base de exemplo e limites da demonstração.
+- Scripts `midia:capturar` e `midia:video` para gerar capturas de tela e o tour de 90 s a partir da própria demonstração (Playwright opcional, fora das dependências do produto).
+
 ### Planejado
 - Reajuste assistido em lote, rescisão de contrato e contas a pagar/receber.
 - Portal do proprietário/inquilino e central de manutenção.

@@ -10,7 +10,7 @@ técnicas, opere em produção e evolua o código sem depender de conhecimento t
 
 | Se você é… | Leia nesta ordem |
 |---|---|
-| **Recrutador, cliente ou visitante do portfólio** | [README principal](../README.md) → [Estudo de caso](ESTUDO-DE-CASO.md) → [Funcionalidades](FUNCIONALIDADES.md) → [Arquitetura](ARQUITETURA.md) |
+| **Recrutador, cliente ou visitante do portfólio** | [README principal](../README.md) → [Demonstração](DEMONSTRACAO.md) → [Estudo de caso](ESTUDO-DE-CASO.md) → [Funcionalidades](FUNCIONALIDADES.md) → [Arquitetura](ARQUITETURA.md) |
 | **Desenvolvedor que vai rodar o projeto** | [README principal](../README.md) → [Arquitetura](ARQUITETURA.md) → [Modelo de dados](MODELO-DE-DADOS.md) → [API](API.md) → [Qualidade](QUALIDADE.md) |
 | **Pessoa que vai publicar e operar** | [Publicação](../deploy/README.md) → [Operação](OPERACAO.md) → [Checklist de segurança](checklist-seguranca.md) |
 | **Revisor de segurança ou LGPD** | [Checklist de segurança](checklist-seguranca.md) → [Política de segurança](../SECURITY.md) → [Arquitetura](ARQUITETURA.md) → [Operação](OPERACAO.md) |
@@ -29,6 +29,7 @@ técnicas, opere em produção e evolua o código sem depender de conhecimento t
 | [OPERACAO.md](OPERACAO.md) | Rotina de produção, backup, restauração e runbooks de incidente |
 | [DECISOES.md](DECISOES.md) | Registro de decisões de arquitetura (ADRs) e trade-offs |
 | [ESTUDO-DE-CASO.md](ESTUDO-DE-CASO.md) | Narrativa do problema, solução, resultados e aprendizados |
+| [DEMONSTRACAO.md](DEMONSTRACAO.md) | Como rodar a demonstração, credenciais, capturas e roteiro do vídeo |
 | [ESTADO-ATUAL.md](ESTADO-ATUAL.md) | Fotografia técnica da versão atual, dívidas e próximos passos |
 | [roadmap.md](roadmap.md) | Prioridades de evolução em fases |
 | [checklist-seguranca.md](checklist-seguranca.md) | Auditoria de 21 pontos com evidências e pendências |
