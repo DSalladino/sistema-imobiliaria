@@ -98,10 +98,10 @@ export function barChart({ labels = [], series = [], altura = 230, formato = mon
 }
 
 /* ---------------- linhas ---------------- */
+let gradienteSeq = 0;
 export function lineChart({ labels = [], series = [], altura = 240, area = true, formato = moneyShort } = {}) {
   if (!labels.length || !series.some(s => s.valores?.some(v => Number(v)))) return empty(altura);
   const W = 640, H = altura;
-  const ultimoRotulo = labels.length > 1;
   const pad = { t: 14, r: 14, b: 30, l: 56 };
   const iw = W - pad.l - pad.r;
   const ih = H - pad.t - pad.b;
@@ -113,11 +113,12 @@ export function lineChart({ labels = [], series = [], altura = 240, area = true,
   if (min < 0) min *= 1.08;
   const px = (i) => pad.l + (labels.length === 1 ? iw / 2 : (i / (labels.length - 1)) * iw);
   const py = (v) => pad.t + ih - ((v - min) / (max - min)) * ih;
+  const gradiente = `grad-${++gradienteSeq}`;
   let grid = '';
   for (let i = 0; i <= 4; i++) {
     const v = min + (max - min) * (i / 4);
     const y = py(v);
-    grid += `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${W - pad.r}" y2="${y.toFixed(1)}" stroke="#e5e0d6" stroke-width="1"/>
+    grid += `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${W - pad.r}" y2="${y.toFixed(1)}" stroke="#e5e0d6" stroke-width="1" stroke-dasharray="${i === 0 ? '0' : '3 4'}"/>
       <text x="${pad.l - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#7d8a85">${esc(formato(v))}</text>`;
   }
   let linhas = '';
@@ -126,11 +127,12 @@ export function lineChart({ labels = [], series = [], altura = 240, area = true,
     const cor = s.cor || CORES[j];
     const d = valores.map((v, i) => `${i ? 'L' : 'M'}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
     if (area && series.length === 1) {
-      linhas += `<path d="${d} L${px(valores.length - 1).toFixed(1)},${(pad.t + ih).toFixed(1)} L${px(0).toFixed(1)},${(pad.t + ih).toFixed(1)} Z" fill="${cor}" opacity=".10"/>`;
+      linhas += `<path d="${d} L${px(valores.length - 1).toFixed(1)},${(pad.t + ih).toFixed(1)} L${px(0).toFixed(1)},${(pad.t + ih).toFixed(1)} Z" fill="url(#${gradiente})" opacity=".55"/>`;
     }
-    linhas += `<path d="${d}" fill="none" stroke="${cor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" ${s.dashed ? 'stroke-dasharray="5 5" opacity=".7"' : ''}/>`;
+    linhas += `<path d="${d}" fill="none" stroke="${cor}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" ${s.dashed ? 'stroke-dasharray="5 5" opacity=".72"' : ''}/>`;
     valores.forEach((v, i) => {
-      linhas += `<circle cx="${px(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="${labels.length > 24 ? 1.6 : 2.6}" fill="#fff" stroke="${cor}" stroke-width="1.8"><title>${esc(s.nome)} ${esc(labels[i])}: ${esc(formato(v))}</title></circle>`;
+      const ultimo = i === valores.length - 1;
+      linhas += `<circle cx="${px(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="${ultimo ? 4 : labels.length > 24 ? 1.8 : 2.8}" fill="#fff" stroke="${cor}" stroke-width="${ultimo ? 2.4 : 1.8}"><title>${esc(s.nome)} ${esc(labels[i])}: ${esc(formato(v))}</title></circle>`;
     });
   });
   let eixo = '';
@@ -141,7 +143,11 @@ export function lineChart({ labels = [], series = [], altura = 240, area = true,
   });
   const legenda = series.map((s, j) => `<span><i style="background:${esc(s.cor || CORES[j])}"></i>${esc(s.nome)}</span>`).join('');
   return `<div>
-    <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de linhas" preserveAspectRatio="xMidYMid meet">
+    <svg class="chart chart-line" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de linhas" preserveAspectRatio="xMidYMid meet">
+      <defs><linearGradient id="${gradiente}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${esc(series[0]?.cor || CORES[0])}" stop-opacity=".28"/>
+        <stop offset="100%" stop-color="${esc(series[0]?.cor || CORES[0])}" stop-opacity="0"/>
+      </linearGradient></defs>
       ${grid}${linhas}${eixo}
     </svg>
     ${series.length > 1 ? `<div class="legend" style="margin-top:4px">${legenda}</div>` : ''}
@@ -166,12 +172,16 @@ export function donut(items = [], { tamanho = 170, centro = '', formato = moneyS
       transform="rotate(-90 80 80)" stroke-linecap="butt"><title>${esc(item.nome)}: ${esc(formato(item.valor))}</title></circle>`;
     off += frac * c;
   });
-  const legenda = validos.slice(0, 6).map((item, i) => `
+  const legenda = validos.slice(0, 6).map((item, i) => {
+    const pct = total ? (Number(item.valor) / total) * 100 : 0;
+    return `
     <div style="display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--muted);padding:2px 0">
       <i style="width:8px;height:8px;border-radius:3px;background:${esc(item.cor || CORES[i % CORES.length])};flex:none"></i>
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.nome)}</span>
-      <strong style="color:var(--ink-soft);font-weight:600">${esc(formato(item.valor))}</strong>
-    </div>`).join('');
+      <span style="color:var(--muted);font-size:.72rem;min-width:36px;text-align:right">${pct.toFixed(0)}%</span>
+      <strong style="color:var(--ink-soft);font-weight:600;min-width:70px;text-align:right">${esc(formato(item.valor))}</strong>
+    </div>`;
+  }).join('');
   return `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
     <svg viewBox="0 0 160 160" width="${tamanho}" height="${tamanho}" role="img" aria-label="Composição">
       <circle cx="80" cy="80" r="${r}" fill="none" stroke="#f0ece3" stroke-width="20"/>
@@ -188,8 +198,9 @@ export function hbar(items = [], { formato = moneyShort, cor = '#3d6350' } = {})
   const validos = items.filter(i => Number(i.valor) > 0).slice(0, 8);
   if (!validos.length) return empty(120);
   const max = Math.max(...validos.map(i => Number(i.valor)), 1);
+  const total = validos.reduce((s, i) => s + Number(i.valor), 0);
   return `<div style="display:grid;gap:10px">${validos.map((item, i) => `
-    <div>
+    <div title="${esc(item.nome)}: ${esc(formato(item.valor))}">
       <div style="display:flex;justify-content:space-between;gap:10px;font-size:.78rem;margin-bottom:4px">
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.nome)}</span>
         <strong style="font-weight:600;color:var(--ink-soft);white-space:nowrap">${esc(formato(item.valor))}</strong>
@@ -197,6 +208,7 @@ export function hbar(items = [], { formato = moneyShort, cor = '#3d6350' } = {})
       <div style="height:7px;background:var(--bg-soft);border-radius:20px;overflow:hidden">
         <div style="height:100%;width:${Math.max((Number(item.valor) / max) * 100, 1.5).toFixed(1)}%;background:${esc(item.cor || cor)};border-radius:20px;opacity:${1 - i * 0.07}"></div>
       </div>
+      <small style="font-size:.69rem;color:var(--muted)">${total ? ((Number(item.valor) / total) * 100).toFixed(1) : '0'}% do total</small>
     </div>`).join('')}</div>`;
 }
 

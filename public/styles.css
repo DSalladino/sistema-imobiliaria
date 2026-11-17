@@ -356,6 +356,10 @@ input[type="checkbox"] { width: auto; }
 .kpi-delta up { color: var(--sage-ink); font-weight: 600; }
 .kpi-delta down { color: var(--blush-ink); font-weight: 600; }
 .kpi .spark { margin-top: 2px; }
+.kpis-compact { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.kpis-compact .kpi { padding: 10px 11px 8px; }
+.kpis-compact .kpi-value { font-size: 1.02rem; }
+.kpis-compact .kpi-label { font-size: .68rem; }
 
 /* badges */
 .badge {
@@ -394,6 +398,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
 .chart-empty { padding: 30px; text-align: center; color: var(--muted); font-size: .85rem; }
+.chart rect { transition: opacity .15s ease, filter .15s ease; }
+.chart rect:hover { opacity: 1 !important; filter: brightness(1.05); }
+.chart-line circle { transition: r .15s ease; }
+.chart-line circle:hover { r: 5; }
+@media (max-width: 900px) { .kpis-compact { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* filters */
 .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }

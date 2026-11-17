@@ -1,6 +1,8 @@
 import { db } from './db.js';
 import { getSettingNum, saldos, alertas, hojeISO, competenciaAtual } from './regras.js';
 import { resumo as resumoCobrancas } from './cobrancas.js';
+import { resumo as resumoContas, previsaoCaixa } from './contas.js';
+import { resumo as resumoComissoes } from './comissoes.js';
 
 export function addMesesComp(comp, delta) {
   const [a, m] = comp.split('-').map(Number);
@@ -34,13 +36,13 @@ export function serieMensal(de, ate, propId = null) {
   const meses = mesesEntre(de, ate);
   const rows = db.prepare(`
     SELECT l.competencia,
-      SUM(CASE WHEN l.tipo='receita' AND l.caixa='proprietarios' AND l.categoria='Aluguel' THEN l.valor_centavos ELSE 0 END) AS alugueis,
-      SUM(CASE WHEN l.tipo='receita' AND l.caixa='proprietarios' AND l.categoria<>'Aluguel' THEN l.valor_centavos ELSE 0 END) AS outras_prop,
-      SUM(CASE WHEN l.tipo='receita' AND l.caixa='imobiliaria' AND l.categoria='Taxa de administração' THEN l.valor_centavos ELSE 0 END) AS taxa,
-      SUM(CASE WHEN l.tipo='receita' AND l.caixa='imobiliaria' AND l.categoria<>'Taxa de administração' THEN l.valor_centavos ELSE 0 END) AS outras_imob,
+      SUM(CASE WHEN l.tipo='receita' AND l.caixa='proprietarios' AND l.categoria='Aluguel' COLLATE NOCASE THEN l.valor_centavos ELSE 0 END) AS alugueis,
+      SUM(CASE WHEN l.tipo='receita' AND l.caixa='proprietarios' AND l.categoria<>'Aluguel' COLLATE NOCASE THEN l.valor_centavos ELSE 0 END) AS outras_prop,
+      SUM(CASE WHEN l.tipo='receita' AND l.caixa='imobiliaria' AND l.categoria='Taxa de administração' COLLATE NOCASE THEN l.valor_centavos ELSE 0 END) AS taxa,
+      SUM(CASE WHEN l.tipo='receita' AND l.caixa='imobiliaria' AND l.categoria<>'Taxa de administração' COLLATE NOCASE THEN l.valor_centavos ELSE 0 END) AS outras_imob,
       SUM(CASE WHEN l.tipo='despesa' AND l.caixa='imobiliaria' THEN l.valor_centavos ELSE 0 END) AS desp_imob,
-      SUM(CASE WHEN l.tipo='despesa' AND l.caixa='proprietarios' AND l.categoria='Repasse ao proprietário' THEN l.valor_centavos ELSE 0 END) AS repasses,
-      SUM(CASE WHEN l.tipo='despesa' AND l.caixa='proprietarios' AND l.categoria<>'Repasse ao proprietário' THEN l.valor_centavos ELSE 0 END) AS desp_prop
+      SUM(CASE WHEN l.tipo='despesa' AND l.caixa='proprietarios' AND l.categoria='Repasse ao proprietário' COLLATE NOCASE THEN l.valor_centavos ELSE 0 END) AS repasses,
+      SUM(CASE WHEN l.tipo='despesa' AND l.caixa='proprietarios' AND l.categoria<>'Repasse ao proprietário' COLLATE NOCASE THEN l.valor_centavos ELSE 0 END) AS desp_prop
     FROM lancamentos l
     WHERE l.status='ativo' AND l.competencia BETWEEN ? AND ?${sqlProp(propId)}
     GROUP BY l.competencia
@@ -122,12 +124,12 @@ export function ocupacao(propId = null) {
 export function composicao(de, ate, tipo, propId = null) {
   const cond = tipo === 'receita'
     ? "l.tipo='receita'"
-    : "l.tipo='despesa' AND l.categoria <> 'Repasse ao proprietário'";
+    : "l.tipo='despesa' AND l.categoria <> 'Repasse ao proprietário' COLLATE NOCASE";
   const rows = db.prepare(`
-    SELECT l.categoria AS nome, SUM(l.valor_centavos) AS valor
+    SELECT MIN(l.categoria) AS nome, SUM(l.valor_centavos) AS valor
     FROM lancamentos l
     WHERE l.status='ativo' AND ${cond} AND l.competencia BETWEEN ? AND ?${sqlProp(propId)}
-    GROUP BY l.categoria ORDER BY valor DESC
+    GROUP BY lower(l.categoria) ORDER BY valor DESC
   `).all(de, ate);
   const top = rows.slice(0, 6);
   const resto = rows.slice(6).reduce((s, r) => s + r.valor, 0);
@@ -158,6 +160,56 @@ export function topContratos(propId = null) {
     WHERE c.status='ativo'${propId ? ` AND i.proprietario_id = ${Number(propId)}` : ''}
     ORDER BY c.aluguel_centavos DESC LIMIT 8
   `).all();
+}
+
+/** Carteira ativa por proprietário: base para concentração e comissão. */
+export function carteiraPorProprietario(propId = null) {
+  return db.prepare(`
+    SELECT p.id, p.nome, COUNT(c.id) AS contratos,
+      COALESCE(SUM(c.aluguel_centavos),0) AS aluguel_centavos
+    FROM contratos c
+    JOIN imoveis i ON i.id = c.imovel_id
+    JOIN proprietarios p ON p.id = i.proprietario_id
+    WHERE c.status='ativo'${propId ? ` AND i.proprietario_id = ${Number(propId)}` : ''}
+    GROUP BY p.id ORDER BY aluguel_centavos DESC
+  `).all();
+}
+
+function dataLocal(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Compromissos em aberto dos próximos dias (contas a pagar e a receber). */
+export function proximosVencimentos(dias = 45, limite = 10) {
+  const hoje = hojeISO();
+  const limiteData = new Date(`${hoje}T00:00:00`);
+  limiteData.setDate(limiteData.getDate() + Math.max(1, Number(dias) || 45));
+  const ate = dataLocal(limiteData);
+  return db.prepare(`
+    SELECT c.id, c.tipo, c.descricao, c.categoria, c.fornecedor, c.valor_centavos, c.vencimento,
+      c.recorrencia, pc.nome AS parceiro_nome
+    FROM contas c LEFT JOIN parceiros pc ON pc.id = c.parceiro_id
+    WHERE c.status = 'aberta' AND c.vencimento <= ?
+    ORDER BY c.vencimento, c.tipo, c.id LIMIT ?
+  `).all(ate, Math.max(1, Math.min(Number(limite) || 10, 50)));
+}
+
+/** Contratos ativos que terminam nos próximos dias. */
+export function contratosVencendo(dias = 90, limite = 10) {
+  const hoje = hojeISO();
+  const d = new Date(`${hoje}T00:00:00`);
+  d.setDate(d.getDate() + Math.max(1, Number(dias) || 90));
+  const ate = dataLocal(d);
+  return db.prepare(`
+    SELECT c.id, c.codigo, c.fim, c.aluguel_centavos, i.endereco, i.numero,
+      p.nome AS proprietario_nome, q.nome AS inquilino_nome
+    FROM contratos c
+    JOIN imoveis i ON i.id = c.imovel_id
+    JOIN proprietarios p ON p.id = i.proprietario_id
+    JOIN inquilinos q ON q.id = c.inquilino_id
+    WHERE c.status = 'ativo' AND c.fim IS NOT NULL AND c.fim BETWEEN ? AND ?
+    ORDER BY c.fim LIMIT ?
+  `).all(hoje, ate, Math.max(1, Math.min(Number(limite) || 10, 50)));
 }
 
 export function analytics({ de, ate, comparar = false, propId = null } = {}) {
@@ -224,6 +276,19 @@ export function analytics({ de, ate, comparar = false, propId = null } = {}) {
 
   const composicaoReceitas = composicao(de, ate, 'receita', propId);
   const composicaoDespesas = composicao(de, ate, 'despesa', propId);
+  const contasResumo = resumoContas();
+  const previsao = previsaoCaixa({ meses: Math.min(Math.max(n, 3), 6) });
+  const comissoesResumo = resumoComissoes(competenciaAtual());
+  const carteiraProprietarios = carteiraPorProprietario(propId);
+  const proximos = proximosVencimentos(45, 8);
+  const contratosFim = contratosVencendo(90, 8);
+  const totalAluguelCarteira = carteiraProprietarios.reduce((s, p) => s + p.aluguel_centavos, 0);
+  const concentracao = totalAluguelCarteira > 0
+    ? (carteiraProprietarios.slice(0, 3).reduce((s, p) => s + p.aluguel_centavos, 0) / totalAluguelCarteira) * 100
+    : 0;
+  const mediaReceita = n ? Math.round(tot.receita_imob / n) : 0;
+  const mediaResultado = n ? Math.round(tot.resultado_imob / n) : 0;
+  const margemPct = tot.receita_imob > 0 ? (tot.resultado_imob / tot.receita_imob) * 100 : 0;
 
   const atividades = db.prepare(`SELECT acao, entidade, entidade_id, usuario_nome, criado_em, detalhe
     FROM auditoria ORDER BY id DESC LIMIT 7`).all();
@@ -234,13 +299,25 @@ export function analytics({ de, ate, comparar = false, propId = null } = {}) {
       anterior: { de: anteriorDe, ate: anteriorAte },
       rotulo: `${meses[0]} a ${meses[meses.length - 1]}`,
     },
-    kpis,
+    kpis: {
+      ...kpis,
+      media_receita: mediaReceita,
+      media_resultado: mediaResultado,
+      margem_pct: margemPct,
+      concentracao_tres_pct: concentracao,
+    },
     comparativo,
     serie,
     serie_anterior: comparar ? serieAnt.map(m => ({ ...m, mes_original: m.mes })) : null,
     composicao_receitas: composicaoReceitas,
     composicao_despesas: composicaoDespesas,
     repasses_proprietarios: repassesPorProprietario(de, ate),
+    carteira_proprietarios: carteiraProprietarios,
+    contas: contasResumo,
+    previsao_caixa: previsao,
+    comissoes: comissoesResumo,
+    proximos_vencimentos: proximos,
+    contratos_vencendo: contratosFim,
     ocupacao: imoveis,
     top_contratos: topContratos(propId),
     alertas: {

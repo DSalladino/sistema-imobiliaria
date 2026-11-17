@@ -13,6 +13,8 @@ export const RELATORIOS = [
   { id: 'fluxo-caixa', nome: 'Fluxo de caixa', descricao: 'Entradas, saídas e saldo mês a mês, separando os dois caixas.', filtros: ['periodo', 'proprietario'], cor: 'mint' },
   { id: 'comissoes', nome: 'Comissões', descricao: 'Corretagem por contrato, corretor, status e lançamento financeiro.', filtros: ['periodo', 'proprietario'], cor: 'peach' },
   { id: 'contas', nome: 'Contas a pagar/receber', descricao: 'Compromissos, recorrências, atrasos e baixas no período.', filtros: ['periodo', 'proprietario'], cor: 'sky' },
+  { id: 'despesas-categoria', nome: 'Despesas por categoria', descricao: 'Quanto cada categoria consumiu no período, separando imobiliária e proprietários.', filtros: ['periodo', 'proprietario'], cor: 'peach' },
+  { id: 'fornecedores', nome: 'Fornecedores e serviços', descricao: 'Cadastro de fornecedores, empresas de manutenção e prestadores com dados de contato e pagamento.', filtros: [], cor: 'lavender' },
   { id: 'contratos', nome: 'Carteira de contratos', descricao: 'Vigência, valores, garantias e taxa aplicada.', filtros: ['proprietario'], cor: 'butter' },
   { id: 'inadimplencia', nome: 'Inadimplência', descricao: 'Aluguéis vencidos e não pagos na competência.', filtros: ['competencia'], cor: 'blush' },
   { id: 'proprietarios', nome: 'Proprietários', descricao: 'Cadastro, carteira e totais por proprietário.', filtros: [], cor: 'peach' },
@@ -213,7 +215,7 @@ export function construirRelatorio(tipo, { de, ate, competencia, proprietario_id
     const linhas = db.prepare(`
       SELECT c.*, i.endereco, i.numero, i.complemento, i.proprietario_id,
              p.nome AS proprietario_nome, q.nome AS inquilino_nome, q.telefone AS inquilino_telefone,
-             (SELECT COALESCE(SUM(l.valor_centavos),0) FROM lancamentos l WHERE l.contrato_id=c.id AND l.competencia=? AND l.tipo='receita' AND l.categoria='Aluguel' AND l.status='ativo') AS pago
+             (SELECT COALESCE(SUM(l.valor_centavos),0) FROM lancamentos l WHERE l.contrato_id=c.id AND l.competencia=? AND l.tipo='receita' AND l.categoria='Aluguel' COLLATE NOCASE AND l.status='ativo') AS pago
       FROM contratos c
       JOIN imoveis i ON i.id = c.imovel_id
       JOIN proprietarios p ON p.id = i.proprietario_id
@@ -508,6 +510,85 @@ export function construirRelatorio(tipo, { de, ate, competencia, proprietario_id
         { rotulo: 'A receber (aberto)', valor: money(aReceber), bruto: aReceber },
         { rotulo: 'Baixado no período', valor: money(baixadas), bruto: baixadas },
         { rotulo: 'Contas', valor: String(linhas.length), bruto: linhas.length },
+      ],
+    };
+  }
+
+  if (tipo === 'despesas-categoria') {
+    const linhas = db.prepare(`
+      SELECT l.categoria, l.caixa, COUNT(*) AS quantidade, SUM(l.valor_centavos) AS valor_centavos
+      FROM lancamentos l
+      WHERE l.status='ativo' AND l.tipo='despesa'
+        AND l.categoria <> 'Repasse ao proprietário' COLLATE NOCASE
+        AND l.competencia BETWEEN ? AND ?${propId ? ` AND l.proprietario_id = ${propId}` : ''}
+      GROUP BY l.categoria COLLATE NOCASE, l.caixa
+      ORDER BY valor_centavos DESC
+    `).all(de, ate);
+    const total = linhas.reduce((s, l) => s + l.valor_centavos, 0);
+    return {
+      ...base,
+      titulo: 'Despesas por categoria',
+      subtitulo: `Competências de ${de} a ${ate} — sem repasses`,
+      colunas: [
+        { key: 'categoria', titulo: 'Categoria', largura: 26, tipo: 'text' },
+        { key: 'caixa_label', titulo: 'Caixa', largura: 13, tipo: 'text' },
+        { key: 'quantidade', titulo: 'Lançamentos', largura: 10, tipo: 'int', align: 'right' },
+        { key: 'percentual', titulo: '% do total', largura: 10, tipo: 'pct', align: 'right' },
+        { key: 'valor_centavos', titulo: 'Valor', largura: 13, tipo: 'money', align: 'right' },
+      ],
+      linhas: linhas.map(l => ({
+        ...l,
+        caixa_label: l.caixa === 'imobiliaria' ? 'Imobiliária' : 'Proprietários',
+        percentual: total ? (l.valor_centavos / total) * 100 : 0,
+      })),
+      resumo: [
+        { rotulo: 'Despesa total', valor: money(total), bruto: total },
+        { rotulo: 'Categorias', valor: String(linhas.length), bruto: linhas.length },
+        { rotulo: 'Maior categoria', valor: linhas[0]?.categoria || '—', bruto: 0 },
+        { rotulo: 'Lançamentos', valor: String(linhas.reduce((s, l) => s + l.quantidade, 0)), bruto: 0 },
+      ],
+    };
+  }
+
+  if (tipo === 'fornecedores') {
+    const linhas = db.prepare(`SELECT * FROM parceiros WHERE ativo = 1 ORDER BY tipo, nome COLLATE NOCASE`).all();
+    const rotulos = {
+      corretor: 'Corretor(a)', fornecedor: 'Fornecedor(a)', manutencao: 'Empresa de manutenção',
+      prestador: 'Prestador(a) de serviços', cliente: 'Cliente', ambos: 'Fornecedor e cliente',
+    };
+    const servicos = {
+      hidraulica: 'Hidráulica', eletrica: 'Elétrica', pintura: 'Pintura', alvenaria: 'Alvenaria e reformas',
+      limpeza: 'Limpeza e conservação', jardinagem: 'Jardinagem', chaveiro: 'Chaveiro e fechaduras',
+      ar_condicionado: 'Ar-condicionado', dedetizacao: 'Dedetização', vidracaria: 'Vidraçaria',
+      marcenaria: 'Marcenaria', elevador: 'Manutenção de elevador', portaria: 'Portaria e segurança',
+      contabilidade: 'Contabilidade', juridico: 'Jurídico', ti: 'Tecnologia', fotografia: 'Fotografia e marketing', outros: 'Outros serviços',
+    };
+    return {
+      ...base,
+      titulo: 'Fornecedores e prestadores de serviços',
+      subtitulo: `${linhas.length} cadastros ativos`,
+      colunas: [
+        { key: 'nome', titulo: 'Nome / razão social', largura: 20, tipo: 'text' },
+        { key: 'tipo_label', titulo: 'Tipo', largura: 13, tipo: 'text' },
+        { key: 'servico_label', titulo: 'Serviço', largura: 13, tipo: 'text' },
+        { key: 'cpf_cnpj', titulo: 'CPF / CNPJ', largura: 14, tipo: 'text' },
+        { key: 'telefone', titulo: 'Telefone', largura: 11, tipo: 'text' },
+        { key: 'email', titulo: 'E-mail', largura: 16, tipo: 'text' },
+        { key: 'pix', titulo: 'Pix / banco', largura: 16, tipo: 'text' },
+        { key: 'condicao', titulo: 'Condição de pagamento', largura: 16, tipo: 'text' },
+      ],
+      linhas: linhas.map(p => ({
+        ...p,
+        tipo_label: rotulos[p.tipo] || p.tipo,
+        servico_label: servicos[p.tipo_servico] || p.tipo_servico || '—',
+        pix: p.pix || [p.banco, p.agencia, p.conta].filter(Boolean).join(' · ') || '—',
+        condicao: [p.forma_pagamento, p.prazo_pagamento_dias ? `${p.prazo_pagamento_dias} dias` : ''].filter(Boolean).join(' · ') || '—',
+      })),
+      resumo: [
+        { rotulo: 'Cadastros ativos', valor: String(linhas.length), bruto: linhas.length },
+        { rotulo: 'Fornecedores', valor: String(linhas.filter(p => ['fornecedor', 'manutencao', 'prestador', 'ambos'].includes(p.tipo)).length), bruto: 0 },
+        { rotulo: 'Corretores', valor: String(linhas.filter(p => p.tipo === 'corretor').length), bruto: 0 },
+        { rotulo: 'Clientes', valor: String(linhas.filter(p => p.tipo === 'cliente').length), bruto: 0 },
       ],
     };
   }

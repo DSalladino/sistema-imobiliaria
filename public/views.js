@@ -28,6 +28,7 @@ function kpiCard(rotulo, valor, rodape, spark = '') {
     <div class="kpi-foot">${rodape || ''}${spark}</div>
   </div>`;
 }
+const stat = (rotulo, valor, tom = '') => `<div class="kpi"><div class="kpi-label">${esc(rotulo)}</div><div class="kpi-value" ${tom ? `style="color:var(--${tom})"` : ''}>${valor}</div></div>`;
 
 function periodoRange(p) {
   const comp = compAtual();
@@ -54,6 +55,7 @@ export async function viewPainel(root, params) {
         <button data-p="anterior">Ano anterior</button>
       </div>
       <button class="btn" data-comparar title="Comparar com o período anterior">Comparar</button>
+      <a class="btn" href="#/relatorios">${icon('chart')} Relatórios</a>
       ${podeEscrever() ? `<button class="btn primary" data-nova-cobranca>${icon('plus')} Gerar cobranças</button>` : ''}`)}
     <div data-corpo>${loadingBox('Montando o painel…')}</div>`;
 
@@ -128,6 +130,43 @@ export async function viewPainel(root, params) {
           ${kpiCard('Inadimplência', brl(k.inadimplencia), `<span class="kpi-delta">${(k.inadimplencia_pct || 0).toFixed(1)}% do previsto</span>`, sparkline(serie.map(x => x.inadimplencia), '#8a4238'))}
           ${kpiCard('Taxa média', `${(k.taxa_media_pct || 0).toFixed(2)}%`, deltaKpi(a, 'taxa_media_pct'), sparkline(serie.map(x => x.taxa), '#7a6425'))}
           ${kpiCard('Carteira ativa', `${k.contratos_ativos} contratos`, `<span class="kpi-delta">${k.imoveis_alugados}/${k.imoveis_total} imóveis ocupados</span>`)}
+        </div>
+
+        <div class="grid cols-2 mt-2">
+          <div class="card">
+            <div class="card-head"><div><h2>Fluxo de caixa projetado</h2><p>Contas em aberto e recorrências dos próximos meses</p></div><a class="link" href="#/contas">Ver contas</a></div>
+            <div class="card-body">
+              ${barChart({
+                labels: (a.previsao_caixa?.meses || []).map(m => m.competencia),
+                series: [
+                  { nome: 'Entradas previstas', valores: (a.previsao_caixa?.meses || []).map(m => m.entradas), cor: '#8fbf9f' },
+                  { nome: 'Saídas previstas', valores: (a.previsao_caixa?.meses || []).map(m => m.saidas), cor: '#e5a08f' },
+                ],
+                altura: 220,
+                formato: brlShort,
+              })}
+              <p class="small muted mt-2">Média mensal prevista: ${brl(a.previsao_caixa?.media_entradas_centavos || 0)} de entradas e ${brl(a.previsao_caixa?.media_saidas_centavos || 0)} de saídas. Vencidos fora da janela: ${brl(a.previsao_caixa?.vencidas_centavos || 0)}.</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><h2>Compromissos e resultado</h2><p>Contas a pagar/receber e comissões do mês</p></div><a class="link" href="#/contas">Abrir financeiro</a></div>
+            <div class="card-body">
+              <div class="kpis kpis-compact">
+                ${stat('A pagar', brl(a.contas?.a_pagar || 0), 'blush-ink')}
+                ${stat('A receber', brl(a.contas?.a_receber || 0), 'sage-ink')}
+                ${stat('Vencido a pagar', brl(a.contas?.vencido_pagar || 0), 'blush-ink')}
+                ${stat('Vencido a receber', brl(a.contas?.vencido_receber || 0), 'butter-ink')}
+                ${stat('Saldo previsto', brl(a.contas?.saldo_previsto_centavos || 0))}
+                ${stat('Contas atrasadas', String(a.contas?.contas_atrasadas || 0))}
+              </div>
+              <div class="pill-row mt-2">
+                ${badge(`Comissões previstas: ${brl(a.comissoes?.previstas_centavos || 0)}`, 'butter')}
+                ${badge(`Comissões pagas: ${brl(a.comissoes?.pagas_centavos || 0)}`, 'sage')}
+                ${badge(`Contratos a vencer em 90 dias: ${(a.contratos_vencendo || []).length}`, 'sky')}
+              </div>
+              <p class="small muted mt-2">Margem operacional do período: <strong>${(k.margem_pct || 0).toFixed(1)}%</strong> · resultado médio mensal: <strong>${brl(k.media_resultado || 0)}</strong>.</p>
+            </div>
+          </div>
         </div>
 
         <div class="grid cols-2 mt-2">
@@ -222,6 +261,56 @@ export async function viewPainel(root, params) {
                   <p><strong>${esc(x.usuario_nome || 'sistema')}</strong> · ${esc(x.acao)} ${esc(x.entidade)}</p>
                   <small>${esc((x.criado_em || '').replace('T', ' ').slice(0, 16))}</small>
                 </div></div>`).join('')}</div>` : '<p class="muted small">Sem atividades visíveis para este perfil.</p>'}
+            </div>
+          </div>
+        </div>
+
+        <div class="grid cols-3 mt-2">
+          <div class="card">
+            <div class="card-head"><div><h2>Despesas por categoria</h2><p>Sem repasses — despesa operacional</p></div></div>
+            <div class="card-body">${donut((a.composicao_despesas || []).map((c, i) => ({
+              nome: c.nome, valor: c.valor, cor: ['#e5b8b0', '#8a4238', '#7a6425', '#5a4a79', '#35596e', '#4f5c58'][i % 6],
+            })), { centro: 'Despesas', tamanho: 140 })}</div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><h2>Concentração da carteira</h2><p>Aluguel ativo por proprietário</p></div><a class="link" href="#/proprietarios">Ver carteira</a></div>
+            <div class="card-body">
+              ${hbar((a.carteira_proprietarios || []).slice(0, 6).map(p => ({ nome: p.nome, valor: p.aluguel_centavos })), { formato: brlShort })}
+              <p class="small muted mt-2">Os 3 maiores proprietários representam <strong>${(k.concentracao_tres_pct || 0).toFixed(1)}%</strong> do aluguel administrado.</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><h2>Receita média e tendência</h2><p>Média mensal do período selecionado</p></div></div>
+            <div class="card-body" style="display:grid;gap:10px">
+              <div class="notice info">Receita média: <strong>${brl(k.media_receita || 0)}</strong> por mês.</div>
+              <div class="notice ${(k.margem_pct || 0) >= 0 ? '' : 'danger'}">Margem operacional: <strong>${(k.margem_pct || 0).toFixed(1)}%</strong> no período.</div>
+              <div class="notice ${k.inadimplencia_pct > 10 ? 'danger' : 'info'}">Inadimplência do período: <strong>${(k.inadimplencia_pct || 0).toFixed(1)}%</strong> do previsto.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid cols-2 mt-2">
+          <div class="card">
+            <div class="card-head"><div><h2>Próximos vencimentos</h2><p>Contas em aberto nos próximos 45 dias</p></div><a class="link" href="#/contas">Ver todas</a></div>
+            <div class="card-body">
+              ${(a.proximos_vencimentos || []).length ? tableHtml([
+                { label: 'Vencimento', render: c => dataBR(c.vencimento) },
+                { label: 'Compromisso', render: c => `<strong>${esc(c.descricao)}</strong><span class="sub">${esc(c.fornecedor || c.categoria || '—')}</span>` },
+                { label: 'Tipo', render: c => badge(c.tipo === 'pagar' ? 'A pagar' : 'A receber', c.tipo === 'pagar' ? 'blush' : 'sage') },
+                { label: 'Valor', num: true, render: c => brl(c.valor_centavos) },
+              ], a.proximos_vencimentos) : '<p class="muted small">Nenhuma conta em aberto nos próximos 45 dias.</p>'}
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><h2>Contratos a vencer</h2><p>Próximos 90 dias</p></div><a class="link" href="#/contratos">Gerenciar</a></div>
+            <div class="card-body">
+              ${(a.contratos_vencendo || []).length ? tableHtml([
+                { label: 'Contrato', render: c => `<strong>${esc(c.codigo || '#' + c.id)}</strong>` },
+                { label: 'Imóvel', render: c => `${esc(c.endereco)}${c.numero ? ', ' + esc(c.numero) : ''}` },
+                { label: 'Inquilino', key: 'inquilino_nome' },
+                { label: 'Fim', render: c => dataBR(c.fim) },
+                { label: 'Aluguel', num: true, render: c => brl(c.aluguel_centavos) },
+              ], a.contratos_vencendo) : '<p class="muted small">Nenhum contrato vence nos próximos 90 dias.</p>'}
             </div>
           </div>
         </div>
@@ -784,57 +873,112 @@ export async function abrirGerarCobrancas(aoConcluir) {
 }
 
 /* ============================================================
-   PARCEIROS (CORRETORES, FORNECEDORES E CLIENTES)
+   PARCEIROS (CORRETORES, FORNECEDORES, MANUTENÇÃO E SERVIÇOS)
    ============================================================ */
 const TIPOS_PARCEIRO = [
   ['corretor', 'Corretor(a)'], ['fornecedor', 'Fornecedor(a)'],
+  ['manutencao', 'Empresa de manutenção'], ['prestador', 'Prestador(a) de serviços'],
   ['cliente', 'Cliente'], ['ambos', 'Fornecedor e cliente'],
 ];
+const TIPOS_SERVICO = [
+  ['hidraulica', 'Hidráulica'], ['eletrica', 'Elétrica'], ['pintura', 'Pintura'],
+  ['alvenaria', 'Alvenaria e reformas'], ['limpeza', 'Limpeza e conservação'],
+  ['jardinagem', 'Jardinagem'], ['chaveiro', 'Chaveiro e fechaduras'],
+  ['ar_condicionado', 'Ar-condicionado'], ['dedetizacao', 'Dedetização'],
+  ['vidracaria', 'Vidraçaria'], ['marcenaria', 'Marcenaria'],
+  ['elevador', 'Manutenção de elevador'], ['portaria', 'Portaria e segurança'],
+  ['contabilidade', 'Contabilidade'], ['juridico', 'Jurídico'], ['ti', 'Tecnologia'],
+  ['fotografia', 'Fotografia e marketing'], ['outros', 'Outros serviços'],
+];
+const FORMAS_PAGAMENTO = [
+  ['pix', 'Pix'], ['transferencia', 'Transferência bancária'], ['boleto', 'Boleto'],
+  ['dinheiro', 'Dinheiro'], ['cartao', 'Cartão'], ['debito_automatico', 'Débito automático'],
+  ['a_definir', 'A definir'],
+];
+const TIPOS_CONTA_BANCARIA = [['corrente', 'Conta corrente'], ['poupanca', 'Poupança'], ['pagamento', 'Conta de pagamento']];
+const GRUPOS_TIPO_PARCEIRO = {
+  corretor: ['corretor', 'ambos'], fornecedor: ['fornecedor', 'manutencao', 'prestador', 'ambos'],
+  manutencao: ['manutencao', 'ambos'], prestador: ['prestador', 'ambos'], cliente: ['cliente', 'ambos'],
+};
+const rotuloTipoParceiro = (t) => (TIPOS_PARCEIRO.find(x => x[0] === t) || [, t])[1];
+const rotuloServico = (t) => (TIPOS_SERVICO.find(x => x[0] === t) || [, t || '—'])[1];
 
 const camposParceiro = () => [
-  { name: 'tipo', label: 'Tipo', type: 'select', required: true, options: TIPOS_PARCEIRO },
-  { name: 'nome', label: 'Nome / razão social', required: true },
-  { name: 'cpf_cnpj', label: 'CPF/CNPJ' },
-  { name: 'creci', label: 'CRECI', hint: 'Obrigatório para corretor de imóveis.' },
-  { name: 'telefone', label: 'Telefone / WhatsApp' },
+  { name: 'tipo', label: 'Tipo de cadastro', type: 'select', required: true, options: TIPOS_PARCEIRO, hint: 'Escolha manutenção ou prestador para empresas que executam serviços nos imóveis.' },
+  { name: 'nome', label: 'Nome / razão social', required: true, span: 2 },
+  { name: 'nome_fantasia', label: 'Nome fantasia' },
+  { name: 'cpf_cnpj', label: 'CPF/CNPJ', hint: 'Validado por dígito verificador e sem duplicidade.' },
+  { name: 'creci', label: 'CRECI', hint: 'Somente para corretor de imóveis.' },
+  { name: 'tipo_servico', label: 'Tipo de serviço', type: 'select', options: TIPOS_SERVICO, placeholder: 'Selecione o serviço principal' },
+  { name: 'especialidades', label: 'Especialidades / serviços prestados', span: 2, placeholder: 'Ex.: hidráulica, elétrica e pequenos reparos' },
+  { name: 'telefone', label: 'Telefone' },
+  { name: 'whatsapp', label: 'WhatsApp', hint: 'Usado nas mensagens de cobrança e contato.' },
   { name: 'email', label: 'E-mail', type: 'email' },
-  { name: 'pix', label: 'Chave Pix', hint: 'Usada no pagamento de comissões e repasses.' },
-  { name: 'endereco', label: 'Endereço', span: 2 },
+  { name: 'site', label: 'Site / perfil', placeholder: 'https://…' },
+  { name: 'endereco', label: 'Endereço completo', span: 2 },
+  { name: 'banco', label: 'Banco' },
+  { name: 'agencia', label: 'Agência' },
+  { name: 'conta', label: 'Conta' },
+  { name: 'tipo_conta', label: 'Tipo de conta', type: 'select', options: TIPOS_CONTA_BANCARIA },
+  { name: 'pix', label: 'Chave Pix', hint: 'Usada no pagamento de comissões, contas e repasses.' },
+  { name: 'forma_pagamento', label: 'Forma de pagamento preferida', type: 'select', options: FORMAS_PAGAMENTO },
+  { name: 'prazo_pagamento_dias', label: 'Prazo de pagamento (dias)', type: 'number', min: 0, placeholder: 'Ex.: 30' },
   { name: 'observacoes', label: 'Observações', type: 'textarea', span: 2 },
   { name: 'ativo', label: 'Ativo', type: 'checkbox', checkLabel: 'Cadastro ativo', span: 2 },
 ];
 
 export async function viewParceiros(root) {
   let dados = [], busca = '', tipo = '';
-  root.innerHTML = head('Corretores e parceiros', 'Quem recebe comissões, fornece serviços ou compra da imobiliária.', podeEscrever() ? `<button class="btn primary" data-novo>${icon('plus')} Novo parceiro</button>` : '')
+  root.innerHTML = head('Fornecedores, serviços e parceiros', 'Quem recebe comissões e quem fornece serviços: cadastro completo de corretores, fornecedores, empresas de manutenção, prestadores e clientes.', podeEscrever() ? `<button class="btn primary" data-novo>${icon('plus')} Novo cadastro</button>` : '')
     + `<div class="filters">
         <label class="field"><span>Tipo</span><select data-tipo><option value="">Todos</option>${TIPOS_PARCEIRO.map(t => `<option value="${t[0]}">${t[1]}</option>`).join('')}</select></label>
-        <div class="search grow">${icon('search')}<input placeholder="Buscar por nome, CPF/CNPJ, CRECI, e-mail ou telefone" data-busca></div>
+        <div class="search grow">${icon('search')}<input placeholder="Buscar por nome, serviço, CPF/CNPJ, CRECI, e-mail, telefone ou Pix" data-busca></div>
       </div><div data-lista>${loadingBox()}</div>`;
   const lista = root.querySelector('[data-lista]');
-  const rotuloTipo = (t) => (TIPOS_PARCEIRO.find(x => x[0] === t) || [, t])[1];
 
   const abrirForm = (p = null) => formModal({
-    titulo: p ? 'Editar parceiro' : 'Novo parceiro',
-    subtitulo: 'Corretores cadastrados aqui aparecem na seleção de comissões e contratos.',
+    titulo: p ? 'Editar cadastro' : 'Novo fornecedor ou prestador',
+    subtitulo: 'Corretores aparecem em contratos e comissões; fornecedores e prestadores aparecem em contas e lançamentos.',
     fields: camposParceiro(), wide: true,
-    valores: p || { tipo: 'corretor', ativo: 1 },
+    valores: p || { tipo: 'fornecedor', ativo: 1, tipo_conta: 'corrente', forma_pagamento: 'pix' },
+    onMount: (r) => {
+      const tipoSel = r.querySelector('[name=tipo]');
+      const creci = r.querySelector('[name=creci]')?.closest('label');
+      const servico = r.querySelector('[name=tipo_servico]')?.closest('label');
+      const especialidades = r.querySelector('[name=especialidades]')?.closest('label');
+      const atualizar = () => {
+        const t = tipoSel.value;
+        const corretor = t === 'corretor';
+        const servicos = ['fornecedor', 'manutencao', 'prestador', 'ambos'].includes(t);
+        if (creci) creci.style.display = corretor ? '' : 'none';
+        if (servico) servico.style.display = servicos ? '' : 'none';
+        if (especialidades) especialidades.style.display = servicos ? '' : 'none';
+      };
+      tipoSel.addEventListener('change', atualizar);
+      atualizar();
+    },
     onSubmit: async (d) => {
       if (p) await api(`/parceiros/${p.id}`, { method: 'PUT', body: d });
       else await api('/parceiros', { method: 'POST', body: d });
-      toast(p ? 'Parceiro atualizado.' : 'Parceiro cadastrado.'); carregar();
+      toast(p ? 'Cadastro atualizado.' : 'Cadastro incluído.'); carregar();
     },
   });
 
   const render = () => {
     const termo = busca.toLowerCase();
-    const filtrados = dados.filter(p => (!tipo || p.tipo === tipo || p.tipo === 'ambos')
-      && (!termo || [p.nome, p.cpf_cnpj, p.creci, p.email, p.telefone, p.pix].some(v => String(v || '').toLowerCase().includes(termo))));
+    const filtrados = dados.filter(p => (!tipo || (GRUPOS_TIPO_PARCEIRO[tipo] || [tipo]).includes(p.tipo))
+      && (!termo || [p.nome, p.nome_fantasia, p.cpf_cnpj, p.creci, p.email, p.telefone, p.whatsapp, p.pix, p.tipo_servico, p.especialidades].some(v => String(v || '').toLowerCase().includes(termo))));
     lista.innerHTML = tableHtml([
-      { label: 'Parceiro', render: p => `<strong>${esc(p.nome)}</strong><span class="sub">${esc(rotuloTipo(p.tipo))}${p.creci ? ' · ' + esc(p.creci) : ''}</span>` },
-      { label: 'Contato', render: p => `${esc(p.telefone || '—')}${p.email ? `<span class="sub">${esc(p.email)}</span>` : ''}` },
-      { label: 'CPF/CNPJ', render: p => esc(p.cpf_cnpj || '—') },
-      { label: 'Pix', render: p => esc(p.pix || '—') },
+      { label: 'Cadastro', render: p => `<strong>${esc(p.nome)}</strong><span class="sub">${esc(rotuloTipoParceiro(p.tipo))}${p.nome_fantasia ? ' · ' + esc(p.nome_fantasia) : ''}${p.tipo_servico ? ' · ' + esc(rotuloServico(p.tipo_servico)) : ''}${p.creci ? ' · ' + esc(p.creci) : ''}</span>` },
+      { label: 'Contato', render: p => `${esc(p.telefone || p.whatsapp || '—')}${p.email ? `<span class="sub">${esc(p.email)}</span>` : ''}` },
+      { label: 'Documento', render: p => esc(p.cpf_cnpj || '—') },
+      { label: 'Pagamento', render: p => {
+        const forma = p.forma_pagamento ? (FORMAS_PAGAMENTO.find(f => f[0] === p.forma_pagamento) || [, p.forma_pagamento])[1] : '';
+        const banco = [p.banco, p.agencia ? 'ag. ' + p.agencia : '', p.conta ? 'c/c ' + p.conta : ''].filter(Boolean).join(' · ');
+        const principal = p.pix ? `Pix: ${p.pix}` : banco || '—';
+        const detalhe = [forma, p.prazo_pagamento_dias ? `${p.prazo_pagamento_dias} dias` : ''].filter(Boolean).join(' · ');
+        return `${esc(principal)}${detalhe ? `<span class="sub">${esc(detalhe)}</span>` : ''}`;
+      } },
       { label: 'Situação', render: p => badge(p.ativo ? 'Ativo' : 'Inativo', p.ativo ? 'sage' : 'plain') },
       { label: 'Ações', acao: p => `${podeEscrever() ? `<button class="icon-btn" data-edit="${p.id}" title="Editar">${icon('edit')}</button>` : ''}
         ${podeEscrever() && p.ativo ? `<button class="icon-btn" data-del="${p.id}" title="Desativar">${icon('trash')}</button>` : ''}` },
@@ -842,8 +986,8 @@ export async function viewParceiros(root) {
     lista.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => abrirForm(dados.find(x => x.id === Number(b.dataset.edit))));
     lista.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
       const p = dados.find(x => x.id === Number(b.dataset.del));
-      if (!await confirmar({ titulo: 'Desativar parceiro', mensagem: `Desativar ${p.nome}? O histórico de comissões e contas é preservado.`, textoBotao: 'Desativar', perigo: true })) return;
-      try { await api(`/parceiros/${p.id}`, { method: 'DELETE' }); toast('Parceiro desativado.'); carregar(); } catch (e) { toast(e.message, 'err'); }
+      if (!await confirmar({ titulo: 'Desativar cadastro', mensagem: `Desativar ${p.nome}? O histórico de comissões, contas e lançamentos é preservado.`, textoBotao: 'Desativar', perigo: true })) return;
+      try { await api(`/parceiros/${p.id}`, { method: 'DELETE' }); toast('Cadastro desativado.'); carregar(); } catch (e) { toast(e.message, 'err'); }
     });
   };
 

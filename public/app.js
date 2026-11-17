@@ -49,7 +49,7 @@ const META = {
   inquilinos: ['Cadastros', 'Inquilinos'],
   contratos: ['Carteira', 'Contratos'],
   excecoes: ['Financeiro', 'Exceções de repasse'],
-  parceiros: ['Cadastros', 'Corretores e parceiros'],
+  parceiros: ['Cadastros', 'Fornecedores e parceiros'],
   categorias: ['Cadastros', 'Categorias financeiras'],
   cobrancas: ['Financeiro', 'Cobranças'],
   conciliacao: ['Financeiro', 'Conciliação'],
@@ -72,7 +72,7 @@ const META = {
 const NAVEAS = [
   { grupo: 'Visão geral', itens: [['painel', 'Painel', 'painel'], ['analises', 'Análises futuras', 'chart'], ['alertas', 'Alertas', 'bell']] },
   { grupo: 'Carteira', itens: [['proprietarios', 'Proprietários', 'owners'], ['imoveis', 'Imóveis', 'home'], ['inquilinos', 'Inquilinos', 'tenant'], ['contratos', 'Contratos', 'contract'], ['excecoes', 'Exceções', 'receipt']] },
-  { grupo: 'Cadastros', itens: [['parceiros', 'Corretores e parceiros', 'owners'], ['categorias', 'Categorias financeiras', 'receipt']] },
+  { grupo: 'Cadastros', itens: [['parceiros', 'Fornecedores e parceiros', 'owners'], ['categorias', 'Categorias financeiras', 'receipt']] },
   { grupo: 'Financeiro', itens: [['cobrancas', 'Cobranças', 'receipt'], ['conciliacao', 'Conciliação', 'bank'], ['lancamentos', 'Lançamentos', 'wallet'], ['contas', 'Contas', 'receipt'], ['comissoes', 'Comissões', 'owners'], ['repasses', 'Repasses', 'send'], ['fechamentos', 'Fechamento', 'check']] },
   { grupo: 'Operação', itens: [['documentos', 'Documentos', 'folder'], ['importacao', 'Importar', 'upload'], ['relatorios', 'Relatórios', 'chart']] },
   { grupo: 'Conta', itens: [['configuracoes', 'Configurações', 'settings']] },

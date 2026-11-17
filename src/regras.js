@@ -126,7 +126,7 @@ export function calcularRepasse(competencia, proprietarioId) {
       SELECT COALESCE(SUM(valor_centavos),0) AS total
       FROM lancamentos
       WHERE contrato_id = ? AND competencia = ? AND tipo = 'receita'
-        AND categoria = 'Aluguel' AND status = 'ativo'
+        AND categoria = 'Aluguel' COLLATE NOCASE AND status = 'ativo'
     `).get(c.id, competencia).total;
     if (!receitas) continue;
 
@@ -340,7 +340,7 @@ export function alertas() {
     const diasAtraso = diffDias(venc) * -1;
     if (diasAtraso >= getSettingNum('dias_alerta_atraso', 1)) {
       const pago = db.prepare(`SELECT COALESCE(SUM(valor_centavos),0) AS total FROM lancamentos
-        WHERE contrato_id = ? AND competencia = ? AND tipo='receita' AND categoria='Aluguel' AND status='ativo'`)
+        WHERE contrato_id = ? AND competencia = ? AND tipo='receita' AND categoria='Aluguel' COLLATE NOCASE AND status='ativo'`)
         .get(c.id, comp).total;
       // Pagamento parcial também é inadimplência: compara valores, não a
       // quantidade de lançamentos.

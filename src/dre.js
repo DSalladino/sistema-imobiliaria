@@ -28,7 +28,7 @@ export function drePorImovel({ de, ate, proprietario_id = null } = {}) {
     for (const c of contratos) {
       const recebido = db.prepare(`SELECT COALESCE(SUM(valor_centavos),0) AS total FROM lancamentos
         WHERE contrato_id = ? AND competencia BETWEEN ? AND ? AND tipo = 'receita'
-          AND categoria = 'Aluguel' AND status = 'ativo'`).get(c.id, deInicial, ateFinal).total;
+          AND categoria = 'Aluguel' COLLATE NOCASE AND status = 'ativo'`).get(c.id, deInicial, ateFinal).total;
       if (!recebido) continue;
       const regra = resolverTaxa(
         { taxa_admin_pct: c.taxa_admin_pct, justificativa_taxa: c.justificativa_taxa },
@@ -41,7 +41,7 @@ export function drePorImovel({ de, ate, proprietario_id = null } = {}) {
 
     const despesas = db.prepare(`SELECT COALESCE(SUM(valor_centavos),0) AS total FROM lancamentos
       WHERE imovel_id = ? AND competencia BETWEEN ? AND ? AND tipo = 'despesa' AND status = 'ativo'
-        AND caixa = 'proprietarios' AND categoria <> 'Repasse ao proprietário'`).get(imovel.id, deInicial, ateFinal).total;
+        AND caixa = 'proprietarios' AND categoria <> 'Repasse ao proprietário' COLLATE NOCASE`).get(imovel.id, deInicial, ateFinal).total;
 
     const comissoes = db.prepare(`SELECT COALESCE(SUM(cm.valor_centavos),0) AS total FROM comissoes cm
       JOIN contratos ct ON ct.id = cm.contrato_id

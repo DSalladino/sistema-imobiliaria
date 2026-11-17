@@ -12,9 +12,64 @@ import { validarDocumentoObrigatorio, somenteDigitos, documentoValido } from './
 export const TIPOS_PARCEIRO = {
   corretor: 'Corretor(a)',
   fornecedor: 'Fornecedor(a)',
+  manutencao: 'Empresa de manutenção',
+  prestador: 'Prestador(a) de serviços',
   cliente: 'Cliente',
   ambos: 'Fornecedor e cliente',
 };
+
+// Tipos de serviço usados no cadastro de empresas de manutenção e prestadores.
+// São sugestões: o campo aceita qualquer descrição digitada pelo usuário.
+export const TIPOS_SERVICO = {
+  hidraulica: 'Hidráulica',
+  eletrica: 'Elétrica',
+  pintura: 'Pintura',
+  alvenaria: 'Alvenaria e reformas',
+  limpeza: 'Limpeza e conservação',
+  jardinagem: 'Jardinagem',
+  chaveiro: 'Chaveiro e fechaduras',
+  ar_condicionado: 'Ar-condicionado',
+  dedetizacao: 'Dedetização',
+  vidracaria: 'Vidraçaria',
+  marcenaria: 'Marcenaria',
+  elevador: 'Manutenção de elevador',
+  portaria: 'Portaria e segurança',
+  contabilidade: 'Contabilidade',
+  juridico: 'Jurídico',
+  ti: 'Tecnologia',
+  fotografia: 'Fotografia e marketing',
+  outros: 'Outros serviços',
+};
+
+export const FORMAS_PAGAMENTO = {
+  pix: 'Pix',
+  transferencia: 'Transferência bancária',
+  boleto: 'Boleto',
+  dinheiro: 'Dinheiro',
+  cartao: 'Cartão',
+  debito_automatico: 'Débito automático',
+  a_definir: 'A definir',
+};
+
+const GRUPOS_PARCEIRO = {
+  corretor: ['corretor', 'ambos'],
+  fornecedor: ['fornecedor', 'manutencao', 'prestador', 'ambos'],
+  manutencao: ['manutencao', 'ambos'],
+  prestador: ['prestador', 'ambos'],
+  cliente: ['cliente', 'ambos'],
+  ambos: ['ambos'],
+};
+
+function aceitaTipo(parceiro, tipo) {
+  if (!tipo) return true;
+  return (GRUPOS_PARCEIRO[tipo] || [tipo]).includes(parceiro.tipo);
+}
+
+function inteiro(valor) {
+  if (valor === null || valor === undefined || valor === '') return null;
+  const n = Math.trunc(Number(valor));
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
 
 export const CONTEXTOS_CATEGORIA = {
   lancamento: 'Lançamentos',
@@ -62,13 +117,14 @@ export function listarParceiros({ tipo, busca } = {}) {
   const args = [];
   if (tipo) {
     if (!TIPOS_PARCEIRO[tipo]) throw erro('Tipo de parceiro inválido.');
-    where.push("(tipo = ? OR tipo = 'ambos')");
-    args.push(tipo);
+    const grupos = GRUPOS_PARCEIRO[tipo] || [tipo];
+    where.push(`tipo IN (${grupos.map(() => '?').join(',')})`);
+    args.push(...grupos);
   }
   if (busca) {
     const b = `%${String(busca).trim()}%`;
-    where.push('(nome LIKE ? OR cpf_cnpj LIKE ? OR creci LIKE ? OR email LIKE ? OR telefone LIKE ?)');
-    args.push(b, b, b, b, b);
+    where.push('(nome LIKE ? OR nome_fantasia LIKE ? OR cpf_cnpj LIKE ? OR creci LIKE ? OR email LIKE ? OR telefone LIKE ? OR whatsapp LIKE ? OR pix LIKE ? OR tipo_servico LIKE ? OR especialidades LIKE ?)');
+    args.push(b, b, b, b, b, b, b, b, b, b);
   }
   return db.prepare(`SELECT * FROM parceiros
     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
@@ -81,17 +137,28 @@ export function obterParceiro(id) {
 
 export function criarParceiro(dados) {
   const tipo = String(dados.tipo || '').trim();
-  if (!TIPOS_PARCEIRO[tipo]) throw erro('Escolha corretor, fornecedor, cliente ou ambos.');
+  if (!TIPOS_PARCEIRO[tipo]) throw erro('Escolha corretor, fornecedor, manutenção, prestador, cliente ou ambos.');
   const nome = texto(dados.nome);
   if (!nome) throw erro('Informe o nome do parceiro.');
   const duplicado = db.prepare('SELECT id FROM parceiros WHERE lower(nome) = lower(?) AND ativo = 1').get(nome);
   if (duplicado) throw erro(`Já existe um parceiro ativo com o nome ${nome}.`, 409);
   const documento = prepararDocumento(dados.cpf_cnpj);
   garantirDocumentoUnico(documento);
-  const r = db.prepare(`INSERT INTO parceiros (tipo, nome, cpf_cnpj, creci, email, telefone, pix, endereco, observacoes, ativo)
-    VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
-    tipo, nome, documento, texto(dados.creci), texto(dados.email), texto(dados.telefone),
-    texto(dados.pix), texto(dados.endereco), texto(dados.observacoes), dados.ativo === 0 || dados.ativo === '0' ? 0 : 1,
+  const tipoServico = texto(dados.tipo_servico);
+  if (tipoServico && !TIPOS_SERVICO[tipoServico] && tipoServico.length > 80) {
+    throw erro('Tipo de serviço inválido.');
+  }
+  const forma = texto(dados.forma_pagamento);
+  if (forma && !FORMAS_PAGAMENTO[forma]) throw erro('Forma de pagamento inválida.');
+  const r = db.prepare(`INSERT INTO parceiros (tipo, nome, nome_fantasia, cpf_cnpj, creci, email, telefone, whatsapp,
+      tipo_servico, especialidades, pix, endereco, site, banco, agencia, conta, tipo_conta, forma_pagamento,
+      prazo_pagamento_dias, observacoes, ativo)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    tipo, nome, texto(dados.nome_fantasia), documento, texto(dados.creci), texto(dados.email), texto(dados.telefone),
+    texto(dados.whatsapp), tipoServico, texto(dados.especialidades), texto(dados.pix), texto(dados.endereco),
+    texto(dados.site), texto(dados.banco), texto(dados.agencia), texto(dados.conta), texto(dados.tipo_conta) || 'corrente',
+    forma, inteiro(dados.prazo_pagamento_dias), texto(dados.observacoes),
+    dados.ativo === 0 || dados.ativo === '0' ? 0 : 1,
   );
   return obterParceiro(Number(r.lastInsertRowid));
 }
@@ -100,7 +167,7 @@ export function atualizarParceiro(id, dados) {
   const atual = obterParceiro(id);
   if (!atual) throw erro('Parceiro não encontrado.', 404);
   const tipo = dados.tipo === undefined ? atual.tipo : String(dados.tipo || '').trim();
-  if (!TIPOS_PARCEIRO[tipo]) throw erro('Escolha corretor, fornecedor, cliente ou ambos.');
+  if (!TIPOS_PARCEIRO[tipo]) throw erro('Escolha corretor, fornecedor, manutenção, prestador, cliente ou ambos.');
   const nome = dados.nome === undefined ? atual.nome : texto(dados.nome);
   if (!nome) throw erro('Informe o nome do parceiro.');
   const duplicado = db.prepare('SELECT id FROM parceiros WHERE lower(nome) = lower(?) AND ativo = 1 AND id <> ?').get(nome, atual.id);
@@ -108,11 +175,19 @@ export function atualizarParceiro(id, dados) {
   const documento = dados.cpf_cnpj === undefined ? atual.cpf_cnpj : prepararDocumento(dados.cpf_cnpj, atual);
   garantirDocumentoUnico(documento, atual.id);
   const campo = (c) => (dados[c] === undefined ? atual[c] : texto(dados[c]));
+  const tipoServico = dados.tipo_servico === undefined ? atual.tipo_servico : texto(dados.tipo_servico);
+  if (tipoServico && !TIPOS_SERVICO[tipoServico] && tipoServico.length > 80) throw erro('Tipo de serviço inválido.');
+  const forma = dados.forma_pagamento === undefined ? atual.forma_pagamento : texto(dados.forma_pagamento);
+  if (forma && !FORMAS_PAGAMENTO[forma]) throw erro('Forma de pagamento inválida.');
   const ativo = dados.ativo === undefined ? atual.ativo : (dados.ativo === 0 || dados.ativo === '0' ? 0 : 1);
-  db.prepare(`UPDATE parceiros SET tipo=?, nome=?, cpf_cnpj=?, creci=?, email=?, telefone=?, pix=?, endereco=?,
-      observacoes=?, ativo=? WHERE id=?`).run(
-    tipo, nome, documento, campo('creci'), campo('email'), campo('telefone'), campo('pix'),
-    campo('endereco'), campo('observacoes'), ativo, atual.id,
+  db.prepare(`UPDATE parceiros SET tipo=?, nome=?, nome_fantasia=?, cpf_cnpj=?, creci=?, email=?, telefone=?, whatsapp=?,
+      tipo_servico=?, especialidades=?, pix=?, endereco=?, site=?, banco=?, agencia=?, conta=?, tipo_conta=?,
+      forma_pagamento=?, prazo_pagamento_dias=?, observacoes=?, ativo=? WHERE id=?`).run(
+    tipo, nome, campo('nome_fantasia'), documento, campo('creci'), campo('email'), campo('telefone'),
+    campo('whatsapp'), tipoServico, campo('especialidades'), campo('pix'), campo('endereco'), campo('site'),
+    campo('banco'), campo('agencia'), campo('conta'), campo('tipo_conta') || 'corrente', forma,
+    dados.prazo_pagamento_dias === undefined ? atual.prazo_pagamento_dias : inteiro(dados.prazo_pagamento_dias),
+    campo('observacoes'), ativo, atual.id,
   );
   return obterParceiro(atual.id);
 }
@@ -129,7 +204,7 @@ export function resolverParceiro({ id, nome, tipo } = {}) {
   if (id != null && id !== '') {
     const p = obterParceiro(id);
     if (!p) throw erro('Parceiro vinculado não encontrado.');
-    if (tipo && p.tipo !== tipo && p.tipo !== 'ambos') {
+    if (tipo && !aceitaTipo(p, tipo)) {
       throw erro(`O parceiro ${p.nome} não está cadastrado como ${TIPOS_PARCEIRO[tipo].toLowerCase()}.`);
     }
     return p;
@@ -137,7 +212,7 @@ export function resolverParceiro({ id, nome, tipo } = {}) {
   const alvo = texto(nome);
   if (!alvo) return null;
   const candidatos = db.prepare(`SELECT * FROM parceiros WHERE ativo = 1 AND lower(nome) = lower(?) ORDER BY id`).all(alvo);
-  const compativel = tipo ? candidatos.find(p => p.tipo === tipo || p.tipo === 'ambos') : candidatos[0];
+  const compativel = tipo ? candidatos.find(p => aceitaTipo(p, tipo)) : candidatos[0];
   return compativel || null;
 }
 

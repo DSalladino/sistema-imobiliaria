@@ -27,7 +27,7 @@ import { hashSenha, verificaSenha, novoToken, hashToken } from './auth.js';
 import { auditar, exigir, pode } from './permissoes.js';
 import {
   listar as listarContas, obter as obterConta, resumo as resumoContas, criar as criarConta,
-  atualizar as atualizarConta, cancelar as cancelarConta, pagar as pagarConta, previsaoCaixa,
+  atualizar as atualizarConta, cancelar as cancelarConta, pagar as pagarConta, previsaoCaixa, RECORRENCIAS,
 } from './contas.js';
 import { previewReajuste, aplicarReajuste, historicoReajustes, rescindir, obterRescisao } from './contratos-acoes.js';
 import {
@@ -43,7 +43,7 @@ import { validarDocumentoObrigatorio, somenteDigitos, documentoValido } from './
 import {
   listarParceiros, obterParceiro, criarParceiro, atualizarParceiro, desativarParceiro,
   listarCategorias, criarCategoria, atualizarCategoria, desativarCategoria,
-  garantirCategoria,
+  garantirCategoria, TIPOS_PARCEIRO, TIPOS_SERVICO, FORMAS_PAGAMENTO, CAIXAS, CONTEXTOS_CATEGORIA,
 } from './cadastros.js';
 import { verificarIntegridadeAuditoria, detalharAuditoria, consultarAuditoria } from './auditoria.js';
 import {
@@ -1988,6 +1988,22 @@ export async function handleApi(req, res, url, user, ip, body) {
     }
 
     /* ---------- Parceiros e categorias ---------- */
+    if (p === '/cadastros/opcoes' && m === 'GET') {
+      exigir(user, 'ler');
+      return json(res, 200, {
+        tipos_parceiro: Object.entries(TIPOS_PARCEIRO).map(([valor, rotulo]) => ({ valor, rotulo })),
+        tipos_servico: Object.entries(TIPOS_SERVICO).map(([valor, rotulo]) => ({ valor, rotulo })),
+        formas_pagamento: Object.entries(FORMAS_PAGAMENTO).map(([valor, rotulo]) => ({ valor, rotulo })),
+        caixas: Object.entries(CAIXAS).map(([valor, rotulo]) => ({ valor, rotulo })),
+        contextos_categoria: Object.entries(CONTEXTOS_CATEGORIA).map(([valor, rotulo]) => ({ valor, rotulo })),
+        recorrencias: RECORRENCIAS.map(([valor, rotulo]) => ({ valor, rotulo })),
+        tipos_conta: [
+          { valor: 'corrente', rotulo: 'Conta corrente' },
+          { valor: 'poupanca', rotulo: 'Poupança' },
+          { valor: 'pagamento', rotulo: 'Conta de pagamento' },
+        ],
+      });
+    }
     if (p === '/parceiros' && m === 'GET') {
       exigir(user, 'ler');
       const itens = listarParceiros({
