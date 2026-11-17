@@ -393,7 +393,7 @@ export function formModal({ titulo, subtitulo = '', fields, valores = {}, textoB
     titulo, subtitulo, wide,
     corpo: `<form data-form novalidate>${fieldsHtml(fields, valores)}<div class="form-error mt-2" data-erro hidden></div></form>`,
     rodape: `${extraRodape}<button class="btn" type="button" data-cancelar>Cancelar</button><button class="btn primary" type="submit" form="" data-salvar>${esc(textoBotao)}</button>`,
-    onMount(r) {
+    onMount(r, fechar) {
       const form = r.querySelector('[data-form]');
       const btn = r.querySelector('[data-salvar]');
       const err = r.querySelector('[data-erro]');
@@ -404,7 +404,7 @@ export function formModal({ titulo, subtitulo = '', fields, valores = {}, textoB
         try {
           const dados = collectForm(form, fields);
           const continuar = await onSubmit(dados, form);
-          if (continuar !== false) close();
+          if (continuar !== false) fechar();
         } catch (ex) {
           err.hidden = false;
           err.textContent = ex.message || 'Não foi possível salvar.';
@@ -414,7 +414,7 @@ export function formModal({ titulo, subtitulo = '', fields, valores = {}, textoB
       };
       form.addEventListener('submit', submit);
       btn.addEventListener('click', submit);
-      r.querySelector('[data-cancelar]').onclick = close;
+      r.querySelector('[data-cancelar]').onclick = fechar;
     },
   });
   return { root, close };

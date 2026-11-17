@@ -97,6 +97,16 @@ test('todas as telas renderizam com dados reais', async (t) => {
     ['manutencao', fin.viewManutencao, 'Base de demonstração'],
   ];
 
+  // formModal precisa montar e fechar sem erro de inicialização.
+  core.formModal({
+    titulo: 'Teste',
+    fields: [{ name: 'nome', label: 'Nome' }],
+    onSubmit: async () => {},
+  });
+  assert.ok(document.querySelector('.modal'), 'formModal deve abrir');
+  document.querySelector('[data-cancelar]').click();
+  assert.equal(document.querySelector('.modal'), null, 'Cancelar deve fechar o modal');
+
   for (const [nome, view, esperado] of rotas) {
     const raiz = document.createElement('div');
     document.body.appendChild(raiz);
