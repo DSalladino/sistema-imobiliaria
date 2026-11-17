@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { db } from './db.js';
+import { inserirAuditoria } from './auditoria.js';
 
 const norm = (s) => String(s ?? '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -549,9 +550,10 @@ export function importar({ entidade, arquivo_base64, opcoes = {}, usuario }) {
         erros.push({ linha: i + 2, erros: [e.message] });
       }
     });
-    db.prepare(`INSERT INTO auditoria (usuario_id, usuario_nome, acao, entidade, entidade_id, detalhe, ip)
-      VALUES (?,?,?,?,?,?,?)`).run(usuario?.id ?? null, usuario?.nome ?? 'sistema', 'importar', entidade, null,
-      JSON.stringify({ inseridos, atualizados, erros: erros.length }), null);
+    inserirAuditoria({
+      usuario_id: usuario?.id ?? null, usuario_nome: usuario?.nome ?? 'sistema', acao: 'importar',
+      entidade, entidade_id: null, detalhe: { inseridos, atualizados, erros: erros.length }, ip: null,
+    });
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');

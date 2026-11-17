@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db, DATA_DIR, seedDemo } from './db.js';
 import { gerarRepasses, pagarRepasse, competenciaAtual, getSettingNum } from './regras.js';
-import { reencadearAuditoria } from './auditoria.js';
+import { reencadearAuditoria, inserirAuditoria } from './auditoria.js';
 import { addMesesComp } from './analytics.js';
 import { gerar as gerarCobrancas, pagar as pagarCobranca, listar as listarCobrancas } from './cobrancas.js';
 import { UPLOADS } from './documentos.js';
@@ -18,7 +18,7 @@ const TABELAS = [
 
 export function statusManutencao() {
   const contagens = {};
-  for (const t of [...TABELAS, 'categorias', 'usuarios', 'auditoria']) {
+  for (const t of [...TABELAS, 'categorias', 'usuarios', 'auditoria', 'auditoria_estado']) {
     try { contagens[t] = db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n; } catch { contagens[t] = null; }
   }
   let arquivos = 0;
@@ -64,10 +64,14 @@ export function limparBase({ incluirAuditoria = true, incluirArquivos = true } =
       try { db.exec(`DELETE FROM ${t}`); } catch {}
     }
     db.exec(`DELETE FROM sqlite_sequence WHERE name IN (${TABELAS.map(t => `'${t}'`).join(',')})`);
-    if (incluirAuditoria) db.exec('DELETE FROM auditoria');
-    db.prepare(`INSERT INTO auditoria (usuario_id, usuario_nome, acao, entidade, detalhe)
-      VALUES (NULL, 'sistema', 'limpar_base', 'sistema', ?)`)
-      .run(JSON.stringify({ backup, incluirArquivos, incluirAuditoria }));
+    if (incluirAuditoria) {
+      db.exec('DELETE FROM auditoria');
+      db.exec('DELETE FROM auditoria_estado');
+    }
+    inserirAuditoria({
+      usuario_nome: 'sistema', acao: 'limpar_base', entidade: 'sistema',
+      detalhe: { backup, incluirArquivos, incluirAuditoria },
+    });
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
@@ -138,7 +142,9 @@ export function carregarDemo() {
       try { pagarRepasse(r.id, 'seed'); } catch {}
     }
   }
-  db.prepare(`INSERT INTO auditoria (usuario_id, usuario_nome, acao, entidade, detalhe)
-    VALUES (NULL, 'sistema', 'carregar_demo', 'sistema', ?)`).run(JSON.stringify({ competencia: compAtual }));
+  inserirAuditoria({
+    usuario_nome: 'sistema', acao: 'carregar_demo', entidade: 'sistema',
+    detalhe: { competencia: compAtual },
+  });
   return { ok: true, ...statusManutencao() };
 }

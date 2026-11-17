@@ -28,6 +28,7 @@ function kpiCard(rotulo, valor, rodape, spark = '') {
     <div class="kpi-foot">${rodape || ''}${spark}</div>
   </div>`;
 }
+const listaApi = (v) => Array.isArray(v) ? v : Array.isArray(v?.itens) ? v.itens : [];
 const stat = (rotulo, valor, tom = '') => `<div class="kpi"><div class="kpi-label">${esc(rotulo)}</div><div class="kpi-value" ${tom ? `style="color:var(--${tom})"` : ''}>${valor}</div></div>`;
 
 function periodoRange(p) {
@@ -992,7 +993,7 @@ export async function viewParceiros(root) {
   };
 
   const carregar = async () => {
-    try { dados = await api('/parceiros'); render(); } catch (e) { lista.innerHTML = erroBox(e); }
+    try { dados = listaApi(await api('/parceiros')); render(); } catch (e) { lista.innerHTML = erroBox(e); }
   };
   root.querySelector('[data-tipo]').onchange = (e) => { tipo = e.target.value; render(); };
   root.querySelector('[data-busca]').addEventListener('input', (e) => { busca = e.target.value; render(); });
@@ -1055,7 +1056,7 @@ export async function viewCategorias(root) {
   };
 
   const carregar = async () => {
-    try { dados = await api('/categorias?inativas=1'); render(); } catch (e) { lista.innerHTML = erroBox(e); }
+    try { dados = listaApi(await api('/categorias?inativas=1')); render(); } catch (e) { lista.innerHTML = erroBox(e); }
   };
   root.querySelector('[data-contexto]').onchange = (e) => { contexto = e.target.value; render(); };
   const nova = root.querySelector('[data-nova]'); if (nova) nova.onclick = () => abrirForm();

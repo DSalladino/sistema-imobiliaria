@@ -72,12 +72,46 @@
     if (exata !== undefined) return exata;
 
     const alvo = new URLSearchParams(search);
-    let melhor = null;
-    let melhorNota = -Infinity;
+    const querEnvelope = alvo.get('envelope') === '1';
+    const candidatos = [];
     for (const [chave, valor] of Object.entries(dados.respostas)) {
       const [chavePath, chaveSearch = ''] = chave.split('?');
       if (chavePath !== path) continue;
-      const candidato = new URLSearchParams(chaveSearch);
+      candidatos.push({ params: new URLSearchParams(chaveSearch), valor });
+    }
+
+    // Listas completas: a demo antiga pode só ter recortes (por contexto ou
+    // inativas=1). Para os cadastros usados em seletores, devolvemos a união,
+    // evitando que o formulário abra sem categorias/fornecedores.
+    if (path === '/api/categorias' || path === '/api/parceiros') {
+      const ids = new Set();
+      const uniao = [];
+      for (const c of candidatos) {
+        if (!Array.isArray(c.valor)) continue;
+        for (const item of c.valor) {
+          const id = item && typeof item === 'object' ? item.id : null;
+          if (id != null) { if (ids.has(id)) continue; ids.add(id); }
+          uniao.push(item);
+        }
+      }
+      if (uniao.length) {
+        const somenteAtivos = path === '/api/categorias' && alvo.get('inativas') === '0';
+        return somenteAtivos ? uniao.filter(x => !x || x.ativo !== 0) : uniao;
+      }
+    }
+
+    // Auditoria: se a interface pediu envelope mas o retrato salvo é uma lista
+    // simples, adaptamos para { itens, total } em vez de devolver o tipo errado.
+    if (path === '/api/auditoria' && querEnvelope) {
+      const lista = candidatos.find(c => Array.isArray(c.valor))?.valor;
+      if (Array.isArray(lista)) return { itens: lista, total: lista.length, limite: lista.length, offset: 0 };
+      const envelope = candidatos.find(c => c.valor && Array.isArray(c.valor.itens))?.valor;
+      if (envelope) return envelope;
+    }
+
+    let melhor = null;
+    let melhorNota = -Infinity;
+    for (const { params: candidato, valor } of candidatos) {
       let nota = 0;
       for (const [k, v] of alvo) {
         if (!v) continue;
