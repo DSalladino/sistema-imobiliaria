@@ -15,7 +15,7 @@
   </a>
   <img src="https://img.shields.io/badge/Node.js-22.13%2B-2E4A40?logo=node.js&logoColor=white" alt="Node.js 22.13+">
   <img src="https://img.shields.io/badge/SQLite-node%3Asqlite-5C8571?logo=sqlite&logoColor=white" alt="SQLite">
-  <img src="https://img.shields.io/badge/vers%C3%A3o-0.10.0-C9A87C" alt="Versão 0.10.0">
+  <img src="https://img.shields.io/badge/vers%C3%A3o-0.11.0-C9A87C" alt="Versão 0.11.0">
   <img src="https://img.shields.io/badge/licen%C3%A7a-MIT-2E4A40" alt="Licença MIT">
   <img src="https://img.shields.io/badge/PRs-bem--vindos-5C8571" alt="PRs bem-vindos">
 </p>
@@ -49,7 +49,7 @@ poucos usuários — e prioriza **simplicidade operacional**, **rastreabilidade*
 **baixo custo**. O resultado é um monólito Node.js + SQLite com frontend sem
 build, testes automatizados e documentação de ponta a ponta.
 
-> **Status:** versão 0.10.0, em evolução ativa. O repositório não contém dados
+> **Status:** versão 0.11.0, em evolução ativa. O repositório não contém dados
 > reais; a base de demonstração é separada da produção.
 
 ### Por que este projeto é diferente
@@ -74,6 +74,13 @@ build, testes automatizados e documentação de ponta a ponta.
   editar o banco diretamente quebra a verificação.
 - **Decisão com horizonte.** Análises futuras projetam receita, resultado e caixa
   com faixa de erro, riscos e simulador de cenário — tudo no banco local.
+- **Dados de apoio que não se repetem.** Corretores, fornecedores e clientes têm
+  cadastro próprio com Pix e CRECI; categorias financeiras são selecionáveis e
+  extensíveis. O formulário deixa de depender de texto livre e o histórico não
+  nasce com três grafias do mesmo nome.
+- **Backup que se prova.** Snapshots automáticos com hash SHA-256 ao lado do
+  arquivo, retenção configurável e ensaio de restauração que compara todas as
+  tabelas — não apenas “o arquivo foi criado”.
 
 ## Demonstração
 
@@ -125,15 +132,16 @@ Passo a passo em [docs/DEPLOY-DEMO.md](docs/DEPLOY-DEMO.md).
 | **Carteira** | Proprietários, imóveis, inquilinos, contratos, garantias, reajustes e exceções de taxa |
 | **Cobranças** | Geração mensal em lote, baixa total/parcial, multa e juros, estorno, cancelamento, aging e régua, **Pix copia e cola com QR por cobrança** |
 | **Conciliação** | Importação de OFX/CSV/Excel, sugestão de vínculo e confirmação humana |
-| **Contas** | Contas a pagar e a receber com recorrência, baixa que gera lançamento e previsão de caixa de 6–24 meses |
+| **Contas** | Contas a pagar e a receber com recorrência semanal a anual, baixa que gera lançamento e previsão de caixa de 6–24 meses |
 | **Financeiro** | Dois caixas, lançamentos por competência, estornos, repasses com extrato e fechamento mensal |
-| **Comissões** | Corretagem prevista/liberada/paga por contrato, geração em lote e lançamento de despesa |
+| **Comissões** | Corretagem prevista/liberada/paga por contrato, corretor vinculado ao cadastro, geração em lote e lançamento de despesa |
+| **Cadastros de apoio** | Corretores (com CRECI e Pix), fornecedores, clientes e categorias financeiras por contexto |
 | **Documentos** | Upload vinculado a cadastros, versões, validade, pré-visualização e download autenticado |
 | **Relatórios** | Oito relatórios em CSV, XLSX e PDF — incluindo **DRE por imóvel** — com cabeçalho, indicadores e paginação |
 | **Importação** | Modelos de planilha, prévia linha a linha e atualização de registros existentes |
 | **Comunicação** | WhatsApp por link `wa.me` ou API oficial (Cloud API), e e-mail SMTP com modelos, histórico e assinatura |
 | **Assistente** | Perguntas em linguagem natural sobre inadimplência, caixa, repasses, contratos, reajustes, ocupação, comissões e contas — com números e atalhos para a tela certa |
-| **Administração** | Usuários, papéis, auditoria, 2FA, LGPD, backup, manutenção e configurações |
+| **Administração** | Usuários, papéis, auditoria encadeada, 2FA, LGPD, backup automático com hash, manutenção e configurações |
 
 Detalhes de cada fluxo, regras e telas em [docs/FUNCIONALIDADES.md](docs/FUNCIONALIDADES.md).
 
@@ -199,7 +207,7 @@ demonstração. O seed **nunca** roda por omissão, mesmo em desenvolvimento.
 |---|---|
 | `npm start` | Sobe a aplicação |
 | `npm run dev` | Sobe com `--watch` |
-| `npm test` | 84 testes: API, regras, interface (jsdom), seed, relatórios e assistente |
+| `npm test` | 126 testes: API, regras, interface (jsdom), seed, relatórios, cadastros e assistente |
 | `npm run check` | Verifica a sintaxe de todos os `.js`/`.mjs` |
 | `npm run deps:check` | Confere versão, origem e integrity da dependência `xlsx` (CDN) |
 | `npm run test:coverage` | Testes com cobertura experimental do Node |
@@ -234,6 +242,8 @@ O núcleo é um monólito com camadas claras:
 - `src/analytics.js` — KPIs, séries, composição e comparativos.
 - `src/reports.js` — CSV, XLSX e PDF.
 - `src/importacao.js` — planilhas, prévia e modelos.
+- `src/cadastros.js` — parceiros (corretores, fornecedores e clientes) e categorias.
+- `src/backup.js` — snapshots, hash SHA-256, retenção e ensaio de restauração.
 - `src/db.js` — esquema, migrações, configurações e seed.
 - `public/*` — SPA, gráficos SVG, componentes e tema.
 
@@ -310,12 +320,13 @@ npm test
   AES-GCM, códigos de recuperação, política de senha e hash de sessão.
 - `tests/features.test.mjs` — Pix, WhatsApp, contas e recorrência, previsão de
   caixa, reajuste em lote, rescisão, comissões e DRE por imóvel.
-- `tests/ui.test.mjs` — renderiza as 22 telas com dados reais em jsdom.
+- `tests/ui.test.mjs` — renderiza as 24 telas com dados reais em jsdom.
 - `tests/seed.test.mjs` — valida a base de demonstração da primeira execução.
 - `tests/relatorios.test.mjs` — CSV/XLSX/PDF, fórmulas, acentos, período vazio e DRE.
 - `tests/conciliacao.test.mjs` — OFX, CSV, sugestão, duplicidade, txid e confirmação.
 - `tests/analytics.test.mjs` — série, ocupação, composição, KPIs e cache de settings.
-
+- `tests/cadastros.test.mjs` — parceiros, categorias, vínculo de corretor,
+  fornecedor em contas, novas recorrências e hash de snapshot.
 - `tests/assistente.test.mjs` — interpretação de período, resumo, caixa,
   ocupação, ajuda, busca por nome e inadimplência.
 
@@ -326,8 +337,10 @@ O CI roda em Node 22 e 24. A estratégia e as lacunas estão em
 
 - **Backup:** Relatórios → “Baixar backup do banco”. O `.zip` inclui o banco, a
   pasta de documentos e, quando existir, a chave local `.app-key`.
+- **Snapshots:** ao iniciar, o sistema cria um snapshot automático se o último
+  tiver mais de 24 h (configurável). Cada arquivo recebe um `.sha256` ao lado.
 - **Verificação:** Relatórios → “Verificar integridade” abre o banco gerado e
-  confere as tabelas.
+  confere tabelas, chaves estrangeiras, contagens e o hash dos snapshots.
 - **Restauração:** pare o servidor, substitua `data/imobiliaria.db`, copie
   `documentos/` para `data/uploads` e `.app-key` para `data/.app-key`, remova
   `-wal`/`-shm` antigos e suba novamente.

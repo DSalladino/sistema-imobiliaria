@@ -339,6 +339,13 @@ function fieldInput(f, valores) {
       ${opts.map(o => `<option value="${esc(o.value)}" ${String(val ?? '') === String(o.value) ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}
     </select>`;
   }
+  if (f.type === 'datalist') {
+    const opts = (typeof f.options === 'function' ? f.options() : f.options || [])
+      .map(o => typeof o === 'object' ? o : { value: o, label: o });
+    const listId = `dl-${f.name}`;
+    return `<input id="${id}" name="${esc(f.name)}" list="${listId}" value="${val == null ? '' : esc(val)}" placeholder="${esc(f.placeholder || 'Selecione ou digite…')}" ${f.maxlength ? `maxlength="${f.maxlength}"` : ''} ${req}>
+      <datalist id="${listId}">${opts.map(o => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</datalist>`;
+  }
   if (f.type === 'textarea') {
     return `<textarea id="${id}" name="${esc(f.name)}" ${req} rows="${f.rows || 3}" placeholder="${esc(f.placeholder || '')}">${esc(val ?? '')}</textarea>`;
   }
@@ -388,7 +395,7 @@ export function collectForm(form, fields) {
   return out;
 }
 
-export function formModal({ titulo, subtitulo = '', fields, valores = {}, textoBotao = 'Salvar', wide = false, onSubmit, extraRodape = '' }) {
+export function formModal({ titulo, subtitulo = '', fields, valores = {}, textoBotao = 'Salvar', wide = false, onSubmit, onMount: aoMontar, extraRodape = '' }) {
   const { root, close } = openModal({
     titulo, subtitulo, wide,
     corpo: `<form data-form novalidate>${fieldsHtml(fields, valores)}<div class="form-error mt-2" data-erro hidden></div></form>`,
@@ -415,6 +422,7 @@ export function formModal({ titulo, subtitulo = '', fields, valores = {}, textoB
       form.addEventListener('submit', submit);
       btn.addEventListener('click', submit);
       r.querySelector('[data-cancelar]').onclick = fechar;
+      if (typeof aoMontar === 'function') aoMontar(r, fechar);
     },
   });
   return { root, close };

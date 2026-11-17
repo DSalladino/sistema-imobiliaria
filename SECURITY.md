@@ -6,7 +6,8 @@ Correções de segurança são aplicadas na versão estável publicada em `main`
 
 | Versão | Suporte |
 |---|---|
-| 0.8.x | Sim |
+| 0.11.x | Sim |
+| 0.8.x–0.10.x | Correções críticas sob demanda |
 | 0.6.x–0.7.x | Correções críticas sob demanda |
 | Anteriores | Recomenda-se atualizar |
 
@@ -55,6 +56,8 @@ A análise completa, o modelo de ameaças e o runbook de incidentes estão em
 - Upload com limite de tamanho, extensões permitidas, nome aleatório e download autenticado.
 - Banco, uploads e backups com permissões restritas no sistema operacional.
 - Backup em ZIP inclui banco, documentos e, quando existir, `.app-key`; o arquivo é tratado como confidencial.
+- Snapshots automáticos recebem um `.sha256` ao lado; a manutenção mostra se o hash confere e a limpeza remove hash e banco juntos.
+- Dados de corretores, fornecedores e clientes seguem a mesma máscara de CPF/CNPJ do perfil consulta e são auditados ao criar, alterar ou desativar.
 - Auditoria de login, alterações, estornos, fechamentos, importações, backups e LGPD.
 - Exportações CSV protegidas contra injeção de fórmula.
 - **Pix estático sem PSP**: o BR Code é gerado localmente, a chave é validada

@@ -417,7 +417,7 @@ export async function viewConciliacao(root) {
    ============================================================ */
 export async function viewLancamentos(root) {
   let comp = compAtual(), caixa = '', tipo = '', dados = [], saldos = null;
-  let props = [], imoveis = [], contratos = [];
+  let props = [], imoveis = [], contratos = [], categorias = [];
   root.innerHTML = head('Lançamentos', 'Dois caixas separados, correção por estorno e fechamento mensal.', `
       ${podeFinanceiro() ? `<button class="btn primary" data-novo>${icon('plus')} Novo lançamento</button>` : ''}
       ${podeFinanceiro() ? `<button class="btn" data-exportar>${icon('download')} CSV</button>` : ''}`) +
@@ -435,7 +435,7 @@ export async function viewLancamentos(root) {
     { name: 'competencia', label: 'Competência', type: 'month', required: true },
     { name: 'tipo', label: 'Tipo', type: 'select', required: true, options: [['receita', 'Receita'], ['despesa', 'Despesa']] },
     { name: 'caixa', label: 'Caixa', type: 'select', required: true, options: [['imobiliaria', 'Imobiliária'], ['proprietarios', 'Proprietários']], hint: 'Aluguel e repasse usam Proprietários; taxa de administração usa Imobiliária.' },
-    { name: 'categoria', label: 'Categoria', required: true, placeholder: 'Aluguel, Taxa de administração, Manutenção…' },
+    { name: 'categoria', label: 'Categoria', type: 'datalist', required: true, options: categorias.map(c => ({ value: c.nome, label: `${c.nome} · ${c.tipo === 'receita' ? 'receita' : 'despesa'} · ${c.caixa === 'proprietarios' ? 'Proprietários' : c.caixa === 'imobiliaria' ? 'Imobiliária' : 'sem caixa'}` })), hint: 'Selecione uma categoria existente ou digite uma nova. Gerenciar em Cadastros › Categorias financeiras.' },
     { name: 'valor_centavos', label: 'Valor (R$)', type: 'money', required: true },
     { name: 'descricao', label: 'Descrição', type: 'textarea', span: 2 },
     { name: 'proprietario_id', label: 'Proprietário', type: 'select', options: props.map(p => ({ value: p.id, label: p.nome })) },
@@ -445,6 +445,16 @@ export async function viewLancamentos(root) {
   const abrirForm = () => formModal({
     titulo: 'Novo lançamento', wide: true,
     fields: campos(), valores: { data: hojeISO(), competencia: comp, tipo: 'despesa', caixa: 'imobiliaria' },
+    onMount: (r) => {
+      const categoria = r.querySelector('[name=categoria]');
+      const caixaSel = r.querySelector('[name=caixa]');
+      const sugerirCaixa = () => {
+        const c = categorias.find(x => x.nome.toLowerCase() === String(categoria.value || '').trim().toLowerCase());
+        if (c?.caixa) caixaSel.value = c.caixa;
+      };
+      categoria.addEventListener('change', sugerirCaixa);
+      categoria.addEventListener('blur', sugerirCaixa);
+    },
     onSubmit: async (d) => { await api('/lancamentos', { method: 'POST', body: d }); toast('Lançamento criado.'); carregar(); },
   });
 
@@ -523,7 +533,12 @@ export async function viewLancamentos(root) {
   root.querySelector('[data-tipo]').onchange = (e) => { tipo = e.target.value; carregar(); };
   root.querySelector("[data-exportar]")?.addEventListener("click", () => download(`/export/lancamentos?competencia=${comp}`));
   root.querySelector('[data-novo]')?.addEventListener('click', async () => {
-    try { [props, imoveis, contratos] = await Promise.all([api('/proprietarios'), api('/imoveis'), api('/contratos')]); abrirForm(); } catch (e) { toast(e.message, 'err'); }
+    try {
+      [props, imoveis, contratos, categorias] = await Promise.all([
+        api('/proprietarios'), api('/imoveis'), api('/contratos'), api('/categorias?contexto=lancamento&inativas=0'),
+      ]);
+      abrirForm();
+    } catch (e) { toast(e.message, 'err'); }
   });
   await carregar();
 }
@@ -1405,13 +1420,15 @@ export async function viewManutencao(root) {
           ${stat('Snapshots', String(s.itens.length))}
           ${stat('Retenção', `${s.retencao_dias} dias`)}
           ${stat('Último backup', esc(cfg('ultimo_backup', 'nunca')))}
+          ${stat('Snapshot automático', `a cada ${esc(cfg('backup_automatico_horas', '24'))} h`)}
         </div>
         ${s.itens.length ? tableHtml([
           { label: 'Arquivo', render: x => `<span class="mono small">${esc(x.nome)}</span>` },
           { label: 'Tamanho', num: true, render: x => `${(x.bytes / 1024 / 1024).toFixed(1)} MB` },
           { label: 'Criado em', render: x => esc((x.criado_em || '').replace('T', ' ').slice(0, 16)) },
+          { label: 'Hash', render: x => x.hash_ok === true ? badge('Conferido', 'sage') : x.hash_ok === false ? badge('Divergente', 'blush') : '<span class="muted">sem hash</span>' },
         ], s.itens.slice(0, 10)) : '<p class="small muted">Nenhum snapshot local ainda. O sistema cria um antes de operações destrutivas.</p>'}
-        <p class="small muted mt-2">O ensaio de restauração abre uma cópia do banco, roda <code>integrity_check</code> e compara as contagens de todas as tabelas.</p>`;
+        <p class="small muted mt-2">Cada snapshot recebe um arquivo <code>.sha256</code> ao lado. O ensaio de restauração abre uma cópia do banco, roda <code>integrity_check</code> e compara as contagens de todas as tabelas.</p>`;
     } catch (e) { root.querySelector('[data-backup-status]').innerHTML = erroBox(e); }
     try {
       const r = await api('/manutencao/retencao');
@@ -1474,6 +1491,7 @@ export async function viewContas(root, params) {
   let busca = '';
   let lista = [];
   let resumo = null;
+  let categorias = [], parceiros = [];
 
   root.innerHTML = head('Contas a pagar e a receber', 'Compromissos, recorrências e previsão de caixa.', `
       ${podeFinanceiro() ? `<button class="btn primary" data-nova>${icon('plus')} Nova conta</button>` : ''}`) +
@@ -1498,11 +1516,11 @@ export async function viewContas(root, params) {
   const campos = () => [
     { name: 'tipo', label: 'Tipo', type: 'select', required: true, options: [['pagar', 'A pagar'], ['receber', 'A receber']] },
     { name: 'descricao', label: 'Descrição', required: true, placeholder: 'Condomínio, IPTU, comissão…' },
-    { name: 'categoria', label: 'Categoria', placeholder: 'Ocupação, Impostos, Serviços' },
-    { name: 'fornecedor', label: 'Fornecedor / cliente' },
+    { name: 'categoria', label: 'Categoria', type: 'datalist', options: categorias.map(c => ({ value: c.nome, label: `${c.nome} · ${c.contexto === 'conta_pagar' ? 'a pagar' : 'a receber'} · ${c.caixa === 'proprietarios' ? 'Proprietários' : c.caixa === 'imobiliaria' ? 'Imobiliária' : 'sem caixa'}` })), hint: 'Selecione ou digite uma nova. Gerenciar em Cadastros › Categorias financeiras.' },
+    { name: 'fornecedor', label: 'Fornecedor / cliente', type: 'datalist', options: parceiros.filter(p => p.ativo && (p.tipo === 'fornecedor' || p.tipo === 'cliente' || p.tipo === 'ambos')).map(p => ({ value: p.nome, label: `${p.nome} · ${p.tipo === 'cliente' ? 'cliente' : 'fornecedor'}${p.pix ? ' · Pix ' + p.pix : ''}` })), hint: 'Cadastre fornecedores e clientes em Cadastros › Corretores e parceiros. Também pode digitar um nome novo.' },
     { name: 'valor_centavos', label: 'Valor (R$)', type: 'money', required: true },
     { name: 'vencimento', label: 'Vencimento', type: 'date', required: true },
-    { name: 'recorrencia', label: 'Recorrência', type: 'select', options: [['unica', 'Única'], ['mensal', 'Mensal'], ['semanal', 'Semanal'], ['anual', 'Anual']] },
+    { name: 'recorrencia', label: 'Recorrência', type: 'select', options: [['unica', 'Única'], ['semanal', 'Semanal'], ['mensal', 'Mensal'], ['bimestral', 'Bimestral'], ['trimestral', 'Trimestral'], ['semestral', 'Semestral'], ['anual', 'Anual']], hint: 'A próxima parcela é criada automaticamente na baixa.' },
     { name: 'recorrencia_fim', label: 'Repetir até', type: 'date' },
     { name: 'caixa', label: 'Caixa', type: 'select', options: [['imobiliaria', 'Imobiliária'], ['proprietarios', 'Proprietários']] },
     { name: 'observacoes', label: 'Observações', type: 'textarea', span: 2 },
@@ -1512,6 +1530,16 @@ export async function viewContas(root, params) {
     titulo: conta ? 'Editar conta' : 'Nova conta', wide: true,
     fields: campos(),
     valores: conta || { tipo: 'pagar', vencimento: hojeISO(), recorrencia: 'unica', caixa: 'imobiliaria' },
+    onMount: (r) => {
+      const categoria = r.querySelector('[name=categoria]');
+      const caixaSel = r.querySelector('[name=caixa]');
+      const sugerirCaixa = () => {
+        const c = categorias.find(x => x.nome.toLowerCase() === String(categoria.value || '').trim().toLowerCase());
+        if (c?.caixa) caixaSel.value = c.caixa;
+      };
+      categoria.addEventListener('change', sugerirCaixa);
+      categoria.addEventListener('blur', sugerirCaixa);
+    },
     onSubmit: async (d) => {
       if (conta) await api(`/contas/${conta.id}`, { method: 'PUT', body: d });
       else await api('/contas', { method: 'POST', body: d });
@@ -1615,6 +1643,14 @@ export async function viewContas(root, params) {
     busca = e.target.value; clearTimeout(window.__contasT); window.__contasT = setTimeout(carregar, 350);
   });
   root.querySelector('[data-nova]')?.addEventListener('click', () => abrirForm());
+  try {
+    [categorias, parceiros] = await Promise.all([
+      api('/categorias?contexto=conta_pagar'),
+      api('/parceiros'),
+    ]);
+    const receber = await api('/categorias?contexto=conta_receber');
+    categorias = [...categorias, ...receber];
+  } catch { /* formulário continua aceitando texto livre */ }
   await carregar();
   await renderPrevisao();
 }
@@ -1628,6 +1664,7 @@ export async function viewComissoes(root, params) {
   let lista = [];
   let resumo = null;
   let contratos = [];
+  let parceiros = [];
 
   root.innerHTML = head('Comissões', 'Corretagem prevista, liberada e paga por contrato.', `
       ${podeFinanceiro() ? `<button class="btn" data-lote>${icon('check')} Gerar em lote</button>` : ''}
@@ -1648,13 +1685,26 @@ export async function viewComissoes(root, params) {
     titulo: 'Nova comissão', wide: true,
     fields: [
       { name: 'contrato_id', label: 'Contrato', type: 'select', required: true, options: contratos.filter(c => c.status === 'ativo').map(c => ({ value: c.id, label: `${c.codigo || '#' + c.id} — ${c.endereco} — ${brl(c.aluguel_centavos)}` })) },
-      { name: 'corretor', label: 'Corretor', required: true },
+      { name: 'corretor', label: 'Corretor(a)', type: 'datalist', required: true, options: parceiros.filter(p => p.ativo && (p.tipo === 'corretor' || p.tipo === 'ambos')).map(p => ({ value: p.nome, label: p.creci ? `${p.nome} — ${p.creci}` : p.nome })), hint: 'Cadastre em Cadastros › Corretores e parceiros. Também pode digitar um nome novo.' },
       { name: 'pct', label: 'Percentual (%)', type: 'percent', required: true },
       { name: 'competencia', label: 'Competência', type: 'month', required: true },
       { name: 'base_centavos', label: 'Base de cálculo (R$)', type: 'money', hint: 'Padrão: aluguel do contrato' },
       { name: 'observacoes', label: 'Observações', type: 'textarea', span: 2 },
     ],
     valores: { competencia: compAtual() },
+    onMount: (r) => {
+      const contrato = r.querySelector('[name=contrato_id]');
+      const corretor = r.querySelector('[name=corretor]');
+      const pct = r.querySelector('[name=pct]');
+      const preencher = () => {
+        const c = contratos.find(x => x.id === Number(contrato.value));
+        if (!c) return;
+        if (!corretor.value && c.corretor) corretor.value = c.corretor;
+        if (!pct.value && c.comissao_pct != null) pct.value = c.comissao_pct;
+      };
+      contrato.addEventListener('change', preencher);
+      preencher();
+    },
     onSubmit: async (d) => {
       await api('/comissoes', { method: 'POST', body: d });
       toast('Comissão criada.'); carregar();
@@ -1666,7 +1716,7 @@ export async function viewComissoes(root, params) {
     fields: [
       { name: 'competencia', label: 'Competência', type: 'month', required: true },
       { name: 'percentual', label: 'Percentual (%)', type: 'percent', hint: 'Vazio usa a comissão do contrato ou a padrão' },
-      { name: 'corretor', label: 'Corretor', hint: 'Vazio usa o corretor do contrato' },
+      { name: 'corretor', label: 'Corretor(a)', type: 'datalist', options: parceiros.filter(p => p.ativo && (p.tipo === 'corretor' || p.tipo === 'ambos')).map(p => ({ value: p.nome, label: p.creci ? `${p.nome} — ${p.creci}` : p.nome })), hint: 'Vazio usa o corretor do contrato. Cadastre novos em Cadastros › Corretores e parceiros.' },
     ],
     valores: { competencia: compAtual() },
     textoBotao: 'Gerar comissões',
@@ -1704,7 +1754,7 @@ export async function viewComissoes(root, params) {
 
   const render = () => {
     container.innerHTML = tableHtml([
-      { label: 'Corretor', render: c => `<strong>${esc(c.corretor)}</strong><span class="sub">${esc(c.contrato_codigo || '#' + c.contrato_id)}</span>` },
+      { label: 'Corretor', render: c => `<strong>${esc(c.corretor)}</strong><span class="sub">${esc(c.corretor_creci || c.contrato_codigo || '#' + c.contrato_id)}</span>` },
       { label: 'Imóvel', render: c => `${esc(c.endereco)}${c.numero ? ', ' + esc(c.numero) : ''}<span class="sub">${esc(c.inquilino_nome)}</span>` },
       { label: 'Competência', render: c => compBR(c.competencia) },
       { label: 'Base', num: true, render: c => `${brl(c.base_centavos)}<span class="sub">${Number(c.pct).toLocaleString('pt-BR')}%</span>` },
@@ -1733,10 +1783,11 @@ export async function viewComissoes(root, params) {
       const qs = new URLSearchParams();
       if (status) qs.set('status', status);
       if (competencia) qs.set('competencia', competencia);
-      [lista, resumo, contratos] = await Promise.all([
+      [lista, resumo, contratos, parceiros] = await Promise.all([
         api(`/comissoes?${qs}`),
         api(`/comissoes/resumo${competencia ? '?competencia=' + competencia : ''}`),
         api('/contratos'),
+        api('/parceiros?tipo=corretor'),
       ]);
       renderResumo(); render();
     } catch (e) { container.innerHTML = erroBox(e); }
@@ -1752,7 +1803,8 @@ export async function viewComissoes(root, params) {
         titulo: 'Comissão', subtitulo: `${c.corretor} · ${compBR(c.competencia)}`, wide: true,
         corpo: `<div class="grid cols-2">
           <div class="card"><div class="card-body"><dl class="dl">
-            <dt>Corretor</dt><dd>${esc(c.corretor)}</dd>
+            <dt>Corretor</dt><dd>${esc(c.corretor)}${c.corretor_creci ? ` · ${esc(c.corretor_creci)}` : ''}</dd>
+            <dt>Pix do corretor</dt><dd>${esc(c.corretor_pix || '—')}</dd>
             <dt>Contrato</dt><dd>${esc(c.contrato_codigo || '#' + c.contrato_id)}</dd>
             <dt>Imóvel</dt><dd>${esc(c.endereco)}${c.numero ? ', ' + esc(c.numero) : ''}</dd>
             <dt>Inquilino</dt><dd>${esc(c.inquilino_nome)}</dd>

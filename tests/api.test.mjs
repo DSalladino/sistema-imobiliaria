@@ -333,4 +333,40 @@ test('fluxo principal da API', async (t) => {
     const contratosDepois = await req('/api/contratos');
     assert.equal(contratosDepois.data.find(c => c.id === alvo.id).status, 'encerrado');
   });
+
+  await t.test('cadastros de apoio: parceiros, categorias e vínculos', async () => {
+    const comp = new Date().toISOString().slice(0, 7);
+    const criado = await req('/api/parceiros', { method: 'POST', body: {
+      tipo: 'corretor', nome: 'Corretora Teste', creci: 'CRECI-T 1', pix: 'corretora@teste.com',
+    } });
+    assert.equal(criado.res.status, 201);
+    assert.equal(criado.data.nome, 'Corretora Teste');
+
+    const lista = await req('/api/parceiros?tipo=corretor');
+    assert.ok(lista.data.some(p => p.nome === 'Corretora Teste'));
+
+    const duplicado = await req('/api/parceiros', { method: 'POST', body: { tipo: 'corretor', nome: 'Corretora Teste' } });
+    assert.equal(duplicado.res.status, 409);
+
+    const categoria = await req('/api/categorias', { method: 'POST', body: {
+      contexto: 'conta_pagar', nome: 'Aluguel de equipamento', tipo: 'despesa', caixa: 'imobiliaria',
+    } });
+    assert.equal(categoria.res.status, 201);
+    const categorias = await req('/api/categorias?contexto=conta_pagar');
+    assert.ok(categorias.data.some(c => c.nome === 'Aluguel de equipamento'));
+
+    const conta = await req('/api/contas', { method: 'POST', body: {
+      tipo: 'pagar', descricao: 'Locação de impressora', categoria: 'Aluguel de equipamento',
+      fornecedor: 'Corretora Teste', valor_centavos: 12000, vencimento: `${comp}-28`,
+    } });
+    assert.equal(conta.res.status, 201, JSON.stringify(conta.data));
+
+    const contrato = (await req('/api/contratos')).data[0];
+    const comissao = await req('/api/comissoes', { method: 'POST', body: {
+      contrato_id: contrato.id, corretor_id: criado.data.id, pct: 5, competencia: comp,
+    } });
+    assert.equal(comissao.res.status, 201, JSON.stringify(comissao.data));
+    assert.equal(comissao.data.corretor, 'Corretora Teste');
+    assert.equal(comissao.data.corretor_id, criado.data.id);
+  });
 });
