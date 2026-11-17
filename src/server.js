@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
 import { parseCookies, hashToken } from './auth.js';
@@ -9,7 +10,10 @@ import { handleApi } from './api.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, '..', 'public');
 const PORT = Number(process.env.PORT || 3000);
-const HOST = process.env.HOST || '127.0.0.1';
+// 0.0.0.0 permite abrir o sistema no navegador de outro dispositivo da rede,
+// em Docker e em PaaS. Para restringir à máquina local use HOST=127.0.0.1.
+const HOST = process.env.HOST || '0.0.0.0';
+const DEMO = process.env.DEMO_MODE === '1' || /(^|[\\/])data-demo([\\/]|$)/.test(process.env.DATA_DIR || '');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -139,6 +143,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Content-Security-Policy', CSP);
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  if (DEMO) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   if (requisicaoSegura(req)) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
@@ -217,6 +222,15 @@ async function completarDemoInicial() {
 }
 await completarDemoInicial();
 
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.error(`\n  ✖ A porta ${PORT} já está em uso.\n\n  Feche o outro programa ou use outra porta:\n\n    PORT=3010 npm start\n`);
+  } else {
+    console.error('\n  ✖ Não foi possível iniciar o servidor:', e.message, '\n');
+  }
+  process.exit(1);
+});
+
 server.listen(PORT, HOST, () => {
   db.prepare('DELETE FROM sessoes WHERE expira_em < ?').run(new Date().toISOString());
   db.prepare("DELETE FROM password_resets WHERE expira_em < ? OR (usado_em IS NOT NULL AND usado_em < datetime('now','-30 days'))")
@@ -224,7 +238,13 @@ server.listen(PORT, HOST, () => {
   const porta = server.address()?.port || PORT;
   const trocaPendente = db.prepare('SELECT COUNT(*) AS n FROM usuarios WHERE deve_trocar_senha = 1').get().n;
   console.log(`\n  Sistema de Gestão da Imobiliária`);
-  console.log(`  Rodando em http://${HOST}:${porta}`);
+  console.log(`  Rodando em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${porta}`);
+  if (HOST === '0.0.0.0') {
+    const ips = Object.values(os.networkInterfaces()).flat()
+      .filter(i => i && !i.internal && i.family === 'IPv4').map(i => i.address);
+    for (const ip of [...new Set(ips)]) console.log(`  Na rede local: http://${ip}:${porta}`);
+  }
+  if (DEMO) console.log('  Modo demonstração: dados fictícios, acesso público de teste e reset automático.');
   console.log(trocaPendente
     ? '  Acesso inicial: admin@imobiliaria.local (troca de senha obrigatória)\n'
     : '  Acesso: admin@imobiliaria.local\n');

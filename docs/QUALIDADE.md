@@ -13,7 +13,7 @@ toca a base real.
 npm ci
 npm run deps:check # versão, origem e integrity do xlsx (CDN)
 npm run check      # sintaxe de todos os .js/.mjs
-npm test           # API, regras, interface, relatórios, conciliação, analytics e seed
+npm test           # 84 testes: API, regras, interface, relatórios, conciliação, analytics, seed e assistente
 npm run test:coverage
 npm audit
 ```
@@ -31,6 +31,7 @@ npm audit
 | `tests/relatorios.test.mjs` | Construção dos 8 relatórios, CSV (BOM, fórmula, `;`), XLSX relido, PDF com e sem dados, DRE por imóvel |
 | `tests/conciliacao.test.mjs` | Parser OFX, CSV com mapeamento e sugestão, deduplicação por FITID, sugestão por valor/data, txid como dica (valor obrigatório), confirmação e bloqueio de transação já tratada |
 | `tests/analytics.test.mjs` | Série mensal, filtro por proprietário, ocupação, composição, ranking, KPIs, período invertido e cache de configurações |
+| `tests/assistente.test.mjs` | Normalização, períodos (mês passado, nome do mês, últimos N meses), resumo, caixa, ocupação, ajuda, busca por nome, inadimplência e limites de pergunta |
 
 ### O que cada suíte protege
 
@@ -65,6 +66,7 @@ npm audit
 **Interface**
 
 - todas as rotas do menu renderizam com dados reais;
+- o assistente responde com números e atalhos sem chamada externa;
 - não caem no estado de erro;
 - conteúdo esperado aparece em cada tela.
 

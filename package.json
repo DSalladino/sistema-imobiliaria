@@ -1,6 +1,6 @@
 {
   "name": "sistema-imobiliaria",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "Sistema de gestão para imobiliária familiar: cadastros, contratos, cobranças, conciliação, repasses, documentos e relatórios.",
@@ -32,18 +32,23 @@
     "node": ">=22.13"
   },
   "scripts": {
+    "prestart": "node scripts/verificar-ambiente.mjs",
     "start": "node src/server.js",
+    "predev": "node scripts/verificar-ambiente.mjs",
     "dev": "node --watch src/server.js",
+    "precheck": "node scripts/verificar-ambiente.mjs",
     "check": "node scripts/verificar-sintaxe.mjs",
     "deps:check": "node scripts/verificar-dependencias.mjs",
-    "test": "node --test tests/api.test.mjs tests/rules.test.mjs tests/seguranca.test.mjs tests/features.test.mjs tests/ui.test.mjs tests/seed.test.mjs tests/relatorios.test.mjs tests/conciliacao.test.mjs tests/analytics.test.mjs",
-    "test:coverage": "node --test --experimental-test-coverage tests/api.test.mjs tests/rules.test.mjs tests/seguranca.test.mjs tests/features.test.mjs tests/ui.test.mjs tests/seed.test.mjs tests/relatorios.test.mjs tests/conciliacao.test.mjs tests/analytics.test.mjs",
+    "test": "node --test tests/api.test.mjs tests/rules.test.mjs tests/seguranca.test.mjs tests/features.test.mjs tests/ui.test.mjs tests/seed.test.mjs tests/relatorios.test.mjs tests/conciliacao.test.mjs tests/analytics.test.mjs tests/assistente.test.mjs",
+    "test:coverage": "node --test --experimental-test-coverage tests/api.test.mjs tests/rules.test.mjs tests/seguranca.test.mjs tests/features.test.mjs tests/ui.test.mjs tests/seed.test.mjs tests/relatorios.test.mjs tests/conciliacao.test.mjs tests/analytics.test.mjs tests/assistente.test.mjs",
     "demo": "node src/demo.js",
     "demo:preparar": "node src/demo-preparar.js",
     "demo:servir": "node src/demo-server.js",
     "midia:capturar": "node scripts/capturar-telas.mjs",
     "midia:video": "node scripts/gravar-demo.mjs",
-    "admin:reset": "node src/reset-admin.js"
+    "admin:reset": "node src/reset-admin.js",
+    "predemo:preparar": "node scripts/verificar-ambiente.mjs",
+    "predemo:servir": "node scripts/verificar-ambiente.mjs"
   },
   "dependencies": {
     "archiver": "^8.0.0",

@@ -1,0 +1,21 @@
+services:
+  demo:
+    build: .
+    image: sistema-imobiliaria:local
+    ports:
+      - "3009:3009"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3009"
+      DEMO_MODE: "1"
+      DEMO_DATA_DIR: /data
+      DEMO_RESET_HORAS: "6"
+      DEMO_EMAIL: admin@imobiliaria.local
+      DEMO_SENHA: Demo#2026
+    volumes:
+      - demo-data:/data
+    restart: unless-stopped
+
+volumes:
+  demo-data:

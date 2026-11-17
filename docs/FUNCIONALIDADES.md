@@ -359,3 +359,24 @@ acesso e recuperação** para o admin atender.
 
 **Regras:** ações restritas ao admin e com confirmação digitada (`DEMO`/`ZERAR`). O backup prévio não
 substitui o backup externo diário.
+
+## 23. Assistente interno de gestão
+
+**Problema:** os números existem, mas nem todo mundo sabe onde encontrá-los ou como interpretar a
+carteira sem abrir várias telas.
+
+**Como funciona:**
+- Botão **Assistente** no topo ou atalho `Ctrl K` abre um painel lateral.
+- Perguntas em português são interpretadas no servidor: “quem está inadimplente?”, “quanto recebi em
+  outubro?”, “quais contratos vencem em 90 dias?”, “qual imóvel rende mais?”.
+- A resposta traz um texto curto, destaques numéricos, os principais registros e atalhos para a tela
+  correspondente.
+- Também explica rotinas (baixa parcial, Pix, conciliação, reajuste, relatórios, LGPD e backup).
+- Tudo é calculado no SQLite local; nenhum dado é enviado a LLM ou serviço externo.
+
+**Regras:** exige usuário autenticado com permissão de leitura, limita 60 perguntas por minuto e
+500 caracteres por pergunta. Quando não entende, devolve um resumo executivo em vez de inventar
+informação. A confirmação de qualquer ação continua sendo humana.
+
+**Onde:** botão **Assistente** na barra superior, em qualquer tela; documentação técnica em
+[API.md](API.md#assistente-interno).

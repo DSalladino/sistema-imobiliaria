@@ -10,6 +10,7 @@ import {
   viewImportacao, viewRelatorios, viewUsuarios, viewAuditoria, viewConfiguracoes, viewLGPD, viewManutencao,
   viewContas, viewComissoes,
 } from './views-fin.js';
+import { bindAssistente } from './ia.js';
 
 const VIEWS = {
   painel: viewPainel,
@@ -72,6 +73,31 @@ const NAVEAS = [
 
 state.viewSeq = 0;
 state.desafio2fa = null;
+state.config = { demo: false, versao: '' };
+
+function aplicarConfig() {
+  const demo = !!state.config.demo;
+  document.body.classList.toggle('modo-demo', demo);
+  const chip = $('#demo-chip');
+  if (chip) chip.hidden = !demo;
+  const box = $('#demo-box');
+  if (box) box.hidden = !demo;
+  if (demo) {
+    const ações = $('#topbar-actions');
+    if (ações && !ações.querySelector('.demo-chip')) {
+      ações.insertAdjacentHTML('afterbegin', '<span class="demo-chip" title="Ambiente de demonstração">Demo</span>');
+    }
+  }
+}
+
+async function carregarConfig() {
+  try {
+    state.config = await api('/config');
+  } catch {
+    state.config = { demo: false, versao: '' };
+  }
+  aplicarConfig();
+}
 
 const podeAdmin = () => state.user?.papel === 'admin';
 
@@ -119,6 +145,9 @@ function showAuth() {
   $('#app').hidden = true;
   $('#auth').hidden = false;
   document.body.classList.remove('menu-open');
+  const ia = $('#ia-root');
+  if (ia) ia.hidden = true;
+  document.body.classList.remove('ia-open');
   mostrarPane('login');
   carregarDicasLogin();
 }
@@ -127,7 +156,7 @@ async function carregarDicasLogin() {
   try {
     const r = await api('/primeiro-acesso');
     const el = $('#primeiro-acesso');
-    if (r.mostrar) {
+    if (r.mostrar && !state.config?.demo) {
       el.hidden = false;
       el.textContent = `Primeiro acesso: entre com ${r.email} e a senha inicial definida na instalação. O sistema exigirá a troca.`;
     } else {
@@ -135,10 +164,14 @@ async function carregarDicasLogin() {
     }
   } catch { /* silencioso */ }
   try {
-    const c = await api('/cadastro/status');
+    const permitido = state.config?.cadastro !== false;
     const link = document.querySelector('[data-auth="register"]');
-    if (link) link.hidden = !c.permitido;
+    if (link) link.hidden = !permitido;
   } catch { /* silencioso */ }
+  if (state.config?.demo) {
+    const box = $('#demo-box');
+    if (box) box.hidden = false;
+  }
 }
 
 async function entrar(usuario) {
@@ -186,6 +219,7 @@ function forcarTrocaSenha() {
 async function boot() {
   const anoEl = document.querySelector('.auth-copyright');
   if (anoEl) anoEl.textContent = `Gestão Imobiliária · ${new Date().getFullYear()}`;
+  await carregarConfig();
 
   const hash = location.hash || '';
   if (hash.includes('redefinir')) {
@@ -226,13 +260,34 @@ function bindAuth() {
     else mostrarPane(alvo);
   });
 
+  document.querySelector('[data-toggle-senha]')?.addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    const input = $('#form-login [name=senha]');
+    const mostrar = input.type === 'password';
+    input.type = mostrar ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', String(mostrar));
+    btn.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
+    input.focus();
+  });
+
+  document.querySelector('[data-demo-login]')?.addEventListener('click', () => {
+    const form = $('#form-login');
+    form.email.value = state.config.demo_email || 'admin@imobiliaria.local';
+    form.senha.value = state.config.demo_senha || 'Demo#2026';
+    form.senha.focus();
+  });
+
   $('#form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
     const err = $('#login-error');
     err.hidden = true;
     const btn = form.querySelector('button[type=submit]');
+    const rotulo = btn.querySelector('span');
+    const textoOriginal = rotulo?.textContent || 'Entrar';
     btn.disabled = true;
+    btn.classList.add('carregando');
+    if (rotulo) rotulo.textContent = 'Entrando…';
     try {
       const r = await api('/login', { method: 'POST', body: { email: form.email.value, senha: form.senha.value } });
       if (r.requer_2fa) {
@@ -245,7 +300,13 @@ function bindAuth() {
     } catch (ex) {
       err.hidden = false;
       err.textContent = ex.message;
-    } finally { btn.disabled = false; }
+      form.senha.focus();
+      form.senha.select();
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('carregando');
+      if (rotulo) rotulo.textContent = textoOriginal;
+    }
   });
 
   $('#form-2fa').addEventListener('submit', async (e) => {
@@ -369,4 +430,5 @@ window.__mostrarLogin = showAuth;
 
 bindAuth();
 bindShell();
+bindAssistente();
 boot();

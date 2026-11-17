@@ -1,0 +1,35 @@
+# Blueprint do Render (https://render.com/docs/blueprint-spec).
+#
+# No painel do Render: New > Blueprint > conecte o repositório. O serviço sobe
+# com dados fictícios, senha conhecida e reset automático.
+#
+# A base fica em /tmp porque o plano gratuito não tem disco persistente. Ela é
+# recriada a cada deploy/restart, o que é o comportamento desejado no demo.
+services:
+  - type: web
+    name: sistema-imobiliaria-demo
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm run demo:servir
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 24.11.1
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DEMO_MODE
+        value: "1"
+      - key: DEMO_DATA_DIR
+        value: /tmp/sistema-imobiliaria-demo
+      - key: DEMO_RESET_HORAS
+        value: "6"
+      - key: DEMO_EMAIL
+        value: admin@imobiliaria.local
+      - key: DEMO_SENHA
+        value: Demo#2026

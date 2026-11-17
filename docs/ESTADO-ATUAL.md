@@ -3,7 +3,7 @@
 Documento de referência técnica: o que está implementado, como executar, onde
 fica cada módulo e quais pendências permanecem.
 
-> **Versão:** 0.8.1 · **Última revisão:** novembro de 2026
+> **Versão:** 0.9.0 · **Última revisão:** novembro de 2026
 
 ## Stack e execução
 
@@ -12,7 +12,7 @@ fica cada módulo e quais pendências permanecem.
   (`public/charts.js`) e ícones SVG no `index.html`.
 - Dependências: `xlsx` (SheetJS), `pdfkit`, `nodemailer`, `archiver`, `qrcode`;
   `jsdom` em desenvolvimento.
-- Rodar: `npm install && npm start` (porta 3000).
+- Rodar: `npm install && npm start` (porta 3000, escuta em `0.0.0.0`).
 - Para não conflitar com instâncias antigas: `PORT=3007 npm start`.
 - Testes: `npm test` (API, regras, interface jsdom, relatórios, conciliação,
   analytics e seed).
@@ -31,6 +31,7 @@ src/
   db.js          esquema, migrações, settings, seed
   regras.js      repasse, taxas, alertas, saldos, fechamento
   analytics.js   KPIs, séries, comparativos, composição
+  assistente.js  assistente interno (consultas em linguagem natural)
   cobrancas.js   geração em lote, baixa, multa/juros, régua
   conciliacao.js OFX/CSV, sugestões, confirmação
   contas.js      contas a pagar/receber, recorrência, previsão de caixa
@@ -48,7 +49,8 @@ src/
   auth.js        hash de senha e token
   permissoes.js  papéis e auditoria
 public/
-  index.html, app.js, charts.js, core.js, views.js, views-fin.js, styles.css,
+  index.html, app.js, ia.js, boot-guard.js, charts.js, core.js, views.js,
+  views-fin.js, styles.css,
   fonts/ (DM Sans e Fraunces servidas localmente)
 tests/
   api.test.mjs, rules.test.mjs, seguranca.test.mjs, features.test.mjs,
@@ -57,7 +59,7 @@ tests/
 docs/
   README, PRODUTO, FUNCIONALIDADES, ARQUITETURA, MODELO-DE-DADOS, API,
   QUALIDADE, OPERACAO, DECISOES, ESTUDO-DE-CASO, ESTADO-ATUAL,
-  roadmap, checklist-seguranca
+  roadmap, checklist-seguranca, DEPLOY-DEMO
 deploy/
   README, Caddyfile, imobiliaria.service, imobiliaria.env.example, backup.sh
 ```
@@ -91,7 +93,9 @@ previsão de caixa, comissões, reajuste em lote, rescisão e DRE por imóvel. A
 0.8.0 acrescentou troca de senha exigida no servidor, seed opt-in, paginação com
 aviso de truncamento, cache de configurações, fontes locais, health check real e
 desligamento gracioso. A 0.8.1 adicionou a análise de segurança do Pix, a
-validação de chave/tamanho EMV e o txid como dica de conciliação.
+validação de chave/tamanho EMV e o txid como dica de conciliação. A 0.9.0 trouxe
+o assistente interno, o novo login, a verificação de ambiente, a proteção contra
+tela em branco e os artefatos de demo online (Docker, Render e Fly.io).
 
 ## Rotas principais
 
@@ -108,6 +112,8 @@ Documentos/comunicação/LGPD/backup: `/api/documentos*`, `/api/comunicacao/*`,
 `/api/lgpd/*`, `/api/backup*`.
 Operação: `/api/health` (checa banco e escrita de uploads), `/api/manutencao/*`,
 `/api/auditoria`.
+Assistente (0.9+): `/api/assistente` (GET contexto, POST pergunta) e
+`/api/config` (público, identifica o modo demonstração).
 Integrações (0.7+): `/api/integracoes/status`, `/api/cobrancas/:id/pix`,
 `/api/pix/pendentes`, `/api/cobrancas/:id/whatsapp`, `/api/contas*`,
 `/api/comissoes*`, `/api/contratos/reajuste/*`, `/api/contratos/:id/rescindir`,
@@ -121,10 +127,11 @@ O contrato completo está em [API.md](API.md).
 
 ## Qualidade
 
-- 72 testes automatizados distribuídos em 10 arquivos.
+- 84 testes automatizados distribuídos em 11 arquivos.
 - CI em Node 22 e 24 (`npm ci`, `npm run deps:check`, `npm run check`,
   `npm test`).
 - Testes de UI renderizam as 22 telas em jsdom com dados reais.
+- O assistente é testado por intenção, período, busca por nome e conteúdo.
 - Cobertura de linhas disponível com `npm run test:coverage` (não é meta).
 - Lacunas: sem lint, sem tipos, sem E2E de navegador real e sem teste de carga.
   Ver [QUALIDADE.md](QUALIDADE.md).
@@ -132,6 +139,7 @@ O contrato completo está em [API.md](API.md).
 ## Dívidas técnicas e riscos conhecidos
 
 1. **Single-tenant:** não há `empresa_id`; todas as consultas assumem uma empresa.
+   O assistente também assume essa premissa e responde apenas pela base local.
 2. **Listas longas:** a API pagina por `limite`/`offset` e informa o total, mas a
    interface ainda não tem controles de página (mostra aviso de truncamento).
 3. **Sem concorrência otimista:** edições simultâneas podem sobrescrever.
@@ -164,5 +172,7 @@ O contrato completo está em [API.md](API.md).
 3. Teste E2E de navegador e acessibilidade automatizada.
 4. Logs estruturados, métricas e alertas.
 5. Criptografia/antivírus nos uploads e retenção automática da auditoria.
+6. Assistente com sinônimos aprendidos e sugestões por tela (mantendo o modo
+   local; integração com LLM deve ser opcional e documentada).
 
 O [roadmap](roadmap.md) organiza por fase e impacto.

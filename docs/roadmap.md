@@ -4,7 +4,7 @@ Prioridades de evolução do produto. A ordem combina **impacto operacional**,
 **risco** e **esforço**. Itens concluídos saem daqui e entram no
 [CHANGELOG](../CHANGELOG.md).
 
-> **Versão atual:** 0.8.1 · **Última revisão:** novembro de 2026
+> **Versão atual:** 0.9.0 · **Última revisão:** novembro de 2026
 
 ## Onde estamos
 
@@ -17,7 +17,9 @@ Já está pronto e em uso:
 - documentos versionados com pré-visualização e validade;
 - importação de planilhas, relatórios CSV/XLSX/PDF;
 - painel analítico, alertas, comunicação manual por WhatsApp/e-mail;
-- 2FA, auditoria, LGPD, backup com verificação de integridade.
+- 2FA, auditoria, LGPD, backup com verificação de integridade;
+- assistente interno em linguagem natural, sem enviar dados para fora;
+- novo login, verificação de ambiente e demo online (Render/Fly/Docker).
 
 O trabalho manual que ainda sobra:
 
@@ -61,7 +63,17 @@ Foco: reduzir atendimento e dar autonomia a proprietários e inquilinos.
 | **Dashboard por bairro/tipo** | Decisão de carteira e pipeline de renovação | Baixo | planejado |
 | **Acessibilidade e PWA** | Navegação por teclado, contraste, uso offline de leitura | Médio | planejado |
 
-## Fase 3 — Escala e integrações (0.9+)
+## Fase 2.5 — Assistente e usabilidade (0.9) — concluída
+
+| Item | Por que | Esforço | Status |
+|---|---|---|---|
+| **Assistente interno** | Consultar a carteira em português sem planilha e sem serviço externo | Médio | **feito** |
+| **Login redesenhado** | Primeira impressão, demo guiada e clareza de acesso | Baixo | **feito** |
+| **Diagnóstico de inicialização** | Trocar tela branca por mensagem acionável e health check | Baixo | **feito** |
+| **Demo online** | URL pública para o time testar com dados fictícios | Baixo | **feito** |
+| **Assistente com LLM opcional** | Respostas mais livres preservando privacidade e custo | Alto | planejado |
+
+## Fase 3 — Escala e integrações (1.0+)
 
 Foco: atender mais operações e integrar o ecossistema.
 
