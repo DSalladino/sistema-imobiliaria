@@ -14,7 +14,7 @@ import {
   gerarSegredoTotp, codigoTotp, verificarTotp, otpauthUrl, cifrar, decifrar, gerarRecovery, usarRecovery, validarSenha,
 } from './seguranca.js';
 import {
-  listar as listarCobrancas, obter as obterCobranca, resumo as resumoCobrancas, previewGeracao,
+  listar as listarCobrancas, contar as contarCobrancas, obter as obterCobranca, resumo as resumoCobrancas, previewGeracao,
   gerar as gerarCobrancas, pagar as pagarCobranca, estornarBaixa, cancelar as cancelarCobranca,
   registrarAcao, definirCobrancaStatus,
 } from './cobrancas.js';
@@ -99,6 +99,20 @@ function texto(v) {
 function bool(v, padrao = 1) {
   if (v == null || v === '') return padrao;
   return (v === true || v === 1 || v === '1' || v === 'true') ? 1 : 0;
+}
+
+// Listas longas (cobranças e lançamentos) têm limite e informam o total quando
+// o cliente pede `envelope=1`, para a interface avisar sobre dados truncados.
+const LIMITE_COBRANCAS = 1000;
+const LIMITE_LANCAMENTOS = 500;
+
+function paginar(url, padrao) {
+  const bruto = url.searchParams.get('limite');
+  const limite = bruto === 'todos'
+    ? null
+    : Math.min(Math.max(Math.trunc(Number(bruto)) || padrao, 1), 5000);
+  const offset = Math.max(Math.trunc(Number(url.searchParams.get('offset'))) || 0, 0);
+  return { limite, offset, envelope: url.searchParams.get('envelope') === '1' };
 }
 
 const CATEGORIAS_CANONICAS = {
@@ -466,6 +480,21 @@ function desativar(entidade, id, user, ip) {
   const ent = ENTIDADES[entidade];
   const antes = db.prepare(`SELECT * FROM ${ent.tabela} WHERE id = ?`).get(id);
   if (!antes) throw Object.assign(new Error('Registro não encontrado.'), { status: 404 });
+  // Desativar um cadastro com contrato ativo esconderia o imóvel/proprietário
+  // das listas ativas enquanto a cobrança continuaria sendo gerada.
+  if (entidade === 'imoveis' || entidade === 'proprietarios' || entidade === 'inquilinos') {
+    const ativos = entidade === 'imoveis'
+      ? db.prepare("SELECT COUNT(*) AS n FROM contratos WHERE imovel_id = ? AND status = 'ativo'").get(id).n
+      : entidade === 'proprietarios'
+        ? db.prepare(`SELECT COUNT(*) AS n FROM contratos c JOIN imoveis i ON i.id = c.imovel_id
+            WHERE i.proprietario_id = ? AND c.status = 'ativo'`).get(id).n
+        : db.prepare("SELECT COUNT(*) AS n FROM contratos WHERE inquilino_id = ? AND status = 'ativo'").get(id).n;
+    if (ativos > 0) {
+      throw Object.assign(new Error(
+        `Existe(m) ${ativos} contrato(s) ativo(s) vinculado(s). Encerre o contrato antes de desativar.`
+      ), { status: 409 });
+    }
+  }
   if (entidade === 'contratos') {
     db.prepare("UPDATE contratos SET status = 'encerrado' WHERE id = ?").run(id);
   } else if (entidade === 'excecoes') {
@@ -479,23 +508,40 @@ function desativar(entidade, id, user, ip) {
 
 /* ---------------- LANÇAMENTOS ---------------- */
 
-function listarLancamentos(url) {
+function filtroLancamentos(url) {
+  const where = [];
+  const args = [];
   const comp = url.searchParams.get('competencia');
   const caixa = url.searchParams.get('caixa');
   const tipo = url.searchParams.get('tipo');
-  const where = [];
-  const args = [];
   if (comp) { where.push('l.competencia = ?'); args.push(comp); }
   if (caixa) { where.push('l.caixa = ?'); args.push(caixa); }
   if (tipo) { where.push('l.tipo = ?'); args.push(tipo); }
+  return { where, args };
+}
+
+function listarLancamentos(url, pagina = {}) {
+  const { where, args } = filtroLancamentos(url);
+  const limite = pagina.limite == null ? null : pagina.limite;
+  const offset = Math.max(Math.trunc(Number(pagina.offset)) || 0, 0);
   const sql = `SELECT l.*, p.nome AS proprietario_nome, i.endereco AS imovel_endereco, c.codigo AS contrato_codigo
     FROM lancamentos l
     LEFT JOIN proprietarios p ON p.id = l.proprietario_id
     LEFT JOIN imoveis i ON i.id = l.imovel_id
     LEFT JOIN contratos c ON c.id = l.contrato_id
     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-    ORDER BY l.data DESC, l.id DESC LIMIT 500`;
+    ORDER BY l.data DESC, l.id DESC ${limite == null ? '' : `LIMIT ${limite} OFFSET ${offset}`}`;
   return db.prepare(sql).all(...args);
+}
+
+function contarLancamentos(url) {
+  const { where, args } = filtroLancamentos(url);
+  const sql = `SELECT COUNT(*) AS n FROM lancamentos l
+    LEFT JOIN proprietarios p ON p.id = l.proprietario_id
+    LEFT JOIN imoveis i ON i.id = l.imovel_id
+    LEFT JOIN contratos c ON c.id = l.contrato_id
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}`;
+  return db.prepare(sql).get(...args).n;
 }
 
 function criarLancamento(body, user, ip) {
@@ -795,12 +841,21 @@ export async function handleApi(req, res, url, user, ip, body) {
     contarTentativa('api:' + ip);
 
     if (p === '/health' && m === 'GET') {
-      db.prepare('SELECT 1 AS ok').get();
-      return json(res, 200, {
-        ok: true,
+      // Health check de verdade: banco respondendo e diretório de uploads
+      // gravável. Um disco cheio ou permissão errada derruba o sistema na
+      // prática e precisa aparecer aqui, não só no log.
+      let banco = 'ok';
+      let uploads = 'ok';
+      try { db.prepare('SELECT 1 AS ok').get(); } catch { banco = 'erro'; }
+      try { fs.accessSync(UPLOADS, fs.constants.W_OK); } catch { uploads = 'erro'; }
+      const ok = banco === 'ok' && uploads === 'ok';
+      return json(res, ok ? 200 : 503, {
+        ok,
         versao: PKG.version,
         uptime_s: Math.round(process.uptime()),
         em: new Date().toISOString(),
+        banco,
+        uploads,
       });
     }
     if (p === '/login' && m === 'POST') return login(req, res, body, ip);
@@ -952,6 +1007,14 @@ export async function handleApi(req, res, url, user, ip, body) {
       registrar(user, 'desativar_2fa', 'usuarios', u.id, null, ip);
       return json(res, 200, { ok: true });
     }
+
+    // A troca de senha é exigida no servidor, não só na interface. Sem isso,
+    // uma senha temporária (criada pelo admin ou por reset) daria acesso
+    // completo à API até o usuário abrir o navegador. Vale também para as
+    // rotas administrativas abaixo.
+    if (user?.deve_trocar_senha) {
+      return erro(res, 403, 'Troque a senha antes de continuar.');
+    }
     if (seg[0] === 'usuarios' && seg[1] && seg[2] === 'resetar-2fa' && m === 'POST') {
       exigir(user, 'admin');
       db.prepare('UPDATE usuarios SET totp_ativo = 0, totp_secret = NULL, totp_recovery = NULL WHERE id = ?').run(Number(seg[1]));
@@ -1044,7 +1107,17 @@ export async function handleApi(req, res, url, user, ip, body) {
       return json(res, 200, db.prepare('SELECT * FROM auditoria ORDER BY id DESC LIMIT ?').all(limite));
     }
 
-    if (p === '/lancamentos' && m === 'GET') return json(res, 200, listarLancamentos(url));
+    if (p === '/lancamentos' && m === 'GET') {
+      const pagina = paginar(url, LIMITE_LANCAMENTOS);
+      const itens = listarLancamentos(url, pagina);
+      if (!pagina.envelope) return json(res, 200, itens);
+      return json(res, 200, {
+        itens,
+        total: contarLancamentos(url),
+        limite: pagina.limite,
+        offset: pagina.offset,
+      });
+    }
     if (p === '/lancamentos' && m === 'POST') { exigir(user, 'financeiro'); return json(res, 201, criarLancamento(body, user, ip)); }
     if (seg[0] === 'lancamentos' && seg[1] && seg[2] === 'estornar' && m === 'POST') {
       exigir(user, 'financeiro');
@@ -1065,12 +1138,21 @@ export async function handleApi(req, res, url, user, ip, body) {
       return json(res, 200, r);
     }
     if (p === '/cobrancas' && m === 'GET') {
-      return json(res, 200, listarCobrancas({
+      const filtros = {
         competencia: url.searchParams.get('competencia') || undefined,
         status: url.searchParams.get('status') || undefined,
         contrato_id: url.searchParams.get('contrato_id') || undefined,
         busca: url.searchParams.get('busca') || undefined,
-      }));
+      };
+      const pagina = paginar(url, LIMITE_COBRANCAS);
+      const itens = listarCobrancas({ ...filtros, limite: pagina.limite, offset: pagina.offset });
+      if (!pagina.envelope) return json(res, 200, itens);
+      return json(res, 200, {
+        itens,
+        total: contarCobrancas(filtros),
+        limite: pagina.limite,
+        offset: pagina.offset,
+      });
     }
 
     /* ---------- Pix e WhatsApp ---------- */

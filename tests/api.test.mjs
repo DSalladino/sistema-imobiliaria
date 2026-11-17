@@ -25,7 +25,7 @@ test('fluxo principal da API', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'imob-api-'));
   const proc = spawn(process.execPath, ['src/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, DATA_DIR: dir, PORT: '0', SEED_COMPLETO: '0', HOST: '127.0.0.1', APP_SECRET: 'test-secret-38-caracteres-para-o-teste', ADMIN_SENHA: 'admin123' },
+    env: { ...process.env, DATA_DIR: dir, PORT: '0', SEED_COMPLETO: '0', SEED_DEMO: '1', HOST: '127.0.0.1', APP_SECRET: 'test-secret-38-caracteres-para-o-teste', ADMIN_SENHA: 'admin123' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(() => {
@@ -51,6 +51,8 @@ test('fluxo principal da API', async (t) => {
     assert.equal(res.status, 200);
     assert.equal(data.ok, true);
     assert.ok(data.versao);
+    assert.equal(data.banco, 'ok', 'health deve checar o banco');
+    assert.equal(data.uploads, 'ok', 'health deve checar a escrita dos uploads');
   });
 
   await t.test('rejeita credenciais inválidas', async () => {
@@ -75,6 +77,13 @@ test('fluxo principal da API', async (t) => {
   });
 
   await t.test('troca de senha e leitura do painel', async () => {
+    // Antes de trocar, a senha temporária não pode operar a API.
+    const bloqueado = await req('/api/dashboard');
+    assert.equal(bloqueado.res.status, 403);
+    assert.match(bloqueado.data.erro, /senha/i);
+    const bloqueadoEscrita = await req('/api/proprietarios', { method: 'POST', body: { nome: 'Bypass' } });
+    assert.equal(bloqueadoEscrita.res.status, 403);
+
     const nova = 'SenhaForte#2026';
     const alt = await req('/api/me/senha', { method: 'POST', body: { senha_atual: 'admin123', senha_nova: nova } });
     assert.equal(alt.res.status, 200);
@@ -127,6 +136,15 @@ test('fluxo principal da API', async (t) => {
     const criado = imoveis.data.find(i => i.id === imovel.data.id);
     assert.equal(criado.proprietario_nome, 'Proprietário Teste');
 
+    // Cadastro com contrato ativo não pode ser desativado.
+    const bloqImovel = await req(`/api/imoveis/${imovel.data.id}`, { method: 'DELETE' });
+    assert.equal(bloqImovel.res.status, 409);
+    assert.match(bloqImovel.data.erro, /contrato/i);
+    const bloqProp = await req(`/api/proprietarios/${prop.data.id}`, { method: 'DELETE' });
+    assert.equal(bloqProp.res.status, 409);
+    const bloqInq = await req(`/api/inquilinos/${inq.data.id}`, { method: 'DELETE' });
+    assert.equal(bloqInq.res.status, 409);
+
     const duplicado = await req('/api/contratos', { method: 'POST', body: {
       codigo: 'CT-TESTE-2', imovel_id: imovel.data.id, inquilino_id: inq.data.id,
       inicio: `${comp}-01`, aluguel_centavos: 100000, dia_vencimento: 10,
@@ -165,6 +183,15 @@ test('fluxo principal da API', async (t) => {
     const lista = await req(`/api/cobrancas?competencia=${comp}`);
     const alvo = lista.data.find(c => c.status !== 'pago' && c.saldo_centavos > 0);
     assert.ok(alvo);
+
+    // Envelope informa o total e permite paginar sem esconder linhas.
+    const env = await req(`/api/cobrancas?competencia=${comp}&envelope=1&limite=1`);
+    assert.equal(env.data.itens.length, 1);
+    assert.ok(env.data.total >= 4);
+    assert.equal(env.data.limite, 1);
+    const env2 = await req(`/api/cobrancas?competencia=${comp}&envelope=1&limite=1&offset=1`);
+    assert.equal(env2.data.itens.length, 1);
+    assert.notEqual(env2.data.itens[0].id, env.data.itens[0].id);
     const baixa = await req(`/api/cobrancas/${alvo.id}/pagar`, { method: 'POST', body: { valor_centavos: alvo.saldo_centavos, data: new Date().toISOString().slice(0, 10), forma: 'pix' } });
     assert.equal(baixa.res.status, 200);
     assert.equal(baixa.data.status, 'pago');

@@ -25,7 +25,7 @@ test('primeira execução completa a demonstração com cobranças e repasses', 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'imob-seed-'));
   const proc = spawn(process.execPath, ['src/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, DATA_DIR: dir, PORT: '0', HOST: '127.0.0.1', APP_SECRET: 'seed-completo-36-caracteres-de-teste', ADMIN_SENHA: 'admin123' },
+    env: { ...process.env, DATA_DIR: dir, PORT: '0', SEED_DEMO: '1', HOST: '127.0.0.1', APP_SECRET: 'seed-completo-36-caracteres-de-teste', ADMIN_SENHA: 'admin123' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(() => { try { proc.kill('SIGKILL'); } catch {} try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} });
@@ -38,6 +38,12 @@ test('primeira execução completa a demonstração com cobranças e repasses', 
   });
   assert.equal(login.status, 200);
   const cookie = (login.headers.getSetCookie?.()[0] || '').split(';')[0];
+
+  const troca = await fetch(base + '/api/me/senha', {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ senha_atual: 'admin123', senha_nova: 'SenhaForte#2026' }),
+  });
+  assert.equal(troca.status, 200);
 
   const req = async (url) => {
     const res = await fetch(base + url, { headers: { cookie } });

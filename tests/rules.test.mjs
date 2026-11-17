@@ -8,6 +8,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'imob-regras-'));
 process.env.DATA_DIR = dir;
 process.env.APP_SECRET = 'segredo-de-teste-com-mais-de-32-caracteres';
 process.env.ADMIN_SENHA = 'admin123';
+process.env.SEED_DEMO = '1';
 
 const { db } = await import('../src/db.js');
 const { resolverTaxa, calcularRepasse, gerarRepasses, competenciaAtual, mesFechado } = await import('../src/regras.js');
