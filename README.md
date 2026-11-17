@@ -75,6 +75,13 @@ build, testes automatizados e documentação de ponta a ponta.
 A forma mais rápida de avaliar o projeto é a instância de demonstração: base
 **isolada**, **dados fictícios**, sem informação comercial nem credencial real.
 
+> **Demo online (somente leitura):**
+> **https://dsalladino.github.io/sistema-imobiliaria/**
+>
+> Publicada pelo GitHub Pages com um retrato real da base de demonstração. Login,
+> navegação, filtros, detalhes e assistente funcionam; cadastros e baixas são
+> desabilitados para não alterar dados. Para testar escritas, rode localmente.
+
 ```bash
 npm ci
 npm run demo:preparar   # cria data-demo/ com 12 meses de histórico
@@ -194,6 +201,7 @@ demonstração. O seed **nunca** roda por omissão, mesmo em desenvolvimento.
 | `npm run demo` | Recarrega os dados de exemplo |
 | `npm run demo:preparar` | Cria a base de demonstração com credenciais conhecidas |
 | `npm run demo:servir` | Sobe uma instância de demonstração isolada |
+| `npm run demo:estatico` | Gera o retrato usado pela demo do GitHub Pages |
 | `npm run midia:capturar` | Gera as capturas de tela (requer Playwright) |
 | `npm run midia:video` | Grava o tour de 90 s (requer Playwright) |
 | `npm run admin:reset` | Redefine a senha do admin pelo terminal |
@@ -327,8 +335,10 @@ Runbook completo em [docs/OPERACAO.md](docs/OPERACAO.md).
 
 O sistema precisa de **um servidor com disco persistente** (Node + SQLite +
 arquivos). Vercel e hospedagem compartilhada não servem. O guia completo está em
-[deploy/README.md](deploy/README.md). Para uma demo pública, use o passo a passo
-de [docs/DEPLOY-DEMO.md](docs/DEPLOY-DEMO.md) (Render, Fly.io ou Docker).
+[deploy/README.md](deploy/README.md). Para uma demo pública com escritas, use o passo a passo
+de [docs/DEPLOY-DEMO.md](docs/DEPLOY-DEMO.md) (Render, Fly.io ou Docker). A demo
+somente leitura do GitHub Pages é publicada automaticamente pelo workflow
+`.github/workflows/pages.yml`.
 
 - **Menor custo com persistência:** VPS pequena (1 GB RAM) ou Oracle Cloud
   Always Free.

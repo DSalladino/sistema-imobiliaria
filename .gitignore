@@ -16,3 +16,6 @@ data-*/
 coverage/
 .tmp*/
 docs/assets/.video-temp/
+
+# Gerado no build da demo do GitHub Pages
+public/demo-data.json

@@ -48,7 +48,8 @@
     "midia:video": "node scripts/gravar-demo.mjs",
     "admin:reset": "node src/reset-admin.js",
     "predemo:preparar": "node scripts/verificar-ambiente.mjs",
-    "predemo:servir": "node scripts/verificar-ambiente.mjs"
+    "predemo:servir": "node scripts/verificar-ambiente.mjs",
+    "demo:estatico": "node scripts/gerar-demo-estatico.mjs"
   },
   "dependencies": {
     "archiver": "^8.0.0",

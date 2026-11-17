@@ -4,6 +4,15 @@ Esta é a forma recomendada de avaliar o projeto: uma instância **isolada**, co
 **dados fictícios**, sem nenhuma informação comercial ou credencial real. A base
 de produção nunca é tocada.
 
+## Demo online (somente leitura)
+
+**https://dsalladino.github.io/sistema-imobiliaria/**
+
+A versão do GitHub Pages é gerada a partir da própria base de demonstração:
+login, menu, filtros, detalhes e assistente funcionam. Escritas (cadastros,
+baixas, conciliação e configurações) ficam desabilitadas. O retrato é atualizado
+a cada push e também semanalmente, para os meses e vencimentos não envelhecerem.
+
 ## Subir em três comandos
 
 ```bash
@@ -89,6 +98,10 @@ da própria demonstração, para não envelhecerem:
 | ![Painel no celular](assets/telas/09-painel-celular.png) | ![Cobranças no celular](assets/telas/10-cobrancas-celular.png) |
 | **Assistente de gestão** | |
 | ![Assistente respondendo sobre inadimplência](assets/telas/11-assistente.png) | |
+
+A demo do GitHub Pages é somente leitura. Para testar cadastros, baixas e
+conciliação de ponta a ponta, rode a instância local com `npm run demo:servir`
+ou publique uma instância Node conforme [DEPLOY-DEMO.md](DEPLOY-DEMO.md).
 
 Para regerar depois de mudar a interface:
 

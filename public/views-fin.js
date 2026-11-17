@@ -1395,7 +1395,15 @@ export async function viewContas(root, params) {
       const maior = Math.max(1, ...p.meses.map(m => Math.max(m.entradas, m.saidas)));
       previsao.innerHTML = `<div class="card-head"><div><h2>Previsão de caixa</h2><p>Próximos 6 meses — contas em aberto e recorrências projetadas</p></div></div>
         <div class="card-body">
-          ${barChart(p.meses.map(m => [compBR(m.competencia), m.entradas, m.saidas]), { formato: brlShort, cores: ['#8fbf9f', '#e5a08f'] })}
+          ${barChart({
+            labels: p.meses.map(m => m.competencia),
+            series: [
+              { nome: 'Entradas', valores: p.meses.map(m => m.entradas), cor: '#8fbf9f' },
+              { nome: 'Saídas', valores: p.meses.map(m => m.saidas), cor: '#e5a08f' },
+            ],
+            formato: brlShort,
+            rotuloEixo: 'Entradas e saídas previstas',
+          })}
           ${tableHtml([
             { label: 'Competência', render: m => compBR(m.competencia) },
             { label: 'Entradas', num: true, render: m => brl(m.entradas) },

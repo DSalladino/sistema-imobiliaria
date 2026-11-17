@@ -104,6 +104,7 @@ test('todas as telas renderizam com dados reais', async (t) => {
     const texto = raiz.textContent || '';
     assert.ok(texto.length > 100, `${nome}: renderização vazia`);
     assert.ok(!texto.includes('Não foi possível carregar'), `${nome}: caiu no estado de erro`);
+    assert.ok(!/Cannot read|is not a function|undefined is not/.test(texto), `${nome}: erro de JavaScript visível na tela`);
     assert.ok(texto.includes(esperado), `${nome}: conteúdo esperado não encontrado (${esperado})`);
     raiz.remove();
   }
