@@ -8,6 +8,7 @@ import {
 import {
   viewCobrancas, viewConciliacao, viewLancamentos, viewRepasses, viewFechamentos, viewDocumentos,
   viewImportacao, viewRelatorios, viewUsuarios, viewAuditoria, viewConfiguracoes, viewLGPD, viewManutencao,
+  viewContas, viewComissoes,
 } from './views-fin.js';
 
 const VIEWS = {
@@ -21,6 +22,8 @@ const VIEWS = {
   cobrancas: viewCobrancas,
   conciliacao: viewConciliacao,
   lancamentos: viewLancamentos,
+  contas: viewContas,
+  comissoes: viewComissoes,
   repasses: viewRepasses,
   fechamentos: viewFechamentos,
   documentos: viewDocumentos,
@@ -44,6 +47,8 @@ const META = {
   cobrancas: ['Financeiro', 'Cobranças'],
   conciliacao: ['Financeiro', 'Conciliação'],
   lancamentos: ['Financeiro', 'Lançamentos'],
+  contas: ['Financeiro', 'Contas a pagar/receber'],
+  comissoes: ['Financeiro', 'Comissões'],
   repasses: ['Financeiro', 'Repasses'],
   fechamentos: ['Financeiro', 'Fechamento'],
   documentos: ['Operação', 'Documentos'],
@@ -59,7 +64,7 @@ const META = {
 const NAVEAS = [
   { grupo: 'Visão geral', itens: [['painel', 'Painel', 'painel'], ['alertas', 'Alertas', 'bell']] },
   { grupo: 'Carteira', itens: [['proprietarios', 'Proprietários', 'owners'], ['imoveis', 'Imóveis', 'home'], ['inquilinos', 'Inquilinos', 'tenant'], ['contratos', 'Contratos', 'contract'], ['excecoes', 'Exceções', 'receipt']] },
-  { grupo: 'Financeiro', itens: [['cobrancas', 'Cobranças', 'receipt'], ['conciliacao', 'Conciliação', 'bank'], ['lancamentos', 'Lançamentos', 'wallet'], ['repasses', 'Repasses', 'send'], ['fechamentos', 'Fechamento', 'check']] },
+  { grupo: 'Financeiro', itens: [['cobrancas', 'Cobranças', 'receipt'], ['conciliacao', 'Conciliação', 'bank'], ['lancamentos', 'Lançamentos', 'wallet'], ['contas', 'Contas', 'receipt'], ['comissoes', 'Comissões', 'owners'], ['repasses', 'Repasses', 'send'], ['fechamentos', 'Fechamento', 'check']] },
   { grupo: 'Operação', itens: [['documentos', 'Documentos', 'folder'], ['importacao', 'Importar', 'upload'], ['relatorios', 'Relatórios', 'chart']] },
   { grupo: 'Conta', itens: [['configuracoes', 'Configurações', 'settings']] },
   { grupo: 'Administração', admin: true, itens: [['usuarios', 'Usuários', 'shield'], ['auditoria', 'Auditoria', 'eye'], ['lgpd', 'Privacidade (LGPD)', 'shield'], ['manutencao', 'Manutenção', 'wrench']] },

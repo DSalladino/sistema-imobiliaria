@@ -96,6 +96,19 @@ Isso garante idempotência da geração mensal.
 
 Restrição importante: `UNIQUE (competencia, proprietario_id)` em `repasses`.
 
+### Contas, comissões e eventos de contrato
+
+| Tabela | Papel | Campos relevantes |
+|---|---|---|
+| `contas` | Contas a pagar/receber | `tipo` (`pagar`/`receber`), `descricao`, `categoria`, `fornecedor`, `valor_centavos`, `vencimento`, `competencia`, `recorrencia`, `recorrencia_fim`, `recorrencia_origem_id`, `caixa`, vínculos, `status`, `pago_em`, `lancamento_id` |
+| `comissoes` | Corretagem | `contrato_id`, `corretor`, `base_centavos`, `pct`, `valor_centavos`, `competencia`, `status`, `pago_em`, `lancamento_id` |
+| `reajustes` | Histórico de reajuste | `contrato_id`, `competencia`, `indice`, `percentual`, `aluguel_anterior_centavos`, `aluguel_novo_centavos`, `aplicado_em`, `aplicado_por` |
+| `rescisoes` | Encerramento antecipado | `contrato_id` (único), `data`, `motivo`, `multa_centavos`, `caucao_devolucao_centavos`, `cobrancas_canceladas` |
+
+Restrições importantes: `UNIQUE (contrato_id, competencia, corretor)` em `comissoes` e
+`UNIQUE (contrato_id)` em `rescisoes`. A recorrência de contas cria a próxima parcela na
+baixa, ligada por `recorrencia_origem_id`, sem duplicar vencimento já existente.
+
 ### Documentos e comunicação
 
 | Tabela | Papel | Campos relevantes |

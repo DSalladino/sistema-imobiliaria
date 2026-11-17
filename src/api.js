@@ -18,8 +18,7 @@ import {
   gerar as gerarCobrancas, pagar as pagarCobranca, estornarBaixa, cancelar as cancelarCobranca,
   registrarAcao, definirCobrancaStatus,
 } from './cobrancas.js';
-import { previewConciliacao, listarPendentes, resumoConciliacao, confirmarConciliacao } from './conciliacao.js';
-import { criarSolicitacao, validarToken, usarToken, listarSolicitacoes } from './senha-recuperacao.js';
+import { previewConciliacao, listarPendentes, resumoConciliacao, confirmarConciliacao } from './conciliacao.js';import { criarSolicitacao, validarToken, usarToken, listarSolicitacoes } from './senha-recuperacao.js';
 import { statusManutencao, limparBase, carregarDemo } from './manutencao.js';
 import {
   UPLOADS, listarDocumentos, salvarDocumento, obterDocumento, caminhoFisico, removerDocumento, nomeArquivoSeguro, versoesDocumento,
@@ -27,7 +26,19 @@ import {
 import { hashSenha, verificaSenha, novoToken, hashToken } from './auth.js';
 import { auditar, exigir, pode } from './permissoes.js';
 import {
-  hojeISO, competenciaAtual, getSetting, setSetting, calcularRepasse, gerarRepasses,
+  listar as listarContas, obter as obterConta, resumo as resumoContas, criar as criarConta,
+  atualizar as atualizarConta, cancelar as cancelarConta, pagar as pagarConta, previsaoCaixa,
+} from './contas.js';
+import { previewReajuste, aplicarReajuste, historicoReajustes, rescindir, obterRescisao } from './contratos-acoes.js';
+import {
+  listar as listarComissoes, resumo as resumoComissoes, criar as criarComissao, atualizarStatus as atualizarStatusComissao,
+  pagar as pagarComissao, cancelar as cancelarComissao, gerarLote as gerarComissoesLote,
+} from './comissoes.js';
+import { pixDaCobranca, pixDoMes, pixConfigurado, configuracaoPix } from './pix.js';
+import { enviarWhatsapp, statusWhatsapp, linkWhatsapp } from './whatsapp.js';
+import { drePorImovel } from './dre.js';
+import {
+  hojeISO, competenciaAtual, getSetting, getSettingNum, setSetting, calcularRepasse, gerarRepasses,
   pagarRepasse, alertas, resumoDashboard, saldos, mesFechado, exigirMesAberto, brl,
 } from './regras.js';
 
@@ -1060,6 +1071,191 @@ export async function handleApi(req, res, url, user, ip, body) {
         contrato_id: url.searchParams.get('contrato_id') || undefined,
         busca: url.searchParams.get('busca') || undefined,
       }));
+    }
+
+    /* ---------- Pix e WhatsApp ---------- */
+    if (p === '/integracoes/status' && m === 'GET') {
+      return json(res, 200, { pix: { configurado: pixConfigurado(), ...configuracaoPix() }, whatsapp: statusWhatsapp() });
+    }
+    if (p === '/pix/pendentes' && m === 'GET') {
+      const comp = url.searchParams.get('competencia') || competenciaAtual();
+      return json(res, 200, { competencia: comp, pix: pixDoMes(comp) });
+    }
+    if (seg[0] === 'cobrancas' && seg[1] && seg[2] === 'pix' && m === 'GET') {
+      const pix = pixDaCobranca(Number(seg[1]));
+      const qr = await QRCode.toDataURL(pix.payload, { margin: 1, width: 280, color: { dark: '#2C3634', light: '#FFFFFF' } });
+      return json(res, 200, { ...pix, qr });
+    }
+    if (seg[0] === 'cobrancas' && seg[1] && seg[2] === 'whatsapp' && m === 'POST') {
+      exigir(user, 'financeiro');
+      const c = obterCobranca(Number(seg[1]));
+      if (!c) return erro(res, 404, 'Cobrança não encontrada.');
+      const mensagem = texto(body.mensagem) || `Olá, ${c.inquilino_nome}! O aluguel de ${String(c.competencia).split('-').reverse().join('/')} do imóvel ${c.endereco} está em aberto. Valor: ${brl(c.saldo_centavos)}. Se já pagou, desconsidere.`;
+      try {
+        const r = await enviarWhatsapp({ telefone: c.inquilino_telefone, mensagem });
+        registrarComunicacao({
+          canal: 'whatsapp', entidade: 'cobrancas', entidade_id: c.id,
+          destinatario_nome: c.inquilino_nome, destinatario: c.inquilino_telefone,
+          mensagem, status: r.modo === 'api' ? 'enviado' : 'link_gerado',
+          erro: null, usuario: user?.nome,
+        });
+        registrar(user, 'whatsapp', 'cobrancas', c.id, { modo: r.modo }, ip);
+        return json(res, 200, { ...r, mensagem });
+      } catch (e) {
+        registrarComunicacao({
+          canal: 'whatsapp', entidade: 'cobrancas', entidade_id: c.id,
+          destinatario_nome: c.inquilino_nome, destinatario: c.inquilino_telefone,
+          mensagem, status: 'falhou', erro: e.message, usuario: user?.nome,
+        });
+        throw e;
+      }
+    }
+
+    /* ---------- Contratos: reajuste em lote e rescisão ---------- */
+    if (p === '/contratos/reajuste/preview' && m === 'GET') {
+      return json(res, 200, previewReajuste({
+        data: url.searchParams.get('data') || hojeISO(),
+        percentual: num(url.searchParams.get('percentual'), 0),
+        indice: url.searchParams.get('indice') || '',
+      }));
+    }
+    if (p === '/contratos/reajustar-lote' && m === 'POST') {
+      exigir(user, 'escrever');
+      const r = aplicarReajuste({
+        contrato_ids: Array.isArray(body.contrato_ids) ? body.contrato_ids : [],
+        percentual: num(body.percentual, 0),
+        indice: texto(body.indice) || '',
+        data: texto(body.data) || hojeISO(),
+        observacoes: texto(body.observacoes) || '',
+      }, user);
+      registrar(user, 'reajustar_lote', 'contratos', r.competencia, r, ip);
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'contratos' && seg[1] && seg[2] === 'reajustes' && m === 'GET') {
+      return json(res, 200, historicoReajustes(Number(seg[1])));
+    }
+    if (seg[0] === 'contratos' && seg[1] && seg[2] === 'rescindir' && m === 'POST') {
+      exigir(user, 'escrever');
+      const r = rescindir(Number(seg[1]), {
+        data: texto(body.data) || hojeISO(),
+        motivo: texto(body.motivo) || '',
+        multa_centavos: int(body.multa_centavos, 0),
+        devolver_caucao: body.devolver_caucao === undefined ? true : !!body.devolver_caucao,
+        observacoes: texto(body.observacoes) || '',
+      }, user);
+      registrar(user, 'rescindir', 'contratos', r.contrato_id, r, ip);
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'contratos' && seg[1] && seg[2] === 'rescisao' && m === 'GET') {
+      return json(res, 200, obterRescisao(Number(seg[1])) || {});
+    }
+
+    /* ---------- Contas a pagar e a receber ---------- */
+    if (p === '/contas/resumo' && m === 'GET') return json(res, 200, resumoContas());
+    if (p === '/contas/previsao' && m === 'GET') {
+      return json(res, 200, previsaoCaixa({
+        meses: int(url.searchParams.get('meses'), getSettingNum('previsao_caixa_meses', 6)),
+        de: url.searchParams.get('de') || null,
+      }));
+    }
+    if (p === '/contas' && m === 'GET') {
+      return json(res, 200, listarContas({
+        tipo: url.searchParams.get('tipo') || undefined,
+        status: url.searchParams.get('status') || undefined,
+        competencia: url.searchParams.get('competencia') || undefined,
+        de: url.searchParams.get('de') || undefined,
+        ate: url.searchParams.get('ate') || undefined,
+        proprietario_id: url.searchParams.get('proprietario_id') || undefined,
+        busca: url.searchParams.get('busca') || undefined,
+      }));
+    }
+    if (p === '/contas' && m === 'POST') {
+      exigir(user, 'financeiro');
+      const r = criarConta({ ...body, criado_por: user?.nome }, user);
+      registrar(user, 'criar', 'contas', r.id, { tipo: r.tipo, valor_centavos: r.valor_centavos }, ip);
+      return json(res, 201, r);
+    }
+    if (seg[0] === 'contas' && seg[1] && seg[2] === 'pagar' && m === 'POST') {
+      exigir(user, 'financeiro');
+      const r = pagarConta(Number(seg[1]), {
+        data: texto(body.data), valor_centavos: int(body.valor_centavos, null), observacoes: texto(body.observacoes),
+      }, user);
+      registrar(user, 'baixar', 'contas', Number(seg[1]), r, ip);
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'contas' && seg[1] && seg[2] === 'cancelar' && m === 'POST') {
+      exigir(user, 'financeiro');
+      const r = cancelarConta(Number(seg[1]), texto(body.motivo), user);
+      registrar(user, 'cancelar', 'contas', Number(seg[1]), { motivo: texto(body.motivo) }, ip);
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'contas' && seg[1] && !seg[2] && m === 'GET') {
+      const r = obterConta(Number(seg[1]));
+      if (!r) return erro(res, 404, 'Conta não encontrada.');
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'contas' && seg[1] && !seg[2] && m === 'PUT') {
+      exigir(user, 'financeiro');
+      const r = atualizarConta(Number(seg[1]), body, user);
+      registrar(user, 'editar', 'contas', r.id, null, ip);
+      return json(res, 200, r);
+    }
+
+    /* ---------- Comissões ---------- */
+    if (p === '/comissoes/resumo' && m === 'GET') {
+      return json(res, 200, resumoComissoes(url.searchParams.get('competencia') || undefined));
+    }
+    if (p === '/comissoes/gerar-lote' && m === 'POST') {
+      exigir(user, 'financeiro');
+      const r = gerarComissoesLote({
+        competencia: texto(body.competencia), percentual: num(body.percentual, null), corretor: texto(body.corretor),
+      }, user);
+      registrar(user, 'gerar_lote', 'comissoes', r.competencia, { criadas: r.criadas }, ip);
+      return json(res, 200, r);
+    }
+    if (p === '/comissoes' && m === 'GET') {
+      return json(res, 200, listarComissoes({
+        status: url.searchParams.get('status') || undefined,
+        competencia: url.searchParams.get('competencia') || undefined,
+        contrato_id: url.searchParams.get('contrato_id') || undefined,
+        corretor: url.searchParams.get('corretor') || undefined,
+      }));
+    }
+    if (p === '/comissoes' && m === 'POST') {
+      exigir(user, 'financeiro');
+      const r = criarComissao(body, user);
+      registrar(user, 'criar', 'comissoes', r.id, { corretor: r.corretor, valor_centavos: r.valor_centavos }, ip);
+      return json(res, 201, r);
+    }
+    if (seg[0] === 'comissoes' && seg[1] && seg[2] === 'pagar' && m === 'POST') {
+      exigir(user, 'financeiro');
+      const r = pagarComissao(Number(seg[1]), { data: texto(body.data), observacoes: texto(body.observacoes) }, user);
+      registrar(user, 'pagar', 'comissoes', Number(seg[1]), r, ip);
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'comissoes' && seg[1] && seg[2] === 'cancelar' && m === 'POST') {
+      exigir(user, 'financeiro');
+      const r = cancelarComissao(Number(seg[1]), texto(body.motivo), user);
+      registrar(user, 'cancelar', 'comissoes', Number(seg[1]), null, ip);
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'comissoes' && seg[1] && seg[2] === 'status' && m === 'POST') {
+      exigir(user, 'financeiro');
+      const r = atualizarStatusComissao(Number(seg[1]), texto(body.status), user);
+      registrar(user, 'status', 'comissoes', Number(seg[1]), { status: r.status }, ip);
+      return json(res, 200, r);
+    }
+
+    /* ---------- DRE por imóvel (JSON) ---------- */
+    if (p === '/relatorios/dre-imovel' && m === 'GET') {
+      return json(res, 200, drePorImovel({
+        de: url.searchParams.get('de') || undefined,
+        ate: url.searchParams.get('ate') || undefined,
+        proprietario_id: url.searchParams.get('proprietario_id') || undefined,
+      }));
+    }
+    if (p === '/whatsapp/link' && m === 'POST') {
+      return json(res, 200, { link: linkWhatsapp(texto(body.telefone), texto(body.mensagem) || '') });
     }
     if (seg[0] === 'cobrancas' && seg[1] && !seg[2] && m === 'GET') {
       const c = obterCobranca(Number(seg[1]));

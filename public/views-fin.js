@@ -123,6 +123,54 @@ export async function viewCobrancas(root, params) {
     });
   };
 
+  const abrirPix = async (c) => {
+    try {
+      const p = await api(`/cobrancas/${c.id}/pix`);
+      openModal({
+        titulo: 'Pix da cobrança', subtitulo: `${p.inquilino} · ${p.valor_formatado} · vence ${dataBR(p.vencimento)}`,
+        corpo: `<div class="grid cols-2" style="align-items:center">
+            <div style="text-align:center"><img src="${p.qr}" alt="QR Code Pix" style="width:100%;max-width:260px;border-radius:12px;background:#fff"></div>
+            <div>
+              <p class="small muted">Txid <code>${esc(p.txid)}</code> — use na conciliação para identificar o pagamento.</p>
+              <label class="field"><span>Pix copia e cola</span><textarea rows="6" data-payload readonly>${esc(p.payload)}</textarea></label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn primary" data-copiar>${icon('check')} Copiar código</button>
+                <button class="btn" data-wa>${icon('whatsapp')} Enviar no WhatsApp</button>
+              </div>
+            </div>
+          </div>`,
+        rodape: `<button class="btn" data-close>Fechar</button>`,
+        onMount(r, close) {
+          r.querySelector('[data-copiar]').onclick = async () => {
+            try {
+              await navigator.clipboard.writeText(p.payload);
+              toast('Pix copiado.');
+            } catch {
+              const ta = r.querySelector('[data-payload]');
+              ta.select();
+              document.execCommand('copy');
+              toast('Pix copiado.');
+            }
+          };
+          r.querySelector('[data-wa]').onclick = () => enviarWhatsappCobranca(p.cobranca_id, p.mensagem, close);
+        },
+      });
+    } catch (e) { toast(e.message, 'err'); }
+  };
+
+  const enviarWhatsappCobranca = async (id, mensagem, fechar = null) => {
+    try {
+      const r = await api(`/cobrancas/${id}/whatsapp`, { method: 'POST', body: { mensagem } });
+      if (r.link) {
+        window.open(r.link, '_blank', 'noopener');
+        toast('Mensagem aberta no WhatsApp (modo link).');
+      } else {
+        toast('Mensagem enviada pela API oficial do WhatsApp.');
+      }
+      fechar?.();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+
   const abrirDetalhe = async (id) => {
     try {
       const c = await api(`/cobrancas/${id}`);
@@ -195,10 +243,20 @@ export async function viewCobrancas(root, params) {
         { label: 'Status', render: c => badgeCobranca(c.status_efetivo) },
         { label: 'Ações', acao: c => `
           <button class="icon-btn" data-detalhe="${c.id}" title="Detalhe">${icon('eye')}</button>
+          ${podeFinanceiro() && c.status !== 'pago' && c.status !== 'cancelado' ? `<button class="icon-btn" data-pix="${c.id}" title="Pix">${icon('qr')}</button>` : ''}
           ${podeFinanceiro() && c.status !== 'pago' && c.status !== 'cancelado' ? `<button class="icon-btn" data-pagar="${c.id}" title="Dar baixa">${icon('check')}</button>` : ''}
+          ${podeFinanceiro() ? `<button class="icon-btn" data-wa="${c.id}" title="Cobrar no WhatsApp">${icon('whatsapp')}</button>` : ''}
           ${podeFinanceiro() ? `<button class="icon-btn" data-acao="${c.id}" title="Régua">${icon('bell')}</button>` : ''}` },
       ], cobrancas);
       lista.querySelectorAll('[data-detalhe]').forEach(b => b.onclick = () => abrirDetalhe(Number(b.dataset.detalhe)));
+      lista.querySelectorAll('[data-pix]').forEach(b => b.onclick = () => abrirPix(cobrancas.find(x => x.id === Number(b.dataset.pix))));
+      lista.querySelectorAll('[data-wa]').forEach(b => b.onclick = async () => {
+        const c = cobrancas.find(x => x.id === Number(b.dataset.wa));
+        try {
+          const p = await api(`/cobrancas/${c.id}`);
+          await enviarWhatsappCobranca(c.id, `Olá, ${p.inquilino_nome}! O aluguel de ${compBR(p.competencia)} do imóvel ${p.endereco} está em aberto. Valor: ${brl(p.saldo_centavos)}. Se já pagou, desconsidere.`);
+        } catch (e) { toast(e.message, 'err'); }
+      });
       lista.querySelectorAll('[data-pagar]').forEach(b => b.onclick = () => abrirPagar(cobrancas.find(x => x.id === Number(b.dataset.pagar))));
       lista.querySelectorAll('[data-acao]').forEach(b => b.onclick = () => {
         const c = cobrancas.find(x => x.id === Number(b.dataset.acao));
@@ -782,7 +840,7 @@ export async function viewImportacao(root) {
    ============================================================ */
 export async function viewRelatorios(root) {
   let dados = [], props = [], filtros = { de: addMesesComp(compAtual(), -11) + '-01', ate: hojeISO(), proprietario_id: '' };
-  root.innerHTML = head('Relatórios', 'Sete relatórios em CSV, Excel e PDF com cabeçalho e paginação.') +
+  root.innerHTML = head('Relatórios', 'Oito relatórios em CSV, Excel e PDF com cabeçalho e paginação.') +
     `<div class="filters">
       <label class="field"><span>De</span><input type="date" data-de value="${filtros.de}"></label>
       <label class="field"><span>Até</span><input type="date" data-ate value="${filtros.ate}"></label>
@@ -946,6 +1004,7 @@ export async function viewAuditoria(root) {
 const GRUPOS = {
   empresa: 'Empresa', regras: 'Regras de negócio', alertas: 'Alertas', mensagens: 'Mensagens',
   comunicacao: 'Comunicação', cobranca: 'Cobrança', lgpd: 'LGPD', seguranca: 'Segurança',
+  integracao: 'Integrações (Pix e WhatsApp)', financeiro: 'Financeiro',
 };
 export async function viewConfiguracoes(root, params) {
   let dados = [], grupo = params?.get('grupo') || 'empresa';
@@ -1212,5 +1271,279 @@ export async function viewManutencao(root) {
     if (!await confirmarTexto({ titulo: 'Zerar dados operacionais', mensagem: 'Cadastros, contratos, financeiro e documentos serão removidos. Usuários e configurações permanecem. Um backup prévio será criado.', palavra: 'ZERAR', textoBotao: 'Zerar dados' })) return;
     try { await api('/manutencao/limpar', { method: 'POST', body: { confirmacao: 'ZERAR' } }); toast('Dados operacionais removidos.'); carregar(); } catch (e) { toast(e.message, 'err'); }
   };
+  await carregar();
+}
+
+/* ============================================================
+   CONTAS A PAGAR E A RECEBER + PREVISÃO DE CAIXA
+   ============================================================ */
+export async function viewContas(root, params) {
+  let tipo = params?.get('tipo') || '';
+  let status = 'abertas';
+  let busca = '';
+  let lista = [];
+  let resumo = null;
+
+  root.innerHTML = head('Contas a pagar e a receber', 'Compromissos, recorrências e previsão de caixa.', `
+      ${podeFinanceiro() ? `<button class="btn primary" data-nova>${icon('plus')} Nova conta</button>` : ''}`) +
+    `<div data-resumo>${loadingBox()}</div>
+     <div class="filters mt-2">
+       <label class="field"><span>Tipo</span><select data-tipo>
+         <option value="">Todos</option><option value="pagar">A pagar</option><option value="receber">A receber</option>
+       </select></label>
+       <label class="field"><span>Status</span><select data-status>
+         <option value="abertas">Em aberto</option><option value="vencidas">Vencidas</option>
+         <option value="paga">Baixadas</option><option value="cancelada">Canceladas</option><option value="">Todas</option>
+       </select></label>
+       <div class="search grow">${icon('search')}<input placeholder="Buscar descrição, fornecedor ou categoria" data-busca></div>
+     </div>
+     <div class="card tight" data-lista>${loadingBox()}</div>
+     <div class="card mt-2" data-previsao>${loadingBox()}</div>`;
+
+  const painel = root.querySelector('[data-resumo]');
+  const container = root.querySelector('[data-lista]');
+  const previsao = root.querySelector('[data-previsao]');
+
+  const campos = () => [
+    { name: 'tipo', label: 'Tipo', type: 'select', required: true, options: [['pagar', 'A pagar'], ['receber', 'A receber']] },
+    { name: 'descricao', label: 'Descrição', required: true, placeholder: 'Condomínio, IPTU, comissão…' },
+    { name: 'categoria', label: 'Categoria', placeholder: 'Ocupação, Impostos, Serviços' },
+    { name: 'fornecedor', label: 'Fornecedor / cliente' },
+    { name: 'valor_centavos', label: 'Valor (R$)', type: 'money', required: true },
+    { name: 'vencimento', label: 'Vencimento', type: 'date', required: true },
+    { name: 'recorrencia', label: 'Recorrência', type: 'select', options: [['unica', 'Única'], ['mensal', 'Mensal'], ['semanal', 'Semanal'], ['anual', 'Anual']] },
+    { name: 'recorrencia_fim', label: 'Repetir até', type: 'date' },
+    { name: 'caixa', label: 'Caixa', type: 'select', options: [['imobiliaria', 'Imobiliária'], ['proprietarios', 'Proprietários']] },
+    { name: 'observacoes', label: 'Observações', type: 'textarea', span: 2 },
+  ];
+
+  const abrirForm = (conta = null) => formModal({
+    titulo: conta ? 'Editar conta' : 'Nova conta', wide: true,
+    fields: campos(),
+    valores: conta || { tipo: 'pagar', vencimento: hojeISO(), recorrencia: 'unica', caixa: 'imobiliaria' },
+    onSubmit: async (d) => {
+      if (conta) await api(`/contas/${conta.id}`, { method: 'PUT', body: d });
+      else await api('/contas', { method: 'POST', body: d });
+      toast(conta ? 'Conta atualizada.' : 'Conta criada.');
+      carregar();
+    },
+  });
+
+  const abrirBaixa = (conta) => formModal({
+    titulo: 'Baixar conta', subtitulo: `${conta.descricao} · ${brl(conta.valor_centavos)}`,
+    fields: [
+      { name: 'valor_centavos', label: 'Valor baixado (R$)', type: 'money', required: true },
+      { name: 'data', label: 'Data', type: 'date', required: true },
+      { name: 'observacoes', label: 'Observações', type: 'textarea', span: 2 },
+    ],
+    valores: { valor_centavos: conta.valor_centavos, data: hojeISO() },
+    textoBotao: 'Confirmar baixa',
+    onSubmit: async (d) => {
+      const r = await api(`/contas/${conta.id}/pagar`, { method: 'POST', body: d });
+      toast(r.proxima_conta_id
+        ? 'Baixa registrada. A próxima parcela da recorrência já foi criada.'
+        : 'Baixa registrada e lançamento financeiro criado.');
+      carregar();
+    },
+  });
+
+  const render = () => {
+    container.innerHTML = tableHtml([
+      { label: 'Descrição', render: c => `<strong>${esc(c.descricao)}</strong><span class="sub">${esc(c.categoria)}${c.fornecedor ? ' · ' + esc(c.fornecedor) : ''}</span>` },
+      { label: 'Tipo', render: c => badge(c.tipo === 'pagar' ? 'A pagar' : 'A receber', c.tipo === 'pagar' ? 'blush' : 'sage') },
+      { label: 'Vencimento', render: c => `${dataBR(c.vencimento)}${c.atrasada ? `<span class="sub" style="color:var(--blush-ink)">${c.dias_atraso} dia(s) de atraso</span>` : ''}` },
+      { label: 'Valor', num: true, render: c => `<strong>${brl(c.valor_centavos)}</strong>${c.recorrencia !== 'unica' ? `<span class="sub">${esc(c.recorrencia_label)}</span>` : ''}` },
+      { label: 'Status', render: c => badge(c.status_label, c.status === 'aberta' ? 'butter' : c.status === 'paga' ? 'sage' : 'plain') },
+      { label: 'Ações', acao: c => `
+        ${podeFinanceiro() && c.status === 'aberta' ? `<button class="icon-btn" data-baixar="${c.id}" title="Baixar">${icon('check')}</button>` : ''}
+        ${podeFinanceiro() && c.status === 'aberta' ? `<button class="icon-btn" data-editar="${c.id}" title="Editar">${icon('edit')}</button>` : ''}
+        ${podeFinanceiro() && c.status === 'aberta' ? `<button class="icon-btn" data-cancelar="${c.id}" title="Cancelar">${icon('x')}</button>` : ''}` },
+    ], lista);
+    container.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => abrirBaixa(lista.find(x => x.id === Number(b.dataset.baixar))));
+    container.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => abrirForm(lista.find(x => x.id === Number(b.dataset.editar))));
+    container.querySelectorAll('[data-cancelar]').forEach(b => b.onclick = async () => {
+      const c = lista.find(x => x.id === Number(b.dataset.cancelar));
+      if (!await confirmar({ titulo: 'Cancelar conta', mensagem: `Cancelar “${c.descricao}”?`, textoBotao: 'Cancelar conta', perigo: true })) return;
+      try { await api(`/contas/${c.id}/cancelar`, { method: 'POST', body: { motivo: 'Cancelada pelo operador' } }); toast('Conta cancelada.'); carregar(); } catch (e) { toast(e.message, 'err'); }
+    });
+  };
+
+  const renderResumo = () => {
+    if (!resumo) return;
+    painel.innerHTML = `<div class="kpis">
+      ${stat('A pagar', brl(resumo.a_pagar), 'blush-ink')}
+      ${stat('A receber', brl(resumo.a_receber), 'sage-ink')}
+      ${stat('Vencido a pagar', brl(resumo.vencido_pagar), 'blush-ink')}
+      ${stat('Vencido a receber', brl(resumo.vencido_receber), 'butter-ink')}
+      ${stat('Saldo previsto', brl(resumo.saldo_previsto_centavos))}
+      ${stat('Contas atrasadas', String(resumo.contas_atrasadas))}
+    </div>`;
+  };
+
+  const renderPrevisao = async () => {
+    try {
+      const p = await api('/contas/previsao?meses=6');
+      const maior = Math.max(1, ...p.meses.map(m => Math.max(m.entradas, m.saidas)));
+      previsao.innerHTML = `<div class="card-head"><div><h2>Previsão de caixa</h2><p>Próximos 6 meses — contas em aberto e recorrências projetadas</p></div></div>
+        <div class="card-body">
+          ${barChart(p.meses.map(m => [compBR(m.competencia), m.entradas, m.saidas]), { formato: brlShort, cores: ['#8fbf9f', '#e5a08f'] })}
+          ${tableHtml([
+            { label: 'Competência', render: m => compBR(m.competencia) },
+            { label: 'Entradas', num: true, render: m => brl(m.entradas) },
+            { label: 'Saídas', num: true, render: m => brl(m.saidas) },
+            { label: 'Saldo do mês', num: true, render: m => `<strong style="color:${m.saldo < 0 ? 'var(--blush-ink)' : 'var(--sage-ink)'}">${brl(m.saldo)}</strong>` },
+            { label: 'Acumulado', num: true, render: m => brl(m.saldo_acumulado) },
+          ], p.meses)}
+          <p class="small muted mt-2">Média mensal: ${brl(p.media_entradas_centavos)} de entradas e ${brl(p.media_saidas_centavos)} de saídas. ${p.projetadas} parcela(s) recorrente(s) projetada(s).</p>
+        </div>`;
+    } catch (e) { previsao.innerHTML = erroBox(e); }
+  };
+
+  const carregar = async () => {
+    try {
+      const qs = new URLSearchParams();
+      if (tipo) qs.set('tipo', tipo);
+      if (status) qs.set('status', status);
+      if (busca) qs.set('busca', busca);
+      [lista, resumo] = await Promise.all([api(`/contas?${qs}`), api('/contas/resumo')]);
+      renderResumo(); render();
+    } catch (e) { container.innerHTML = erroBox(e); }
+  };
+
+  root.querySelector('[data-tipo]').onchange = (e) => { tipo = e.target.value; carregar(); };
+  root.querySelector('[data-status]').onchange = (e) => { status = e.target.value; carregar(); };
+  root.querySelector('[data-busca]').addEventListener('input', (e) => {
+    busca = e.target.value; clearTimeout(window.__contasT); window.__contasT = setTimeout(carregar, 350);
+  });
+  root.querySelector('[data-nova]')?.addEventListener('click', () => abrirForm());
+  await carregar();
+  await renderPrevisao();
+}
+
+/* ============================================================
+   COMISSÕES DE CORRETAGEM
+   ============================================================ */
+export async function viewComissoes(root, params) {
+  let status = params?.get('status') || '';
+  let competencia = params?.get('competencia') || '';
+  let lista = [];
+  let resumo = null;
+  let contratos = [];
+
+  root.innerHTML = head('Comissões', 'Corretagem prevista, liberada e paga por contrato.', `
+      ${podeFinanceiro() ? `<button class="btn" data-lote>${icon('check')} Gerar em lote</button>` : ''}
+      ${podeFinanceiro() ? `<button class="btn primary" data-nova>${icon('plus')} Nova comissão</button>` : ''}`) +
+    `<div data-resumo>${loadingBox()}</div>
+     <div class="filters mt-2">
+       <label class="field"><span>Competência</span><input type="month" data-comp value="${esc(competencia)}"></label>
+       <label class="field"><span>Status</span><select data-status>
+         <option value="">Todos</option><option value="prevista">Previstas</option><option value="liberada">Liberadas</option>
+         <option value="paga">Pagas</option><option value="cancelada">Canceladas</option>
+       </select></label>
+     </div>
+     <div class="card tight" data-lista>${loadingBox()}</div>`;
+  const painel = root.querySelector('[data-resumo]');
+  const container = root.querySelector('[data-lista]');
+
+  const abrirNova = () => formModal({
+    titulo: 'Nova comissão', wide: true,
+    fields: [
+      { name: 'contrato_id', label: 'Contrato', type: 'select', required: true, options: contratos.filter(c => c.status === 'ativo').map(c => ({ value: c.id, label: `${c.codigo || '#' + c.id} — ${c.endereco} — ${brl(c.aluguel_centavos)}` })) },
+      { name: 'corretor', label: 'Corretor', required: true },
+      { name: 'pct', label: 'Percentual (%)', type: 'percent', required: true },
+      { name: 'competencia', label: 'Competência', type: 'month', required: true },
+      { name: 'base_centavos', label: 'Base de cálculo (R$)', type: 'money', hint: 'Padrão: aluguel do contrato' },
+      { name: 'observacoes', label: 'Observações', type: 'textarea', span: 2 },
+    ],
+    valores: { competencia: compAtual() },
+    onSubmit: async (d) => {
+      await api('/comissoes', { method: 'POST', body: d });
+      toast('Comissão criada.'); carregar();
+    },
+  });
+
+  const abrirLote = () => formModal({
+    titulo: 'Gerar comissões em lote', wide: true,
+    fields: [
+      { name: 'competencia', label: 'Competência', type: 'month', required: true },
+      { name: 'percentual', label: 'Percentual (%)', type: 'percent', hint: 'Vazio usa a comissão do contrato ou a padrão' },
+      { name: 'corretor', label: 'Corretor', hint: 'Vazio usa o corretor do contrato' },
+    ],
+    valores: { competencia: compAtual() },
+    textoBotao: 'Gerar comissões',
+    onSubmit: async (d) => {
+      const r = await api('/comissoes/gerar-lote', { method: 'POST', body: d });
+      toast(`${r.criadas} comissão(ões) gerada(s); ${r.ignoradas.length} contrato(s) sem corretor ou percentual.`);
+      carregar();
+    },
+  });
+
+  const abrirPagar = (c) => formModal({
+    titulo: 'Pagar comissão', subtitulo: `${c.corretor} · ${brl(c.valor_centavos)}`,
+    fields: [
+      { name: 'data', label: 'Data do pagamento', type: 'date', required: true },
+      { name: 'observacoes', label: 'Observações', type: 'textarea', span: 2 },
+    ],
+    valores: { data: hojeISO() },
+    textoBotao: 'Confirmar pagamento',
+    onSubmit: async (d) => {
+      await api(`/comissoes/${c.id}/pagar`, { method: 'POST', body: d });
+      toast('Comissão paga e lançada como despesa da imobiliária.'); carregar();
+    },
+  });
+
+  const renderResumo = () => {
+    if (!resumo) return;
+    painel.innerHTML = `<div class="kpis">
+      ${stat('Previstas + liberadas', brl(resumo.previstas_centavos), 'butter-ink')}
+      ${stat('Pagas', brl(resumo.pagas_centavos), 'sage-ink')}
+      ${stat('Total no mês', brl(resumo.total_centavos))}
+      ${stat('Comissões', String(resumo.quantidade))}
+      ${stat('Corretores', String(resumo.corretores.length))}
+    </div>`;
+  };
+
+  const render = () => {
+    container.innerHTML = tableHtml([
+      { label: 'Corretor', render: c => `<strong>${esc(c.corretor)}</strong><span class="sub">${esc(c.contrato_codigo || '#' + c.contrato_id)}</span>` },
+      { label: 'Imóvel', render: c => `${esc(c.endereco)}${c.numero ? ', ' + esc(c.numero) : ''}<span class="sub">${esc(c.inquilino_nome)}</span>` },
+      { label: 'Competência', render: c => compBR(c.competencia) },
+      { label: 'Base', num: true, render: c => `${brl(c.base_centavos)}<span class="sub">${Number(c.pct).toLocaleString('pt-BR')}%</span>` },
+      { label: 'Comissão', num: true, render: c => `<strong>${brl(c.valor_centavos)}</strong>` },
+      { label: 'Status', render: c => badge(c.status_label, c.status === 'paga' ? 'sage' : c.status === 'cancelada' ? 'plain' : 'butter') },
+      { label: 'Ações', acao: c => `
+        ${podeFinanceiro() && c.status === 'prevista' ? `<button class="icon-btn" data-liberar="${c.id}" title="Liberar">${icon('check')}</button>` : ''}
+        ${podeFinanceiro() && (c.status === 'prevista' || c.status === 'liberada') ? `<button class="icon-btn" data-pagar="${c.id}" title="Pagar">${icon('send')}</button>` : ''}
+        ${podeFinanceiro() && (c.status === 'prevista' || c.status === 'liberada') ? `<button class="icon-btn" data-cancelar="${c.id}" title="Cancelar">${icon('x')}</button>` : ''}` },
+    ], lista);
+    container.querySelectorAll('[data-liberar]').forEach(b => b.onclick = async () => {
+      try { await api(`/comissoes/${b.dataset.liberar}/status`, { method: 'POST', body: { status: 'liberada' } }); toast('Comissão liberada.'); carregar(); } catch (e) { toast(e.message, 'err'); }
+    });
+    container.querySelectorAll('[data-pagar]').forEach(b => b.onclick = () => abrirPagar(lista.find(x => x.id === Number(b.dataset.pagar))));
+    container.querySelectorAll('[data-cancelar]').forEach(b => b.onclick = async () => {
+      const c = lista.find(x => x.id === Number(b.dataset.cancelar));
+      if (!await confirmar({ titulo: 'Cancelar comissão', mensagem: `Cancelar a comissão de ${c.corretor} (${brl(c.valor_centavos)})?`, textoBotao: 'Cancelar', perigo: true })) return;
+      try { await api(`/comissoes/${c.id}/cancelar`, { method: 'POST', body: { motivo: 'Cancelada pelo operador' } }); toast('Comissão cancelada.'); carregar(); } catch (e) { toast(e.message, 'err'); }
+    });
+  };
+
+  const carregar = async () => {
+    try {
+      const qs = new URLSearchParams();
+      if (status) qs.set('status', status);
+      if (competencia) qs.set('competencia', competencia);
+      [lista, resumo, contratos] = await Promise.all([
+        api(`/comissoes?${qs}`),
+        api(`/comissoes/resumo${competencia ? '?competencia=' + competencia : ''}`),
+        api('/contratos'),
+      ]);
+      renderResumo(); render();
+    } catch (e) { container.innerHTML = erroBox(e); }
+  };
+
+  root.querySelector('[data-status]').onchange = (e) => { status = e.target.value; carregar(); };
+  root.querySelector('[data-comp]').onchange = (e) => { competencia = e.target.value; carregar(); };
+  root.querySelector('[data-nova]')?.addEventListener('click', abrirNova);
+  root.querySelector('[data-lote]')?.addEventListener('click', abrirLote);
   await carregar();
 }

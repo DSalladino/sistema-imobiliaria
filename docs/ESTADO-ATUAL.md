@@ -31,6 +31,12 @@ src/
   analytics.js   KPIs, séries, comparativos, composição
   cobrancas.js   geração em lote, baixa, multa/juros, régua
   conciliacao.js OFX/CSV, sugestões, confirmação
+  contas.js      contas a pagar/receber, recorrência, previsão de caixa
+  comissoes.js   corretagem, liberação, pagamento
+  contratos-acoes.js  reajuste em lote e rescisão
+  dre.js         DRE por imóvel
+  pix.js         BR Code Pix (EMV, CRC16)
+  whatsapp.js    link wa.me e Cloud API
   documentos.js  upload, versões, validade, download
   seguranca.js   TOTP, AES do segredo, recovery codes
   email.js       SMTP
@@ -42,7 +48,8 @@ src/
 public/
   index.html, app.js, charts.js, core.js, views.js, views-fin.js, styles.css
 tests/
-  api.test.mjs, rules.test.mjs, ui.test.mjs, seed.test.mjs
+  api.test.mjs, rules.test.mjs, seguranca.test.mjs, features.test.mjs,
+  ui.test.mjs, seed.test.mjs
 docs/
   README, PRODUTO, FUNCIONALIDADES, ARQUITETURA, MODELO-DE-DADOS, API,
   QUALIDADE, OPERACAO, DECISOES, ESTUDO-DE-CASO, ESTADO-ATUAL,
@@ -95,7 +102,7 @@ O contrato completo está em [API.md](API.md).
 
 ## Qualidade
 
-- 20 testes automatizados distribuídos em 4 arquivos.
+- 48 testes automatizados distribuídos em 7 arquivos.
 - CI em Node 22 e 24 (`npm ci`, `npm run check`, `npm test`).
 - Testes de UI renderizam as 20 telas em jsdom com dados reais.
 - Cobertura de linhas disponível com `npm run test:coverage` (não é meta).

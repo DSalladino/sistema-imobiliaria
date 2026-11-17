@@ -299,6 +299,83 @@ CREATE TABLE IF NOT EXISTS comunicacoes (
   criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
+CREATE TABLE IF NOT EXISTS contas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tipo TEXT NOT NULL DEFAULT 'pagar',
+  descricao TEXT NOT NULL,
+  categoria TEXT NOT NULL DEFAULT 'Outros',
+  fornecedor TEXT,
+  valor_centavos INTEGER NOT NULL DEFAULT 0,
+  vencimento TEXT NOT NULL,
+  competencia TEXT NOT NULL,
+  recorrencia TEXT NOT NULL DEFAULT 'unica',
+  recorrencia_fim TEXT,
+  recorrencia_origem_id INTEGER,
+  caixa TEXT NOT NULL DEFAULT 'imobiliaria',
+  proprietario_id INTEGER REFERENCES proprietarios(id),
+  imovel_id INTEGER REFERENCES imoveis(id),
+  contrato_id INTEGER REFERENCES contratos(id),
+  status TEXT NOT NULL DEFAULT 'aberta',
+  pago_em TEXT,
+  pago_centavos INTEGER,
+  lancamento_id INTEGER,
+  observacoes TEXT,
+  criado_por TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  atualizado_em TEXT,
+  cancelado_em TEXT,
+  motivo_cancelamento TEXT
+);
+
+CREATE TABLE IF NOT EXISTS comissoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  contrato_id INTEGER NOT NULL REFERENCES contratos(id),
+  corretor TEXT NOT NULL,
+  base_centavos INTEGER NOT NULL DEFAULT 0,
+  pct REAL NOT NULL DEFAULT 0,
+  valor_centavos INTEGER NOT NULL DEFAULT 0,
+  competencia TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'prevista',
+  prevista_em TEXT,
+  paga_em TEXT,
+  lancamento_id INTEGER,
+  observacoes TEXT,
+  criado_por TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  UNIQUE (contrato_id, competencia, corretor)
+);
+
+CREATE TABLE IF NOT EXISTS reajustes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  contrato_id INTEGER NOT NULL REFERENCES contratos(id),
+  competencia TEXT NOT NULL,
+  indice TEXT,
+  percentual REAL NOT NULL DEFAULT 0,
+  aluguel_anterior_centavos INTEGER NOT NULL DEFAULT 0,
+  aluguel_novo_centavos INTEGER NOT NULL DEFAULT 0,
+  aplicado_em TEXT NOT NULL,
+  aplicado_por TEXT,
+  observacoes TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS rescisoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  contrato_id INTEGER NOT NULL UNIQUE REFERENCES contratos(id),
+  data TEXT NOT NULL,
+  motivo TEXT NOT NULL,
+  multa_centavos INTEGER NOT NULL DEFAULT 0,
+  caucao_devolucao_centavos INTEGER NOT NULL DEFAULT 0,
+  cobrancas_canceladas INTEGER NOT NULL DEFAULT 0,
+  observacoes TEXT,
+  criado_por TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_contas_venc ON contas(vencimento, status);
+CREATE INDEX IF NOT EXISTS idx_contas_tipo ON contas(tipo, status);
+CREATE INDEX IF NOT EXISTS idx_comissoes_status ON comissoes(status, competencia);
+CREATE INDEX IF NOT EXISTS idx_reajustes_contrato ON reajustes(contrato_id);
 CREATE INDEX IF NOT EXISTS idx_lanc_comp ON lancamentos(competencia);
 CREATE INDEX IF NOT EXISTS idx_lanc_prop ON lancamentos(proprietario_id);
 CREATE INDEX IF NOT EXISTS idx_contrato_imovel ON contratos(imovel_id);
@@ -329,6 +406,8 @@ garantirColuna('usuarios', 'totp_recovery', 'TEXT');
 garantirColuna('conciliacoes', 'sugestao_tipo', 'TEXT');
 garantirColuna('conciliacoes', 'sugestao_id', 'INTEGER');
 garantirColuna('conciliacoes', 'sugestao_label', 'TEXT');
+garantirColuna('contratos', 'corretor', 'TEXT');
+garantirColuna('contratos', 'comissao_pct', 'REAL');
 
 const SETTINGS_PADRAO = [
   ['imob_nome', 'Imobiliária Exemplo', 'Nome da imobiliária', 'empresa', 'texto', null, 1],
@@ -346,6 +425,8 @@ const SETTINGS_PADRAO = [
   ['dias_alerta_contrato', '90,60,30', 'Avisos de vencimento de contrato (dias, separados por vírgula)', 'alertas', 'texto', null, 20],
   ['dias_alerta_reajuste', '30', 'Aviso de reajuste anual (dias antes)', 'alertas', 'numero', null, 21],
   ['dias_alerta_garantia', '30', 'Aviso de fim de garantia (dias antes)', 'alertas', 'numero', null, 22],
+  ['comissao_padrao_pct', '0', 'Comissão padrão de corretagem (%)', 'regras', 'percentual', null, 16],
+  ['previsao_caixa_meses', '6', 'Meses de previsão de caixa', 'financeiro', 'numero', null, 62],
   ['dias_alerta_atraso', '1', 'Aviso de aluguel atrasado (dias após vencimento)', 'alertas', 'numero', null, 23],
   ['mensagem_cobranca', 'Olá, {inquilino}! Identificamos que o aluguel referente a {competencia} do imóvel {imovel} está em aberto. Valor: {valor}. Se já pagou, desconsidere. Obrigado!', 'Modelo de mensagem de cobrança', 'mensagens', 'texto_longo', null, 30],
   ['mensagem_lembrete', 'Olá, {inquilino}! Lembrete: o aluguel do imóvel {imovel} vence em {vencimento}. Valor: {valor}. Qualquer dúvida, estamos à disposição.', 'Modelo de lembrete de vencimento', 'mensagens', 'texto_longo', null, 31],
@@ -366,6 +447,11 @@ const SETTINGS_PADRAO = [
   ['permitir_cadastro', '1', 'Permitir solicitação de acesso pela tela de login', 'seguranca', 'lista', '1,0', 82],
   ['primeiro_acesso', '1', 'Mostrar dica de primeiro acesso na tela de login', 'seguranca', 'lista', '1,0', 83],
   ['url_publica', '', 'URL pública do sistema (usada nos links de e-mail)', 'seguranca', 'texto', null, 84],
+  ['pix_chave', '', 'Chave Pix para recebimento (CPF/CNPJ, e-mail, telefone ou aleatória)', 'integracao', 'texto', null, 90],
+  ['pix_recebedor', '', 'Nome do recebedor no Pix (máx. 25 caracteres)', 'integracao', 'texto', null, 91],
+  ['pix_cidade', '', 'Cidade do recebedor no Pix (máx. 15 caracteres)', 'integracao', 'texto', null, 92],
+  ['whatsapp_modo', 'link', 'Modo de envio do WhatsApp', 'integracao', 'lista', 'link,api', 93],
+  ['whatsapp_numero', '', 'WhatsApp da empresa no formato wa.me (DDI + DDD + número)', 'integracao', 'texto', null, 94],
   ['backup_aviso_dias', '7', 'Aviso se o último backup tiver mais de (dias)', 'seguranca', 'numero', null, 40],
   ['ultimo_backup', '', 'Último backup registrado', 'seguranca', 'data', null, 41],
 ];

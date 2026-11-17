@@ -23,7 +23,9 @@ npm audit
 |---|---|
 | `tests/api.test.mjs` | Login, troca de senha, sessão hash, CSRF, CRUD, autorização, precedência de taxa, cobrança, baixa, repasse, PDF, backup, fechamento e proteção do último admin |
 | `tests/rules.test.mjs` | Precedência de taxas, snapshot do repasse, política de senha, CSV, repasse com contrato encerrado, juros em baixa parcial e importação sem duplicar inquilino |
-| `tests/ui.test.mjs` | Renderiza todas as 20 telas com dados reais em jsdom e verifica conteúdo |
+| `tests/seguranca.test.mjs` | Vetores do RFC 6238 para TOTP, base32, cifragem AES-256-GCM (ida e volta e adulteração), códigos de recuperação de uso único (v1 e v2), política de senha e hash de token de sessão |
+| `tests/ui.test.mjs` | Renderiza as 22 telas com dados reais em jsdom e verifica conteúdo |
+| `tests/features.test.mjs` | Pix (CRC/EMV), WhatsApp (link e API), contas e recorrência, previsão de caixa, reajuste em lote, rescisão e comissões, DRE por imóvel e geração de CSV |
 | `tests/seed.test.mjs` | Primeira execução completa a demonstração com cobranças e repasses |
 
 ### O que cada suíte protege

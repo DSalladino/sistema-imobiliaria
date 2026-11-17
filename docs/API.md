@@ -201,6 +201,10 @@ Regras de integridade:
 | `POST` | `/api/cobrancas/:id/cancelar` | Cancela sem pagamento |
 | `POST` | `/api/cobrancas/:id/acao` | Registra contato, promessa, acordo etc. |
 | `POST` | `/api/cobrancas/:id/status` | Altera o status da régua |
+| `GET` | `/api/cobrancas/:id/pix` | Gera o BR Code Pix da cobrança (payload, QR e txid) |
+| `POST` | `/api/cobrancas/:id/whatsapp` | Envia cobrança pelo WhatsApp (API oficial ou link `wa.me`) |
+| `GET` | `/api/pix/pendentes?competencia=` | Lista os Pix pendentes da competência |
+| `GET` | `/api/integracoes/status` | Situação do Pix e do WhatsApp |
 
 Exemplo de baixa:
 
@@ -234,6 +238,49 @@ Corpo do preview:
 
 `mapeamento` é opcional para OFX e para CSV com cabeçalho reconhecível.
 
+## Contas a pagar e a receber
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/contas?tipo=&status=&competencia=&de=&ate=&busca=` | Lista contas com atraso calculado |
+| `GET` | `/api/contas/resumo` | A pagar, a receber, vencidos e saldo previsto |
+| `GET` | `/api/contas/previsao?meses=6&de=` | Previsão de caixa com recorrências projetadas |
+| `GET` | `/api/contas/:id` | Detalhe |
+| `POST` | `/api/contas` | Cria conta (recorrência `unica`, `mensal`, `semanal` ou `anual`) |
+| `PUT` | `/api/contas/:id` | Edita conta em aberto |
+| `POST` | `/api/contas/:id/pagar` | Baixa: gera lançamento e a próxima parcela |
+| `POST` | `/api/contas/:id/cancelar` | Cancela com motivo |
+
+## Comissões de corretagem
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/comissoes?status=&competencia=&contrato_id=&corretor=` | Lista comissões |
+| `GET` | `/api/comissoes/resumo?competencia=` | Previstas, liberadas, pagas e corretores |
+| `POST` | `/api/comissoes` | Cria comissão para um contrato |
+| `POST` | `/api/comissoes/gerar-lote` | Gera as comissões da competência para contratos ativos |
+| `POST` | `/api/comissoes/:id/status` | Marca como `liberada` ou `prevista` |
+| `POST` | `/api/comissoes/:id/pagar` | Paga e lança a despesa no caixa da imobiliária |
+| `POST` | `/api/comissoes/:id/cancelar` | Cancela comissão ainda não paga |
+
+## Contratos: reajuste e rescisão
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/contratos/reajuste/preview?data=&percentual=&indice=` | Prévia dos contratos com aniversário vencido |
+| `POST` | `/api/contratos/reajustar-lote` | Aplica o reajuste e atualiza cobranças em aberto |
+| `GET` | `/api/contratos/:id/reajustes` | Histórico de reajustes |
+| `POST` | `/api/contratos/:id/rescindir` | Encerra contrato, cancela cobranças futuras e gera devolução de caução |
+| `GET` | `/api/contratos/:id/rescisao` | Dados da rescisão |
+
+Exemplo de rescisão:
+
+```bash
+curl -s -b cookies.txt http://127.0.0.1:3000/api/contratos/7/rescindir \
+  -H 'Content-Type: application/json' \
+  -d '{"data":"2026-11-30","motivo":"Devolução do imóvel","multa_centavos":50000,"devolver_caucao":true}'
+```
+
 ## Repasses e fechamento
 
 | Método | Rota | Descrição |
@@ -250,7 +297,7 @@ Corpo do preview:
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/api/relatorios` | Catálogo dos sete relatórios |
+| `GET` | `/api/relatorios` | Catálogo dos oito relatórios |
 | `GET` | `/api/reports/:tipo.:formato` | Gera relatório (`csv`, `xlsx`, `pdf`) |
 | `GET` | `/api/export/lancamentos?competencia=` | CSV de lançamentos |
 | `GET` | `/api/export/cobrancas?competencia=` | CSV de cobranças |
@@ -258,7 +305,7 @@ Corpo do preview:
 | `GET` | `/api/export/contratos` | CSV de contratos |
 
 Tipos de relatório: `resumo-financeiro`, `lancamentos`, `repasses`, `contratos`,
-`inadimplencia`, `proprietarios`, `imoveis`.
+`inadimplencia`, `proprietarios`, `imoveis`, `dre-imovel`.
 
 Parâmetros: `de`, `ate`, `competencia`, `proprietario_id`.
 

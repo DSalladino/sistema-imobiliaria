@@ -3,17 +3,23 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e versionamento
 semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
-## [Não publicado]
+## [0.7.0] — 2026-11
 
 ### Adicionado
-- Base de demonstração com **credenciais conhecidas** (`Demo#2026`) e sem troca obrigatória de senha, sempre isolada em `data-demo/`.
+- **Pix automático por cobrança**: BR Code estático (EMV) com CRC16, QR Code e copia e cola, txid determinístico (`IMOB<id><competência>`) para conciliação e listagem de Pix pendentes da competência.
+- **WhatsApp pela API oficial** (Cloud API), com modo `link` (`wa.me`) como padrão e fallback; envio registrado em `comunicacoes` e botão de cobrança direto na listagem.
+- **Contas a pagar e a receber** com recorrência (mensal, semanal, anual), baixa que gera lançamento no caixa correto, criação automática da próxima parcela e **previsão de caixa** de 6 a 24 meses.
+- **Reajuste em lote** com prévia por contrato, aplicação do percentual, histórico em `reajustes` e atualização das cobranças em aberto.
+- **Rescisão de contrato**: encerramento com data, motivo, multa, cancelamento de cobranças futuras e devolução de caução como conta a pagar.
+- **Comissões de corretagem** por contrato: prevista, liberada, paga e cancelada, com geração em lote e lançamento de despesa da imobiliária.
+- **DRE por imóvel**: aluguéis, taxa de administração, despesas, comissões e resultados por imóvel, disponível como relatório (CSV, XLSX e PDF).
+- Configurações de **Integrações** (chave Pix, recebedor, cidade e modo do WhatsApp) e campos de corretor/comissão no contrato.
+- Variáveis `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID` e `WHATSAPP_API_VERSION`.
+- `tests/features.test.mjs` (17 testes) e subteste de API para Pix, WhatsApp, contas, comissões, reajuste e rescisão.
+- Suíte `tests/seguranca.test.mjs` (10 testes) para TOTP (vetores do RFC 6238), base32, AES-256-GCM e códigos de recuperação.
+- Base de demonstração com **credenciais conhecidas** (`Demo#2026`) e sem troca obrigatória de senha, isolada em `data-demo/`.
 - `docs/DEMONSTRACAO.md` com roteiro de avaliação, conteúdo da base de exemplo e limites da demonstração.
-- Scripts `midia:capturar` e `midia:video` para gerar capturas de tela e o tour de 90 s a partir da própria demonstração (Playwright opcional, fora das dependências do produto).
-- Capturas de tela em `docs/assets/telas/` e vídeo de demonstração em `docs/assets/demonstracao.webm`.
-
-### Planejado
-- Reajuste assistido em lote, rescisão de contrato e contas a pagar/receber.
-- Portal do proprietário/inquilino e central de manutenção.
+- Scripts `midia:capturar` e `midia:video` e capturas em `docs/assets/telas/` (Playwright opcional, fora das dependências do produto).
 
 ## [0.6.0] — 2026-11
 

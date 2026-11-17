@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { db } from './db.js';
 import { serieMensal, ultimoDia, mesesEntre } from './analytics.js';
 import { resolverTaxa, getSetting, hojeISO, competenciaAtual } from './regras.js';
+import { construirRelatorioDre } from './dre.js';
 
 export const RELATORIOS = [
   { id: 'resumo-financeiro', nome: 'Resumo financeiro', descricao: 'Receitas, despesas, repasses e resultado mês a mês.', filtros: ['periodo'], cor: 'sage' },
@@ -12,6 +13,7 @@ export const RELATORIOS = [
   { id: 'inadimplencia', nome: 'Inadimplência', descricao: 'Aluguéis vencidos e não pagos na competência.', filtros: ['competencia'], cor: 'blush' },
   { id: 'proprietarios', nome: 'Proprietários', descricao: 'Cadastro, carteira e totais por proprietário.', filtros: [], cor: 'peach' },
   { id: 'imoveis', nome: 'Imóveis', descricao: 'Carteira de imóveis, ocupação e contrato atual.', filtros: ['proprietario'], cor: 'mint' },
+  { id: 'dre-imovel', nome: 'DRE por imóvel', descricao: 'Aluguéis, taxa, despesas e comissões com o resultado de cada imóvel.', filtros: ['periodo', 'proprietario'], cor: 'sage' },
 ];
 
 const money = (c) => (Number(c || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,6 +29,9 @@ function filtroProprietario(propId) {
 }
 
 export function construirRelatorio(tipo, { de, ate, competencia, proprietario_id } = {}) {
+  if (tipo === 'dre-imovel') {
+    return construirRelatorioDre({ de, ate, proprietario_id });
+  }
   const propId = proprietario_id ? Number(proprietario_id) : null;
   ate = ate || competencia || competenciaAtual();
   de = de || ate;

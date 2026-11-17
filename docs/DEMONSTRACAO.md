@@ -115,7 +115,7 @@ A suíte é pública e roda sem a demonstração no ar:
 
 ```bash
 npm run check   # sintaxe
-npm test        # 20 testes: API, regras, interface (jsdom) e seed
+npm test        # 48 testes: API, regras, segurança, funcionalidades, interface (jsdom) e seed
 ```
 
 Ela cobre login e sessão, CSRF, permissões, precedência de taxas, geração e baixa

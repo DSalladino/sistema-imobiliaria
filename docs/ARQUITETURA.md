@@ -200,6 +200,9 @@ Checklist completo em [checklist-seguranca.md](checklist-seguranca.md).
 
 - `tests/api.test.mjs`: API e regras de negócio, em banco temporário.
 - `tests/rules.test.mjs`: precedência, snapshot, CSV, repasse e importação.
+- `tests/seguranca.test.mjs`: TOTP, cifragem, códigos de recuperação e senha.
+- `tests/features.test.mjs`: Pix, WhatsApp, contas, reajuste, rescisão, comissões
+  e DRE por imóvel.
 - `tests/ui.test.mjs`: HTML real em jsdom, login, troca de senha, telas, modais,
   gráficos.
 - `tests/seed.test.mjs`: carga inicial da demonstração.

@@ -197,4 +197,90 @@ test('fluxo principal da API', async (t) => {
     } });
     assert.equal(novo.res.status, 409);
   });
+
+  await t.test('contas, comissões, Pix, WhatsApp, reajuste e rescisão pela API', async () => {
+    const comp = new Date().toISOString().slice(0, 7);
+    // Integrações: chave Pix e modo link (sem chamada externa).
+    const cfg = await req('/api/settings', { method: 'PUT', body: { itens: {
+      pix_chave: 'financeiro@imobiliaria.local', pix_recebedor: 'Imobiliaria Teste', pix_cidade: 'Sao Paulo', whatsapp_modo: 'link',
+    } } });
+    assert.equal(cfg.res.status, 200);
+    const status = await req('/api/integracoes/status');
+    assert.equal(status.data.pix.configurado, true);
+    assert.equal(status.data.whatsapp.modo, 'link');
+
+    const cobrancas = await req(`/api/cobrancas?competencia=${comp}&status=abertas`);
+    const cobranca = cobrancas.data[0];
+    assert.ok(cobranca, 'precisa haver cobrança em aberto');
+    const pix = await req(`/api/cobrancas/${cobranca.id}/pix`);
+    assert.equal(pix.res.status, 200);
+    assert.ok(pix.data.payload.startsWith('000201'));
+    assert.ok(pix.data.qr.startsWith('data:image/png;base64,'));
+    assert.ok(pix.data.txid.startsWith('IMOB' + cobranca.id));
+
+    const zap = await req(`/api/cobrancas/${cobranca.id}/whatsapp`, { method: 'POST', body: {} });
+    assert.equal(zap.res.status, 200);
+    assert.equal(zap.data.modo, 'link');
+    assert.ok(zap.data.link.startsWith('https://wa.me/'));
+
+    const contasCriadas = [];
+    const conta = await req('/api/contas', { method: 'POST', body: {
+      tipo: 'pagar', descricao: 'Condomínio do mês', categoria: 'Ocupação', valor_centavos: 45000,
+      vencimento: `${comp}-20`, recorrencia: 'mensal',
+    } });
+    assert.equal(conta.res.status, 201);
+    contasCriadas.push(conta.data.id);
+    const receber = await req('/api/contas', { method: 'POST', body: {
+      tipo: 'receber', descricao: 'Taxa de vistoria', categoria: 'Serviços', valor_centavos: 30000, vencimento: `${comp}-25`,
+    } });
+    assert.equal(receber.res.status, 201);
+
+    const listaContas = await req('/api/contas?status=abertas');
+    assert.equal(listaContas.res.status, 200);
+    assert.ok(listaContas.data.some(c => c.id === conta.data.id));
+    const resumoContas = await req('/api/contas/resumo');
+    assert.equal(resumoContas.res.status, 200);
+    assert.ok(resumoContas.data.a_pagar >= 45000);
+
+    const baixaConta = await req(`/api/contas/${conta.data.id}/pagar`, { method: 'POST', body: { data: `${comp}-20` } });
+    assert.equal(baixaConta.res.status, 200);
+    assert.ok(baixaConta.data.proxima_conta_id, 'recorrência cria a próxima parcela');
+    const previsao = await req('/api/contas/previsao?meses=3');
+    assert.equal(previsao.res.status, 200);
+    assert.equal(previsao.data.meses.length, 3);
+
+    const contratosAbertos = await req('/api/contratos');
+    const alvo = contratosAbertos.data.find(c => c.status === 'ativo');
+    const comissao = await req('/api/comissoes', { method: 'POST', body: {
+      contrato_id: alvo.id, corretor: 'Corretor API', pct: 10, competencia: comp,
+    } });
+    assert.equal(comissao.res.status, 201);
+    assert.ok(comissao.data.valor_centavos > 0);
+    const pagarComissao = await req(`/api/comissoes/${comissao.data.id}/pagar`, { method: 'POST', body: {} });
+    assert.equal(pagarComissao.res.status, 200);
+    const lote = await req('/api/comissoes/gerar-lote', { method: 'POST', body: { competencia: comp } });
+    assert.equal(lote.res.status, 200);
+
+    const previa = await req(`/api/contratos/reajuste/preview?data=${comp}-01&percentual=8`);
+    assert.equal(previa.res.status, 200);
+    assert.ok(Array.isArray(previa.data.linhas));
+    const reajuste = await req('/api/contratos/reajustar-lote', { method: 'POST', body: {
+      contrato_ids: [alvo.id], percentual: 8, indice: 'IPCA', data: `${comp}-01`,
+    } });
+    assert.equal(reajuste.res.status, 200);
+    assert.equal(reajuste.data.aplicados.length, 1);
+    assert.ok(reajuste.data.total_novo_centavos > reajuste.data.total_anterior_centavos);
+
+    const dre = await req(`/api/reports/dre-imovel.pdf?de=${comp}&ate=${comp}`);
+    assert.equal(dre.res.status, 200);
+    assert.equal(dre.res.headers.get('content-type'), 'application/pdf');
+
+    const rescisao = await req(`/api/contratos/${alvo.id}/rescindir`, { method: 'POST', body: {
+      data: `${comp}-15`, motivo: 'Devolução do imóvel', multa_centavos: 10000,
+    } });
+    assert.equal(rescisao.res.status, 200);
+    assert.equal(rescisao.data.contrato_id, alvo.id);
+    const contratosDepois = await req('/api/contratos');
+    assert.equal(contratosDepois.data.find(c => c.id === alvo.id).status, 'encerrado');
+  });
 });
