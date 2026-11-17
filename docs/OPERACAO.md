@@ -28,14 +28,14 @@ flowchart LR
 
 | Variável | Obrigatória | Uso |
 |---|---|---|
-| `NODE_ENV=production` | recomendada | Impede seed automático e endurece URLs |
+| `NODE_ENV=production` | recomendada | Desliga dicas de desenvolvimento e endurece URLs |
 | `HOST=127.0.0.1` | sim | Não expor o Node direto na internet |
 | `PORT=3000` | sim | Porta interna |
-| `TRUST_PROXY=1` | atrás de proxy | Usa `X-Forwarded-For` para rate limit |
+| `TRUST_PROXY=1` | atrás de proxy | Usa `X-Forwarded-For` para rate limit. Se o cabeçalho chegar sem esta variável, o servidor avisa no log e todos os usuários passam a compartilhar o mesmo balde de rate limit |
 | `APP_SECRET` | recomendada | Cifra segredos de 2FA e códigos de recuperação |
 | `ADMIN_SENHA` | primeira execução | Senha inicial do admin (opcional) |
 | `PUBLIC_URL` | para recuperação | Base dos links de e-mail |
-| `SEED_DEMO=0` | produção | Não carregar demonstração |
+| `SEED_DEMO=0` | produção | Dados de exemplo são **opt-in**: sem `SEED_DEMO=1`, a base sobe vazia em qualquer ambiente |
 | `SMTP_*` | opcional | Envio de e-mail |
 
 `APP_SECRET` e o arquivo `data/.app-key` são **segredos**. Se `APP_SECRET` não
@@ -47,7 +47,8 @@ ele existe.
 
 ### Diária
 
-- [ ] Verificar `/api/health` (ou o monitor HTTP).
+- [ ] Verificar `/api/health` (ou o monitor HTTP). Ele retorna `503` quando o
+  banco não responde ou `data/uploads` não está gravável.
 - [ ] Conferir se o backup da madrugada foi enviado para fora.
 - [ ] Revisar alertas de cobrança e vencimento.
 - [ ] Verificar erros no log do serviço.
@@ -115,9 +116,24 @@ tar dos uploads, envia via `rclone` e mantém 30 dias locais. Configure
 cd /opt/imobiliaria
 sudo -u imobiliaria git pull            # ou copie o pacote
 sudo -u imobiliaria npm ci --omit=dev
+sudo -u imobiliaria npm run deps:check  # garante o xlsx do CDN
 sudo systemctl restart imobiliaria
 curl -fsS http://127.0.0.1:3000/api/health
 ```
+
+## Desligamento e reinício
+
+O processo trata `SIGTERM`/`SIGINT`: para de aceitar conexões, conclui as
+requisições em curso e fecha o SQLite (consolidando o WAL) antes de sair. Em
+caso de travamento, há um limite de 10 s para o encerramento forçado. Não use
+`kill -9` no dia a dia: `systemctl restart` já envia `SIGTERM`.
+
+## Mídia da demonstração
+
+`docs/assets` tem ~7,7 MB de capturas e vídeo versionados no Git. Se o clone
+começar a pesar, mova esses arquivos para Git LFS ou anexos de release e ajuste
+os links do README. Isso **não** afeta a instalação de produção, que não usa
+`docs/`.
 
 Antes:
 

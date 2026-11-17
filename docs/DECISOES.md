@@ -269,3 +269,110 @@ a documentação.
 - mais tempo em manutenção;
 - documentação pode ficar desatualizada se não for revisada;
 - o repositório comunica maturidade técnica.
+
+---
+
+## ADR-013 — Troca de senha exigida no servidor
+
+**Status:** aceito (0.8.0)
+
+**Contexto:** a flag `deve_trocar_senha` só era aplicada pela interface. Qualquer
+cliente HTTP usava a senha temporária em todas as rotas.
+
+**Decisão:** o roteador recusa rotas protegidas com `403` enquanto a flag estiver
+ativa, liberando apenas sessão, troca de senha e 2FA.
+
+**Consequências:**
+
+- senha temporária deixa de ser um acesso completo;
+- testes e integrações precisam trocar a senha antes de operar;
+- a interface continua forçando a troca, agora como conveniência.
+
+---
+
+## ADR-014 — Demonstração opt-in
+
+**Status:** aceito (0.8.0)
+
+**Contexto:** o seed rodava em qualquer ambiente que não fosse `production`,
+o que injetava dados fictícios em deploys mal configurados.
+
+**Decisão:** `SEED_DEMO=1` é obrigatório; comandos `npm run demo*` definem a
+variável por conta própria. Produção e desenvolvimento começam vazios.
+
+**Consequências:**
+
+- um passo explícito para demonstrar;
+- testes declaram a variável;
+- impossível confundir base fictícia com produção.
+
+---
+
+## ADR-015 — Paginação por envelope opcional
+
+**Status:** aceito (0.8.0)
+
+**Contexto:** listas de cobranças e lançamentos tinham `LIMIT` fixo e escondiam
+registros sem avisar; mudar o formato quebraria consumidores existentes.
+
+**Decisão:** aceitar `limite`, `offset` e `envelope=1`. Sem envelope a resposta
+continua sendo um array; com envelope vira `{ itens, total, limite, offset }`.
+
+**Consequências:**
+
+- compatibilidade preservada;
+- a interface avisa sobre truncamento;
+- paginação de verdade (controles de página) fica para o próximo ciclo.
+
+---
+
+## ADR-016 — Configurações em cache de processo
+
+**Status:** aceito (0.8.0)
+
+**Contexto:** multa e juros consultavam `settings` duas vezes por cobrança.
+
+**Decisão:** cache em memória carregado sob demanda, atualizado por `setSetting`
+e recarregável por `invalidarCacheSettings()`.
+
+**Consequências:**
+
+- menos consultas por painel e relatório;
+- pressupõe um único processo escrevendo no banco (já é a premissa do ADR-001);
+- edição externa da tabela exige reinício ou invalidação explícita.
+
+---
+
+## ADR-017 — Fontes servidas localmente
+
+**Status:** aceito (0.8.0)
+
+**Contexto:** DM Sans e Fraunces vinham do Google Fonts, criando dependência
+externa, exposição de IP e quebra offline.
+
+**Decisão:** versionar os `woff2` (latin/latin-ext) em `public/fonts`, com licença
+OFL registrada e CSP restrita a `'self'`.
+
+**Consequências:**
+
+- nenhum terceiro no navegador;
+- ~180 KB de fontes no repositório;
+- atualização manual das fontes quando necessário.
+
+---
+
+## ADR-018 — Guarda de dependência fora do npm
+
+**Status:** aceito (0.8.0)
+
+**Contexto:** `xlsx` é instalado por URL do CDN do fornecedor e não aparece no
+`npm audit`; o Dependabot o ignora.
+
+**Decisão:** script `npm run deps:check` valida URL, versão e `integrity` do
+lockfile e a versão instalada; a CI executa antes dos testes.
+
+**Consequências:**
+
+- troca acidental de origem/versão falha cedo;
+- atualização exige revisão consciente;
+- não substitui monitoramento de CVE (risco residual R-13).

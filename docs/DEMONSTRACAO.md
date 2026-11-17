@@ -115,13 +115,14 @@ A suíte é pública e roda sem a demonstração no ar:
 
 ```bash
 npm run check   # sintaxe
-npm test        # 48 testes: API, regras, segurança, funcionalidades, interface (jsdom) e seed
+npm run deps:check  # integridade da dependência xlsx de CDN
+npm test        # 69 testes: API, regras, segurança, funcionalidades, interface (jsdom), seed, relatórios, conciliação e analytics
 ```
 
 Ela cobre login e sessão, CSRF, permissões, precedência de taxas, geração e baixa
-de cobranças, repasse com snapshot, fechamento, importação e a renderização de
-todas as telas com dados reais da demonstração. Detalhes em
-[QUALIDADE.md](QUALIDADE.md).
+de cobranças, repasse com snapshot, fechamento, importação, relatórios (CSV/XLSX/PDF),
+conciliação OFX/CSV, analytics e a renderização de todas as telas com dados reais
+da demonstração. Detalhes em [QUALIDADE.md](QUALIDADE.md).
 
 ## O que não está na demonstração
 

@@ -15,7 +15,7 @@
   </a>
   <img src="https://img.shields.io/badge/Node.js-22.13%2B-2E4A40?logo=node.js&logoColor=white" alt="Node.js 22.13+">
   <img src="https://img.shields.io/badge/SQLite-node%3Asqlite-5C8571?logo=sqlite&logoColor=white" alt="SQLite">
-  <img src="https://img.shields.io/badge/vers%C3%A3o-0.7.0-C9A87C" alt="Versão 0.7.0">
+  <img src="https://img.shields.io/badge/vers%C3%A3o-0.8.0-C9A87C" alt="Versão 0.8.0">
   <img src="https://img.shields.io/badge/licen%C3%A7a-MIT-2E4A40" alt="Licença MIT">
   <img src="https://img.shields.io/badge/PRs-bem--vindos-5C8571" alt="PRs bem-vindos">
 </p>
@@ -49,7 +49,7 @@ poucos usuários — e prioriza **simplicidade operacional**, **rastreabilidade*
 **baixo custo**. O resultado é um monólito Node.js + SQLite com frontend sem
 build, testes automatizados e documentação de ponta a ponta.
 
-> **Status:** versão 0.7.0, em evolução ativa. O repositório não contém dados
+> **Status:** versão 0.8.0, em evolução ativa. O repositório não contém dados
 > reais; a base de demonstração é separada da produção.
 
 ### Por que este projeto é diferente
@@ -135,7 +135,8 @@ Detalhes de cada fluxo, regras e telas em [docs/FUNCIONALIDADES.md](docs/FUNCION
 ## Começando
 
 Requisito: **Node.js 22.13 ou superior** (recomendado 24+). O módulo
-`node:sqlite` só fica disponível sem flag a partir dessa versão.
+`node:sqlite` só fica disponível sem flag a partir dessa versão. O `.nvmrc` fixa
+**24** para desenvolvimento; a CI cobre **22 e 24**.
 
 ```bash
 npm install
@@ -173,7 +174,7 @@ npm run demo:servir
 O banco fica em `data-demo/` e a instância sobe em **http://127.0.0.1:3009**.
 A produção continua intacta. Em produção (`NODE_ENV=production`) a base começa
 vazia; dados de exemplo só entram com `SEED_DEMO=1` ou pelos comandos de
-demonstração.
+demonstração. O seed **nunca** roda por omissão, mesmo em desenvolvimento.
 
 ### Scripts
 
@@ -183,6 +184,7 @@ demonstração.
 | `npm run dev` | Sobe com `--watch` |
 | `npm test` | API, regras, interface (jsdom) e seed |
 | `npm run check` | Verifica a sintaxe de todos os `.js`/`.mjs` |
+| `npm run deps:check` | Confere versão, origem e integrity da dependência `xlsx` (CDN) |
 | `npm run test:coverage` | Testes com cobertura experimental do Node |
 | `npm run demo` | Recarrega os dados de exemplo |
 | `npm run demo:preparar` | Cria a base de demonstração com credenciais conhecidas |
@@ -233,6 +235,8 @@ O projeto adota, entre outras práticas:
   `Sec-Fetch-Site`.
 - **Rate limit:** login, 2FA, API, importação, comunicação e recuperação.
 - **XSS:** escape na renderização e CSP sem script inline.
+- **Sem terceiros no navegador:** fontes servidas pelo próprio sistema, sem
+  CDN externo, o que preserva o modo offline e não envia IP do usuário ao Google.
 - **SQL:** consultas parametrizadas e referências validadas.
 - **Upload:** limite de tamanho, extensões permitidas, nome aleatório, storage
   fora de `public/` e download autenticado.
@@ -284,8 +288,11 @@ npm test
   AES-GCM, códigos de recuperação, política de senha e hash de sessão.
 - `tests/features.test.mjs` — Pix, WhatsApp, contas e recorrência, previsão de
   caixa, reajuste em lote, rescisão, comissões e DRE por imóvel.
-- `tests/ui.test.mjs` — renderiza as 20 telas com dados reais em jsdom.
+- `tests/ui.test.mjs` — renderiza as 22 telas com dados reais em jsdom.
 - `tests/seed.test.mjs` — valida a base de demonstração da primeira execução.
+- `tests/relatorios.test.mjs` — CSV/XLSX/PDF, fórmulas, acentos, período vazio e DRE.
+- `tests/conciliacao.test.mjs` — OFX, CSV, sugestão, duplicidade e confirmação.
+- `tests/analytics.test.mjs` — série, ocupação, composição, KPIs e cache de settings.
 
 O CI roda em Node 22 e 24. A estratégia e as lacunas estão em
 [docs/QUALIDADE.md](docs/QUALIDADE.md).
@@ -342,6 +349,8 @@ arquivos). Vercel e hospedagem compartilhada não servem. O guia completo está 
 | `WHATSAPP_PHONE_ID` | ID do número na Cloud API |
 | `WHATSAPP_API_VERSION` | Versão da Graph API (padrão `v21.0`) |
 | `SEED_DEMO=1` | Carrega demonstração em produção (use com cuidado) |
+
+Sem `SEED_DEMO=1` a base começa sempre vazia, inclusive fora de produção.
 
 ## Estrutura
 

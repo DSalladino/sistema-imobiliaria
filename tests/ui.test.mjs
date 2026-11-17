@@ -23,7 +23,7 @@ test('todas as telas renderizam com dados reais', async (t) => {
   let base = '';
   const proc = spawn(process.execPath, ['src/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, DATA_DIR: dir, PORT: '0', SEED_COMPLETO: '0', HOST: '127.0.0.1', APP_SECRET: 'teste-ui-36-caracteres-aleatorios-x', ADMIN_SENHA: 'admin123' },
+    env: { ...process.env, DATA_DIR: dir, PORT: '0', SEED_COMPLETO: '0', SEED_DEMO: '1', HOST: '127.0.0.1', APP_SECRET: 'teste-ui-36-caracteres-aleatorios-x', ADMIN_SENHA: 'admin123' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(() => { try { proc.kill('SIGKILL'); } catch {} try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} });
@@ -37,6 +37,13 @@ test('todas as telas renderizam com dados reais', async (t) => {
   assert.equal(login.status, 200);
   const cookie = (login.headers.getSetCookie?.()[0] || '').split(';')[0];
   assert.ok(cookie.startsWith('sid='));
+
+  // A senha inicial é temporária; a API exige a troca antes de liberar as telas.
+  const troca = await fetch(base + '/api/me/senha', {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ senha_atual: 'admin123', senha_nova: 'SenhaForte#2026' }),
+  });
+  assert.equal(troca.status, 200);
 
   const nodeFetch = globalThis.fetch;
   const apiFetch = (url, opts = {}) => nodeFetch(base + url, {

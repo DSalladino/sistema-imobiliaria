@@ -15,6 +15,7 @@ const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
+  '.woff2': 'font/woff2',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
@@ -24,8 +25,8 @@ const MIME = {
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com data:",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
   "img-src 'self' data:",
   "connect-src 'self'",
   "frame-ancestors 'none'",
@@ -53,10 +54,18 @@ function origemPermitida(req) {
   }
 }
 
+let avisouProxy = false;
+
 function ipCliente(req) {
+  const encaminhado = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   if (process.env.TRUST_PROXY === '1') {
-    const xff = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-    if (xff) return xff;
+    if (encaminhado) return encaminhado;
+  } else if (encaminhado && !avisouProxy) {
+    // Atrás de proxy sem TRUST_PROXY todo mundo compartilha o IP 127.0.0.1 e,
+    // portanto, o mesmo balde de rate limit. Um aviso único evita horas de
+    // diagnóstico quando as respostas 429 começarem.
+    avisouProxy = true;
+    console.warn('  Aviso: X-Forwarded-For recebido com TRUST_PROXY desligado. Defina TRUST_PROXY=1 atrás de um proxy confiável.');
   }
   return req.socket?.remoteAddress || 'desconhecido';
 }
@@ -165,6 +174,27 @@ const server = http.createServer(async (req, res) => {
 
 server.headersTimeout = 20000;
 server.requestTimeout = 30000;
+
+// Desligamento gracioso: o systemd envia SIGTERM e, sem isso, o processo morre
+// no meio de uma escrita. Fecha o listener, deixa as requisições em curso
+// terminarem e então fecha o SQLite (consolidando o WAL).
+let encerrando = false;
+function encerrar(sinal) {
+  if (encerrando) return;
+  encerrando = true;
+  console.log(`\n  ${sinal} recebido: encerrando o servidor...`);
+  server.close(() => {
+    try { db.close(); } catch {}
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.warn('  Encerramento forçado após 10s.');
+    try { db.close(); } catch {}
+    process.exit(1);
+  }, 10000).unref();
+}
+process.on('SIGTERM', () => encerrar('SIGTERM'));
+process.on('SIGINT', () => encerrar('SIGINT'));
 
 // Primeira execução: completa a base de demonstração com cobranças e repasses.
 // Só roda quando o banco está intocado (sem cobranças e sem auditoria), para não
