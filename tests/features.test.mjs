@@ -76,6 +76,12 @@ test('valor zero não vai no payload e txid vazio vira ***', () => {
   assert.ok(payload.includes('0503***'));
 });
 
+test('chave Pix não-ASCII ou longa demais é recusada', () => {
+  assert.throws(() => pix.pixPayload({ chave: 'chave-com-ç', nome: 'X', cidade: 'Y' }), (e) => e.status === 409);
+  assert.throws(() => pix.pixPayload({ chave: 'a'.repeat(78), nome: 'X', cidade: 'Y' }), (e) => e.status === 409);
+  assert.doesNotThrow(() => pix.pixPayload({ chave: 'financeiro@imobiliaria.com', nome: 'X', cidade: 'Y' }));
+});
+
 test('Pix da cobrança usa o saldo e exige chave configurada', () => {
   const { contrato } = cenario();
   const id = cobranca(contrato, { vencimento: '2026-12-10', valor: 150000, competencia: '2026-12' });
