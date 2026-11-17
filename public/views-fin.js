@@ -186,6 +186,7 @@ export async function viewCobrancas(root, params) {
                 <dt>Proprietário</dt><dd>${esc(c.proprietario_nome)}</dd>
                 <dt>Vencimento</dt><dd>${dataBR(c.vencimento)}${c.dias_atraso ? ` (+${c.dias_atraso} dias)` : ''}</dd>
                 <dt>Status</dt><dd>${badgeCobranca(c.status_efetivo)}</dd>
+                ${c.regua_status ? `<dt>Régua de cobrança</dt><dd>${badgeCobranca(c.regua_status)}</dd>` : ''}
               </dl>
             </div></div>
             <div class="card"><div class="card-body">
@@ -228,13 +229,17 @@ export async function viewCobrancas(root, params) {
       const qs = new URLSearchParams({ competencia: comp, status });
       if (busca) qs.set('busca', busca);
       if (contrato) qs.set('contrato_id', contrato);
-      const [cobrancas, res] = await Promise.all([
-        api(`/cobrancas?${qs}`),
+      const [pagina, res] = await Promise.all([
+        api(`/cobrancas?${qs}&envelope=1`),
         api(`/cobrancas/resumo?competencia=${comp}`),
       ]);
+      const cobrancas = pagina.itens;
       resumo = res;
       renderResumo();
-      lista.innerHTML = tableHtml([
+      const avisoTruncado = pagina.total > cobrancas.length
+        ? `<div class="notice mt-2">Mostrando ${cobrancas.length} de ${pagina.total} cobranças. Refine a busca ou o período para ver as demais.</div>`
+        : '';
+      lista.innerHTML = avisoTruncado + tableHtml([
         { label: 'Inquilino / imóvel', render: c => `<strong>${esc(c.inquilino_nome)}</strong><span class="sub">${esc(c.endereco)}${c.numero ? ', ' + esc(c.numero) : ''} · ${esc(c.contrato_codigo || '#' + c.contrato_id)}</span>` },
         { label: 'Competência', render: c => compBR(c.competencia) },
         { label: 'Vencimento', render: c => `${dataBR(c.vencimento)}${c.dias_atraso ? `<span class="sub" style="color:var(--blush-ink)">${c.dias_atraso} dias</span>` : ''}` },
@@ -449,14 +454,18 @@ export async function viewLancamentos(root) {
       const qs = new URLSearchParams({ competencia: comp });
       if (caixa) qs.set('caixa', caixa);
       if (tipo) qs.set('tipo', tipo);
-      [dados, saldos] = await Promise.all([api(`/lancamentos?${qs}`), api('/saldos')]);
+      const [pagina, saldos] = await Promise.all([api(`/lancamentos?${qs}&envelope=1`), api('/saldos')]);
+      dados = pagina.itens;
+      const avisoTruncado = pagina.total > dados.length
+        ? `<div class="notice mt-2">Mostrando ${dados.length} de ${pagina.total} lançamentos. Filtre por caixa ou tipo para ver os demais.</div>`
+        : '';
       root.querySelector('[data-saldos]').innerHTML = `<div class="kpis">
         ${stat('Saldo imobiliária', brl(saldos.imobiliaria_centavos))}
         ${stat('Saldo proprietários', brl(saldos.proprietarios_centavos))}
         ${stat('Receitas da imobiliária', brl(saldos.receitas_imob_centavos), 'sage-ink')}
         ${stat('Despesas da imobiliária', brl(saldos.despesas_imob_centavos), 'blush-ink')}
       </div>`;
-      lista.innerHTML = tableHtml([
+      lista.innerHTML = avisoTruncado + tableHtml([
         { label: 'Data', render: l => `${dataBR(l.data)}<span class="sub">${compBR(l.competencia)}</span>` },
         { label: 'Tipo', render: l => badge(l.tipo, l.tipo === 'receita' ? 'sage' : 'blush') },
         { label: 'Categoria', render: l => `<strong>${esc(l.categoria)}</strong><span class="sub">${esc(l.descricao || '')}</span>` },
