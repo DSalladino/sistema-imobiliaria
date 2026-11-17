@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
 import { parseCookies, hashToken } from './auth.js';
 import { handleApi } from './api.js';
+import { getSettingNum } from './regras.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -79,12 +80,27 @@ function usuarioDaRequisicao(req) {
   const token = cookies.sid;
   if (!token) return { user: null, token: null, tokenHash: null };
   const tokenHash = hashToken(token);
-  const row = db.prepare(`SELECT u.id, u.nome, u.email, u.papel, u.ativo, u.deve_trocar_senha, u.totp_ativo, s.expira_em
+  const row = db.prepare(`SELECT u.id, u.nome, u.email, u.papel, u.ativo, u.deve_trocar_senha, u.totp_ativo,
+      s.expira_em, s.ultimo_uso
     FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id WHERE s.token = ?`).get(tokenHash);
   if (!row || !row.ativo) return { user: null, token, tokenHash };
+  const agora = Date.now();
   if (new Date(row.expira_em) < new Date()) {
     db.prepare('DELETE FROM sessoes WHERE token = ?').run(tokenHash);
     return { user: null, token, tokenHash };
+  }
+  // Expiração por inatividade: limita o dano de um cookie esquecido em
+  // computador compartilhado. O limite é configurável (padrão 12 horas).
+  const idleHoras = Math.min(Math.max(getSettingNum('sessao_horas', 12), 1), 720);
+  const ultimoUso = row.ultimo_uso ? new Date(row.ultimo_uso).getTime() : 0;
+  if (ultimoUso && agora - ultimoUso > idleHoras * 3600000) {
+    db.prepare('DELETE FROM sessoes WHERE token = ?').run(tokenHash);
+    return { user: null, token, tokenHash };
+  }
+  // Grava o uso no máximo a cada cinco minutos para não transformar cada
+  // requisição (inclusive polling) em uma escrita no SQLite.
+  if (!ultimoUso || agora - ultimoUso > 5 * 60000) {
+    db.prepare('UPDATE sessoes SET ultimo_uso = ? WHERE token = ?').run(new Date().toISOString(), tokenHash);
   }
   return {
     user: {

@@ -1,4 +1,4 @@
-import { db } from './db.js';
+import { inserirAuditoria } from './auditoria.js';
 
 export const PERMISSOES = {
   admin: ['*'],
@@ -22,8 +22,13 @@ export function exigir(user, acao) {
 }
 
 export function auditar(user, acao, entidade, entidadeId, detalhe, ip) {
-  db.prepare(`INSERT INTO auditoria (usuario_id, usuario_nome, acao, entidade, entidade_id, detalhe, ip)
-              VALUES (?,?,?,?,?,?,?)`)
-    .run(user?.id ?? null, user?.nome ?? 'sistema', acao, entidade, entidadeId == null ? null : String(entidadeId),
-      detalhe == null ? null : (typeof detalhe === 'string' ? detalhe : JSON.stringify(detalhe)), ip ?? null);
+  return inserirAuditoria({
+    usuario_id: user?.id ?? null,
+    usuario_nome: user?.nome ?? 'sistema',
+    acao,
+    entidade,
+    entidade_id: entidadeId,
+    detalhe,
+    ip,
+  });
 }

@@ -195,9 +195,11 @@ contratos. Datas em `dd/mm/aaaa` e valores em reais são convertidos.
 
 **Problema:** prestar contas ao proprietário e ao contador.
 
-**Como funciona:** sete relatórios (resumo financeiro, lançamentos, repasses, contratos, inadimplência,
-proprietários e imóveis) em **CSV, Excel e PDF**. O PDF tem cabeçalho, KPIs, tabela e paginação. Há
-também exportações CSV rápidas de lançamentos, cobranças, repasses e contratos.
+**Como funciona:** doze relatórios (resumo financeiro, lançamentos, repasses, cobranças, fluxo de
+caixa, comissões, contas, contratos, inadimplência, proprietários, imóveis e DRE por imóvel) em
+**CSV, Excel e PDF**. O PDF tem cabeçalho, KPIs, tabela e paginação. O Excel tem totais, autofiltro,
+resumo numérico e aba de parâmetros. Há também exportações CSV rápidas de lançamentos, cobranças,
+repasses e contratos.
 
 **Regras:** filtros por período/proprietário; perfil consulta não exporta. CSV protegido contra injeção
 de fórmula.
@@ -380,3 +382,21 @@ informação. A confirmação de qualquer ação continua sendo humana.
 
 **Onde:** botão **Assistente** na barra superior, em qualquer tela; documentação técnica em
 [API.md](API.md#assistente-interno).
+
+## 24. Análises futuras e projeções
+
+**Problema:** decidir com base no passado sem enxergar tendência, risco e efeito de um cenário.
+
+**Como funciona:**
+- A tela **Análises futuras** calcula, sobre os últimos 12 meses, receita/despesa/resultado médios,
+  margem, inadimplência, ocupação, meses de caixa, concentração da carteira e renovações em 90 dias.
+- A tendência e a projeção usam regressão linear, com R², inclinação mensal e faixa de erro.
+- O simulador permite informar inadimplência, vacância extra, reajuste médio e pressão de despesa,
+  devolvendo receita, despesa, resultado e saldo acumulado mês a mês.
+- Riscos e recomendações são derivados dos indicadores; o assistente também responde “qual a previsão?”
+  e “quais são os riscos da carteira?”.
+
+**Regras:** nenhum dado sai do servidor; a projeção é estatística simples e não substitui decisão humana.
+O histórico e as premissas ficam visíveis para que o número possa ser explicado.
+
+**Onde:** menu **Visão geral → Análises futuras** e assistente.

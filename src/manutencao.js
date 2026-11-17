@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { db, DATA_DIR, seedDemo } from './db.js';
-import { gerarRepasses, pagarRepasse, competenciaAtual } from './regras.js';
+import { gerarRepasses, pagarRepasse, competenciaAtual, getSettingNum } from './regras.js';
+import { reencadearAuditoria } from './auditoria.js';
 import { addMesesComp } from './analytics.js';
 import { gerar as gerarCobrancas, pagar as pagarCobranca, listar as listarCobrancas } from './cobrancas.js';
 import { UPLOADS } from './documentos.js';
@@ -71,6 +72,36 @@ export function limparBase({ incluirAuditoria = true, incluirArquivos = true } =
   }
   const arquivos = incluirArquivos ? apagarArquivos() : 0;
   return { ok: true, backup, arquivos_removidos: arquivos };
+}
+
+export function expurgarRetencao({ confirmar = false } = {}) {
+  const hoje = new Date();
+  const corte = (dias) => {
+    const d = new Date(hoje.getTime() - Math.max(Number(dias) || 0, 1) * 86400000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 23:59:59`;
+  };
+  const limiteLogs = corte(getSettingNum('lgpd_retencao_logs_dias', 365));
+  const limiteComunicacoes = corte(getSettingNum('lgpd_retencao_comunicacoes_dias', 730));
+  const auditoria = db.prepare('SELECT COUNT(*) AS n FROM auditoria WHERE criado_em < ?').get(limiteLogs).n;
+  const comunicacoes = db.prepare('SELECT COUNT(*) AS n FROM comunicacoes WHERE criado_em < ?').get(limiteComunicacoes).n;
+  const resets = db.prepare("SELECT COUNT(*) AS n FROM password_resets WHERE usado_em IS NOT NULL OR expira_em < datetime('now','localtime')").get().n;
+  if (!confirmar) {
+    return { simulado: true, auditoria, comunicacoes, password_resets: resets, limites: { auditoria: limiteLogs, comunicacoes: limiteComunicacoes } };
+  }
+  // Backup antes de apagar qualquer coisa, mesmo que seja apenas retenção.
+  const backup = backupAntes();
+  db.exec('BEGIN');
+  try {
+    db.prepare('DELETE FROM auditoria WHERE criado_em < ?').run(limiteLogs);
+    db.prepare('DELETE FROM comunicacoes WHERE criado_em < ?').run(limiteComunicacoes);
+    db.prepare("DELETE FROM password_resets WHERE usado_em IS NOT NULL OR expira_em < datetime('now','localtime')").run();
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  const reencadeada = auditoria > 0 ? reencadearAuditoria() : null;
+  return { simulado: false, auditoria, comunicacoes, password_resets: resets, backup: path.basename(backup), reencadeada };
 }
 
 export function carregarDemo() {

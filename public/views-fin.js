@@ -448,6 +448,40 @@ export async function viewLancamentos(root) {
     onSubmit: async (d) => { await api('/lancamentos', { method: 'POST', body: d }); toast('Lançamento criado.'); carregar(); },
   });
 
+  const abrirDetalhe = async (id) => {
+    try {
+      const l = await api(`/lancamentos/${id}`);
+      const vinculos = [
+        l.contrato_codigo ? `Contrato ${l.contrato_codigo}` : null,
+        l.cobranca_id ? `Cobrança #${l.cobranca_id} (${compBR(l.cobranca_competencia)})` : null,
+        l.repasse_id ? `Repasse #${l.repasse_id} (${compBR(l.repasse_competencia)})` : null,
+        l.estorno ? `Estorno do lançamento #${l.estorno_de_id}` : null,
+        l.estornado_por ? `Estornado pelo lançamento #${l.estornado_por.id}` : null,
+      ].filter(Boolean);
+      openModal({
+        titulo: 'Lançamento', subtitulo: `${dataBR(l.data)} · ${compBR(l.competencia)} · ${esc(l.categoria)}`, wide: true,
+        corpo: `<div class="grid cols-2">
+          <div class="card"><div class="card-body"><dl class="dl">
+            <dt>Tipo</dt><dd>${badge(l.tipo, l.tipo === 'receita' ? 'sage' : 'blush')}</dd>
+            <dt>Caixa</dt><dd>${l.caixa === 'imobiliaria' ? 'Imobiliária' : 'Proprietários'}</dd>
+            <dt>Valor</dt><dd><strong>${brl(l.valor_centavos)}</strong></dd>
+            <dt>Status</dt><dd>${badge(l.status, l.status === 'estornado' ? 'plain' : 'sage')}</dd>
+          </dl></div></div>
+          <div class="card"><div class="card-body"><dl class="dl">
+            <dt>Proprietário</dt><dd>${esc(l.proprietario_nome || '—')}</dd>
+            <dt>Imóvel</dt><dd>${esc(l.imovel_endereco ? l.imovel_endereco + (l.imovel_numero ? ', ' + l.imovel_numero : '') : '—')}</dd>
+            <dt>Vínculos</dt><dd>${vinculos.length ? vinculos.map(esc).join('<br>') : '—'}</dd>
+            <dt>Criado por</dt><dd>${esc(l.criado_por || '—')} · ${esc(l.criado_em || '')}</dd>
+          </dl></div></div>
+        </div>
+        <div class="card mt-2"><div class="card-body"><h3>Descrição</h3><p>${esc(l.descricao || '—')}</p>
+          ${l.motivo_estorno ? `<div class="notice mt-2">Motivo do estorno: ${esc(l.motivo_estorno)}</div>` : ''}</div></div>
+        ${(l.auditoria || []).length ? `<div class="card mt-2"><div class="card-head"><h3>Trilha de auditoria</h3></div><div class="card-body"><div class="timeline">${l.auditoria.map(a => `<div class="tl-item"><span class="tl-dot"></span><div><p><strong>${esc(a.acao)}</strong> · ${esc(a.usuario_nome || 'sistema')}</p><small>${esc((a.criado_em || '').replace('T', ' ').slice(0, 16))}</small></div></div>`).join('')}</div></div></div>` : ''}`,
+        rodape: '<button class="btn" data-close>Fechar</button>',
+      });
+    } catch (e) { toast(e.message, 'err'); }
+  };
+
   const carregar = async () => {
     lista.innerHTML = loadingBox();
     try {
@@ -473,8 +507,9 @@ export async function viewLancamentos(root) {
         { label: 'Proprietário', render: l => esc(l.proprietario_nome || '—') },
         { label: 'Valor', num: true, render: l => `<span style="color:${l.tipo === 'receita' ? 'var(--sage-ink)' : 'var(--blush-ink)'}">${brl(l.valor_centavos)}</span>` },
         { label: 'Status', render: l => badge(l.status, l.status === 'estornado' ? 'plain' : 'sage') },
-        { label: 'Ações', acao: l => l.status === 'estornado' || l.repasse_id || !podeFinanceiro() ? '' : `<button class="icon-btn" data-estornar="${l.id}" title="Estornar">${icon('x')}</button>` },
+        { label: 'Ações', acao: l => `<button class="icon-btn" data-ver="${l.id}" title="Detalhe">${icon('eye')}</button>${l.status === 'estornado' || l.repasse_id || !podeFinanceiro() ? '' : `<button class="icon-btn" data-estornar="${l.id}" title="Estornar">${icon('x')}</button>`}` },
       ], dados);
+      lista.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => abrirDetalhe(Number(b.dataset.ver)));
       lista.querySelectorAll('[data-estornar]').forEach(b => b.onclick = async () => {
         const motivo = prompt('Motivo do estorno (obrigatório):');
         if (!motivo) return;
@@ -849,7 +884,7 @@ export async function viewImportacao(root) {
    ============================================================ */
 export async function viewRelatorios(root) {
   let dados = [], props = [], filtros = { de: addMesesComp(compAtual(), -11) + '-01', ate: hojeISO(), proprietario_id: '' };
-  root.innerHTML = head('Relatórios', 'Oito relatórios em CSV, Excel e PDF com cabeçalho e paginação.') +
+  root.innerHTML = head('Relatórios', 'Relatórios em CSV, Excel e PDF com cabeçalho, paginação, resumo e parâmetros do recorte.') +
     `<div class="filters">
       <label class="field"><span>De</span><input type="date" data-de value="${filtros.de}"></label>
       <label class="field"><span>Até</span><input type="date" data-ate value="${filtros.ate}"></label>
@@ -986,25 +1021,98 @@ export async function viewUsuarios(root) {
    AUDITORIA
    ============================================================ */
 export async function viewAuditoria(root) {
-  let dados = [], busca = '';
-  root.innerHTML = head('Auditoria', 'Login, CRUD, estornos, repasses, fechamentos, importações, backups e LGPD.') +
-    `<div class="filters"><div class="search grow">${icon('search')}<input placeholder="Buscar por usuário, ação, entidade ou detalhe" data-busca></div></div>
+  let dados = [];
+  let total = 0;
+  let filtros = { busca: '', acao: '', entidade: '', de: '', ate: '' };
+  root.innerHTML = head('Auditoria', 'Trilha encadeada por hash: alterar um registro antigo quebra a verificação.', `
+      <button class="btn" data-integridade>${icon('shield')} Verificar integridade</button>`) +
+    `<div class="filters">
+       <div class="search grow">${icon('search')}<input placeholder="Buscar usuário, ação, entidade ou detalhe" data-busca></div>
+       <label class="field"><span>Ação</span><input data-acao placeholder="ex.: criar"></label>
+       <label class="field"><span>Entidade</span><input data-entidade placeholder="ex.: lancamentos"></label>
+       <label class="field"><span>De</span><input type="date" data-de></label>
+       <label class="field"><span>Até</span><input type="date" data-ate></label>
+     </div>
+     <div class="notice info" data-aviso hidden></div>
      <div class="card tight" data-lista>${loadingBox()}</div>`;
   const lista = root.querySelector('[data-lista]');
-  const render = () => {
-    const termo = busca.toLowerCase();
-    const rows = dados.filter(a => !termo || [a.usuario_nome, a.acao, a.entidade, a.entidade_id, a.detalhe, a.ip].some(v => String(v || '').toLowerCase().includes(termo)));
-    lista.innerHTML = tableHtml([
-      { label: 'Quando', render: a => esc((a.criado_em || '').replace('T', ' ').slice(0, 16)) },
-      { label: 'Usuário', render: a => esc(a.usuario_nome || 'sistema') },
-      { label: 'Ação', render: a => badge(a.acao, 'lavender') },
-      { label: 'Entidade', render: a => `${esc(a.entidade)}${a.entidade_id ? ` #${esc(a.entidade_id)}` : ''}` },
-      { label: 'Detalhe', render: a => `<span class="small muted">${esc(String(a.detalhe || '—').slice(0, 160))}</span>` },
-      { label: 'IP', render: a => esc(a.ip || '—') },
-    ], rows);
+  const aviso = root.querySelector('[data-aviso]');
+
+  const abrirDetalhe = async (id) => {
+    try {
+      const a = await api(`/auditoria/${id}`);
+      openModal({
+        titulo: `Auditoria #${a.id}`, subtitulo: `${a.usuario_nome || 'sistema'} · ${a.criado_em}`, wide: true,
+        corpo: `<div class="grid cols-2">
+          <div class="card"><div class="card-body"><dl class="dl">
+            <dt>Ação</dt><dd>${badge(a.acao, 'lavender')}</dd>
+            <dt>Entidade</dt><dd>${esc(a.entidade)}${a.entidade_id ? ` #${esc(a.entidade_id)}` : ''}</dd>
+            <dt>Usuário</dt><dd>${esc(a.usuario_nome || 'sistema')}</dd>
+            <dt>IP</dt><dd>${esc(a.ip || '—')}</dd>
+            <dt>Quando</dt><dd>${esc(a.criado_em)}</dd>
+          </dl></div></div>
+          <div class="card"><div class="card-body"><dl class="dl">
+            <dt>Hash</dt><dd class="mono small" style="word-break:break-all">${esc(a.hash || '—')}</dd>
+            <dt>Hash anterior</dt><dd class="mono small" style="word-break:break-all">${esc(a.hash_anterior || '—')}</dd>
+          </dl></div></div>
+        </div>
+        ${a.alteracoes?.length ? `<div class="card mt-2"><div class="card-head"><h3>Alterações</h3></div><div class="card-body">${tableHtml([
+          { label: 'Campo', render: d => esc(d.campo) },
+          { label: 'Antes', render: d => `<span class="small muted">${esc(JSON.stringify(d.antes))}</span>` },
+          { label: 'Depois', render: d => `<span class="small">${esc(JSON.stringify(d.depois))}</span>` },
+        ], a.alteracoes)}</div></div>` : ''}
+        <div class="card mt-2"><div class="card-head"><h3>Detalhe bruto</h3></div><div class="card-body"><pre class="mono small" style="white-space:pre-wrap;word-break:break-word">${esc(a.detalhe || '—')}</pre></div></div>`,
+        rodape: '<button class="btn" data-close>Fechar</button>',
+      });
+    } catch (e) { toast(e.message, 'err'); }
   };
-  try { dados = await api('/auditoria?limite=500'); render(); } catch (e) { lista.innerHTML = erroBox(e); }
-  root.querySelector('[data-busca]').addEventListener('input', (e) => { busca = e.target.value; render(); });
+
+  const carregar = async () => {
+    lista.innerHTML = loadingBox();
+    try {
+      const qs = new URLSearchParams({ envelope: '1', limite: '500' });
+      for (const [k, v] of Object.entries(filtros)) if (v) qs.set(k, v);
+      const r = await api(`/auditoria?${qs}`);
+      dados = r.itens;
+      total = r.total;
+      aviso.hidden = total <= dados.length;
+      if (total > dados.length) aviso.textContent = `Mostrando ${dados.length} de ${total} registros. Refine os filtros para ver os demais.`;
+      lista.innerHTML = tableHtml([
+        { label: 'Quando', render: a => esc((a.criado_em || '').replace('T', ' ').slice(0, 16)) },
+        { label: 'Usuário', render: a => esc(a.usuario_nome || 'sistema') },
+        { label: 'Ação', render: a => badge(a.acao, 'lavender') },
+        { label: 'Entidade', render: a => `${esc(a.entidade)}${a.entidade_id ? ` #${esc(a.entidade_id)}` : ''}` },
+        { label: 'Detalhe', render: a => `<span class="small muted">${esc(String(a.detalhe || '—').slice(0, 140))}</span>` },
+        { label: 'IP', render: a => esc(a.ip || '—') },
+        { label: 'Ações', acao: a => `<button class="icon-btn" data-ver="${a.id}" title="Detalhe">${icon('eye')}</button>` },
+      ], dados);
+      lista.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => abrirDetalhe(Number(b.dataset.ver)));
+    } catch (e) { lista.innerHTML = erroBox(e); }
+  };
+
+  root.querySelector('[data-integridade]').onclick = async () => {
+    try {
+      const r = await api('/auditoria/integridade');
+      openModal({
+        titulo: 'Integridade da auditoria', narrow: true,
+        corpo: `<div class="notice ${r.ok ? 'info' : ''}" style="${r.ok ? '' : 'border-color:#eccfc9;color:var(--blush-ink)'}">
+          ${r.ok ? `Cadeia íntegra: ${r.total} registro(s) verificados.` : `Divergência encontrada no registro #${r.problema?.id}: ${esc(r.problema?.motivo || '')}`}
+        </div>
+        <p class="small muted mt-2">Último hash: <span class="mono" style="word-break:break-all">${esc(r.ultimo_hash || '—')}</span></p>`,
+        rodape: '<button class="btn" data-close>Fechar</button>',
+      });
+    } catch (e) { toast(e.message, 'err'); }
+  };
+
+  const ligar = () => {
+    root.querySelector('[data-busca]').addEventListener('input', (e) => { filtros.busca = e.target.value; clearTimeout(window.__audT); window.__audT = setTimeout(carregar, 350); });
+    root.querySelector('[data-acao]').addEventListener('input', (e) => { filtros.acao = e.target.value; clearTimeout(window.__audA); window.__audA = setTimeout(carregar, 350); });
+    root.querySelector('[data-entidade]').addEventListener('input', (e) => { filtros.entidade = e.target.value; clearTimeout(window.__audE); window.__audE = setTimeout(carregar, 350); });
+    root.querySelector('[data-de]').onchange = (e) => { filtros.de = e.target.value; carregar(); };
+    root.querySelector('[data-ate]').onchange = (e) => { filtros.ate = e.target.value; carregar(); };
+  };
+  ligar();
+  await carregar();
 }
 
 /* ============================================================
@@ -1217,7 +1325,8 @@ export async function viewLGPD(root) {
         <dt>Retenção financeira</dt><dd>${esc(cfg('lgpd_retencao_financeira_anos', '5'))} anos</dd>
         <dt>Retenção de logs</dt><dd>${esc(cfg('lgpd_retencao_logs_dias', '365'))} dias</dd>
         <dt>CPF mascarado para consulta</dt><dd>${cfg('mascarar_cpf_consulta', '1') === '1' ? 'Sim' : 'Não'}</dd>
-      </dl></div></div>`;
+      </dl></div></div>
+    <div class="card mt-2" data-inventario>${loadingBox()}</div>`;
   const sel = root.querySelector('[data-id]');
   const renderSel = () => {
     const lista = tipo === 'proprietario' ? props : inqs;
@@ -1227,6 +1336,17 @@ export async function viewLGPD(root) {
     [props, inqs] = await Promise.all([api('/proprietarios'), api('/inquilinos')]);
     renderSel();
   } catch (e) { toast(e.message, 'err'); }
+  try {
+    const inv = await api('/lgpd/inventario');
+    root.querySelector('[data-inventario]').innerHTML = `<div class="card-head"><div><h2>Inventário de dados</h2><p>O que é coletado, para quê, por quanto tempo e quantos registros existem.</p></div></div>
+      <div class="card-body">${tableHtml([
+        { label: 'Categoria', render: c => `<strong>${esc(c.categoria)}</strong><span class="sub">${esc(c.dados)}</span>` },
+        { label: 'Base legal', render: c => esc(c.base) },
+        { label: 'Retenção', render: c => esc(c.retencao) },
+        { label: 'Registros', num: true, render: c => c.registros == null ? '—' : String(c.registros) },
+      ], inv.categorias)}
+      <p class="small muted mt-2">${esc(inv.observacao)} Encarregado: ${esc(inv.encarregado.nome || 'não configurado')}${inv.encarregado.email ? ' · ' + esc(inv.encarregado.email) : ''}.</p></div>`;
+  } catch (e) { root.querySelector('[data-inventario]').innerHTML = erroBox(e); }
   root.querySelector('[data-tipo]').onchange = (e) => { tipo = e.target.value; renderSel(); };
   root.querySelector('[data-exportar]').onclick = () => {
     const id = sel.value; if (!id) return toast('Escolha o titular.', 'err');
@@ -1262,6 +1382,13 @@ export async function viewManutencao(root) {
          <div class="card-body"><div class="notice danger">Usuários e configurações permanecem. Um backup do banco é criado em <code>data/backups/</code> antes da operação.</div>
          <button class="btn danger mt-2" data-zerar>Zerar dados</button></div></div>
      </div>
+     <div class="card mt-2"><div class="card-head"><div><h2>Backup e restauração</h2><p>Snapshots locais, verificação de integridade e ensaio real de restauração.</p></div><div class="section-actions">
+         <button class="btn" data-snapshot>${icon('download')} Criar snapshot</button>
+         <button class="btn soft" data-integridade>${icon('shield')} Verificar integridade</button>
+       </div></div>
+       <div class="card-body" data-backup-status>${loadingBox()}</div></div>
+     <div class="card mt-2"><div class="card-head"><div><h2>Retenção e privacidade</h2><p>Expurgo de logs e comunicações antigos conforme os prazos configurados.</p></div></div>
+       <div class="card-body" data-retencao>${loadingBox()}</div></div>
      <div class="card mt-2"><div class="card-head"><div><h2>Instância de demonstração separada</h2><p>Rode <code>npm run demo:servir</code> para apresentar em outra porta sem tocar na produção.</p></div></div>
        <div class="card-body"><p class="small muted">Banco em <code>data-demo/</code>, porta 3009. Pode rodar ao mesmo tempo que o sistema principal.</p></div></div>`;
   const carregar = async () => {
@@ -1271,6 +1398,61 @@ export async function viewManutencao(root) {
       root.querySelector('[data-status]').innerHTML = ['proprietarios', 'imoveis', 'contratos', 'lancamentos', 'cobrancas', 'documentos']
         .map(t => stat(t, String(c[t] ?? 0))).join('');
     } catch (e) { root.querySelector('[data-status]').innerHTML = erroBox(e); }
+    try {
+      const s = await api('/manutencao/snapshots');
+      root.querySelector('[data-backup-status]').innerHTML = `
+        <div class="kpis">
+          ${stat('Snapshots', String(s.itens.length))}
+          ${stat('Retenção', `${s.retencao_dias} dias`)}
+          ${stat('Último backup', esc(cfg('ultimo_backup', 'nunca')))}
+        </div>
+        ${s.itens.length ? tableHtml([
+          { label: 'Arquivo', render: x => `<span class="mono small">${esc(x.nome)}</span>` },
+          { label: 'Tamanho', num: true, render: x => `${(x.bytes / 1024 / 1024).toFixed(1)} MB` },
+          { label: 'Criado em', render: x => esc((x.criado_em || '').replace('T', ' ').slice(0, 16)) },
+        ], s.itens.slice(0, 10)) : '<p class="small muted">Nenhum snapshot local ainda. O sistema cria um antes de operações destrutivas.</p>'}
+        <p class="small muted mt-2">O ensaio de restauração abre uma cópia do banco, roda <code>integrity_check</code> e compara as contagens de todas as tabelas.</p>`;
+    } catch (e) { root.querySelector('[data-backup-status]').innerHTML = erroBox(e); }
+    try {
+      const r = await api('/manutencao/retencao');
+      root.querySelector('[data-retencao]').innerHTML = `<div class="kpis">
+        ${stat('Logs além do prazo', String(r.auditoria))}
+        ${stat('Comunicações além do prazo', String(r.comunicacoes))}
+        ${stat('Resets expirados', String(r.password_resets))}
+      </div>
+      <p class="small muted mt-2">Auditoria até ${esc(r.limites.auditoria)}; comunicações até ${esc(r.limites.comunicacoes)}. O expurgo cria backup, remove os registros e reencadeia a trilha de auditoria.</p>
+      <button class="btn danger mt-2" data-expurgar>Expurgar agora</button>`;
+      root.querySelector('[data-expurgar]').onclick = async () => {
+        if (!await confirmarTexto({ titulo: 'Expurgar retenção', mensagem: 'Os registros além do prazo serão removidos após um backup. A trilha de auditoria será reencadeada.', palavra: 'RETENCAO', textoBotao: 'Expurgar' })) return;
+        try { const x = await api('/manutencao/retencao', { method: 'POST', body: { confirmacao: 'RETENCAO' } }); toast(`${x.auditoria + x.comunicacoes} registro(s) expurgados.`); carregar(); } catch (e) { toast(e.message, 'err'); }
+      };
+    } catch (e) { root.querySelector('[data-retencao]').innerHTML = erroBox(e); }
+  };
+  root.querySelector('[data-snapshot]').onclick = async () => {
+    try { const r = await api('/manutencao/snapshots', { method: 'POST', body: {} }); toast(`Snapshot ${r.arquivo} criado.`); carregar(); } catch (e) { toast(e.message, 'err'); }
+  };
+  root.querySelector('[data-integridade]').onclick = async () => {
+    try {
+      const r = await api('/backup/verificar');
+      openModal({
+        titulo: 'Ensaio de restauração', wide: true,
+        corpo: `<div class="notice ${r.ok ? 'info' : ''}" style="${r.ok ? '' : 'border-color:#eccfc9;color:var(--blush-ink)'}">
+          ${r.ok ? 'Backup íntegro e contagens conferem com a base viva.' : 'Falha no ensaio: verifique as divergências abaixo.'}
+        </div>
+        <dl class="dl mt-2">
+          <dt>Duração</dt><dd>${r.duracao_ms} ms</dd>
+          <dt>Banco</dt><dd>${r.integridade?.ok ? 'integrity_check ok' : 'falhou'}</dd>
+          <dt>Chaves estrangeiras</dt><dd>${(r.integridade?.foreign_keys || []).length} problema(s)</dd>
+          <dt>Documentos</dt><dd>${r.documentos_arquivos} arquivo(s) · ${(r.documentos_bytes / 1024 / 1024).toFixed(1)} MB</dd>
+        </dl>
+        ${(r.divergencias || []).length ? tableHtml([
+          { label: 'Tabela', render: d => esc(d.tabela) },
+          { label: 'Atual', num: true, render: d => String(d.atual ?? '—') },
+          { label: 'Backup', num: true, render: d => String(d.backup ?? '—') },
+        ], r.divergencias) : '<p class="small muted">Todas as contagens conferem.</p>'}`,
+        rodape: '<button class="btn" data-close>Fechar</button>',
+      });
+    } catch (e) { toast(e.message, 'err'); }
   };
   root.querySelector('[data-demo]').onclick = async () => {
     if (!await confirmarTexto({ titulo: 'Carregar demonstração', mensagem: 'Isto substitui os dados operacionais pelo exemplo de 12 meses. Um backup prévio será criado.', palavra: 'DEMO', textoBotao: 'Carregar demonstração' })) return;
@@ -1529,10 +1711,12 @@ export async function viewComissoes(root, params) {
       { label: 'Comissão', num: true, render: c => `<strong>${brl(c.valor_centavos)}</strong>` },
       { label: 'Status', render: c => badge(c.status_label, c.status === 'paga' ? 'sage' : c.status === 'cancelada' ? 'plain' : 'butter') },
       { label: 'Ações', acao: c => `
+        <button class="icon-btn" data-ver="${c.id}" title="Detalhe">${icon('eye')}</button>
         ${podeFinanceiro() && c.status === 'prevista' ? `<button class="icon-btn" data-liberar="${c.id}" title="Liberar">${icon('check')}</button>` : ''}
         ${podeFinanceiro() && (c.status === 'prevista' || c.status === 'liberada') ? `<button class="icon-btn" data-pagar="${c.id}" title="Pagar">${icon('send')}</button>` : ''}
         ${podeFinanceiro() && (c.status === 'prevista' || c.status === 'liberada') ? `<button class="icon-btn" data-cancelar="${c.id}" title="Cancelar">${icon('x')}</button>` : ''}` },
     ], lista);
+    container.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => abrirDetalhe(Number(b.dataset.ver)));
     container.querySelectorAll('[data-liberar]').forEach(b => b.onclick = async () => {
       try { await api(`/comissoes/${b.dataset.liberar}/status`, { method: 'POST', body: { status: 'liberada' } }); toast('Comissão liberada.'); carregar(); } catch (e) { toast(e.message, 'err'); }
     });
@@ -1561,6 +1745,165 @@ export async function viewComissoes(root, params) {
   root.querySelector('[data-status]').onchange = (e) => { status = e.target.value; carregar(); };
   root.querySelector('[data-comp]').onchange = (e) => { competencia = e.target.value; carregar(); };
   root.querySelector('[data-nova]')?.addEventListener('click', abrirNova);
+  const abrirDetalhe = async (id) => {
+    try {
+      const c = await api(`/comissoes/${id}`);
+      openModal({
+        titulo: 'Comissão', subtitulo: `${c.corretor} · ${compBR(c.competencia)}`, wide: true,
+        corpo: `<div class="grid cols-2">
+          <div class="card"><div class="card-body"><dl class="dl">
+            <dt>Corretor</dt><dd>${esc(c.corretor)}</dd>
+            <dt>Contrato</dt><dd>${esc(c.contrato_codigo || '#' + c.contrato_id)}</dd>
+            <dt>Imóvel</dt><dd>${esc(c.endereco)}${c.numero ? ', ' + esc(c.numero) : ''}</dd>
+            <dt>Inquilino</dt><dd>${esc(c.inquilino_nome)}</dd>
+          </dl></div></div>
+          <div class="card"><div class="card-body"><dl class="dl">
+            <dt>Base</dt><dd>${brl(c.base_centavos)}</dd>
+            <dt>Percentual</dt><dd>${Number(c.pct).toLocaleString('pt-BR')}%</dd>
+            <dt>Valor</dt><dd><strong>${brl(c.valor_centavos)}</strong></dd>
+            <dt>Status</dt><dd>${badge(c.status_label, c.status === 'paga' ? 'sage' : c.status === 'cancelada' ? 'plain' : 'butter')}</dd>
+            <dt>Paga em</dt><dd>${c.paga_em ? dataBR(c.paga_em) : '—'}</dd>
+            <dt>Lançamento</dt><dd>${c.lancamento_id ? `#${c.lancamento_id}` : '—'}</dd>
+          </dl></div></div>
+        </div>
+        <div class="card mt-2"><div class="card-body"><h3>Observações</h3><p>${esc(c.observacoes || '—')}</p></div></div>
+        ${(c.auditoria || []).length ? `<div class="card mt-2"><div class="card-head"><h3>Trilha de auditoria</h3></div><div class="card-body"><div class="timeline">${c.auditoria.map(a => `<div class="tl-item"><span class="tl-dot"></span><div><p><strong>${esc(a.acao)}</strong> · ${esc(a.usuario_nome || 'sistema')}</p><small>${esc((a.criado_em || '').replace('T', ' ').slice(0, 16))}</small></div></div>`).join('')}</div></div></div>` : ''}`,
+        rodape: '<button class="btn" data-close>Fechar</button>',
+      });
+    } catch (e) { toast(e.message, 'err'); }
+  };
+
   root.querySelector('[data-lote]')?.addEventListener('click', abrirLote);
   await carregar();
+}
+
+/* ============================================================
+   ANÁLISES FUTURAS E PROJEÇÕES
+   ============================================================ */
+export async function viewAnalises(root) {
+  let dados = null;
+  let projecaoCenario = null;
+  const cenarioInicial = { meses: 6, inadimplencia_pct: '', vacancia_pct: 0, reajuste_pct: 0, aumento_despesa_pct: 0 };
+  let cenario = { ...cenarioInicial };
+
+  root.innerHTML = head('Análises futuras', 'Projeções, tendência e riscos calculados a partir dos dados já coletados. Nenhum dado sai do servidor.', '') +
+    `<div class="notice info">A projeção usa regressão linear sobre o histórico e uma faixa de erro. O cenário é explícito: você informa inadimplência, vacância, reajuste e pressão de custos.</div>
+     <div data-analise>${loadingBox()}</div>
+     <div class="card mt-2" data-cenario>
+       <div class="card-head"><div><h2>Simular cenário</h2><p>Ajuste as premissas e veja o impacto no caixa dos próximos meses.</p></div></div>
+       <div class="card-body">
+         <div class="filters">
+           <label class="field"><span>Horizonte (meses)</span><input type="number" min="1" max="24" data-c-meses value="6"></label>
+           <label class="field"><span>Inadimplência (%)</span><input type="number" min="0" max="100" step="0.5" data-c-inad placeholder="observada"></label>
+           <label class="field"><span>Vacância extra (%)</span><input type="number" min="0" max="100" step="0.5" data-c-vac value="0"></label>
+           <label class="field"><span>Reajuste médio (%)</span><input type="number" min="-100" max="100" step="0.5" data-c-reaj value="0"></label>
+           <label class="field"><span>Aumento de despesa (%)</span><input type="number" min="-100" max="300" step="0.5" data-c-desp value="0"></label>
+           <div class="field" style="justify-content:flex-end"><button class="btn primary" data-simular>${icon('chart')} Simular</button></div>
+         </div>
+         <div class="form-error mt-2" data-c-erro hidden></div>
+         <div data-c-resultado class="mt-2"></div>
+       </div>
+     </div>`;
+
+  const alvo = root.querySelector('[data-analise]');
+  const resultado = root.querySelector('[data-c-resultado]');
+
+  const riscoBadge = (n) => badge(n === 'alto' ? 'Alto' : n === 'atencao' ? 'Atenção' : 'OK', n === 'alto' ? 'blush' : n === 'atencao' ? 'butter' : 'sage');
+
+  const render = () => {
+    if (!dados) return;
+    const i = dados.indicadores;
+    const t = dados.tendencia;
+    const serieCompleta = [
+      ...dados.serie.map(m => ({ ...m, tipo: 'hist' })),
+      ...dados.projecao.map(p => ({ competencia: p.competencia, rotulo: p.rotulo, receita_centavos: p.receita_centavos, resultado_centavos: p.resultado_centavos, tipo: 'proj' })),
+    ];
+    alvo.innerHTML = `
+      <div class="kpis">
+        ${stat('Receita média', brl(i.receita_media_centavos))}
+        ${stat('Resultado médio', brl(i.resultado_medio_centavos), i.resultado_medio_centavos < 0 ? 'blush-ink' : 'sage-ink')}
+        ${stat('Margem', `${i.margem_pct.toFixed(1)}%`)}
+        ${stat('Inadimplência', `${i.inadimplencia_pct.toFixed(1)}%`, i.inadimplencia_pct >= 10 ? 'blush-ink' : '')}
+        ${stat('Ocupação', `${i.ocupacao_pct.toFixed(0)}%`)}
+        ${stat('Meses de caixa', i.meses_de_caixa == null ? '—' : String(i.meses_de_caixa))}
+      </div>
+      <div class="grid cols-2 mt-2">
+        <div class="card"><div class="card-body">
+          <h3>Tendência</h3>
+          <p class="small muted">Últimos ${dados.periodo.meses} meses · confiança ${esc(t.confianca)} (R² ${t.r2})</p>
+          <dl class="dl">
+            <dt>Receita</dt><dd>${badge(t.receita, t.receita === 'alta' ? 'sage' : t.receita === 'queda' ? 'blush' : 'plain')} <span class="sub">${brl(t.inclinacao_receita_centavos_mes)}/mês</span></dd>
+            <dt>Resultado</dt><dd>${badge(t.resultado, t.resultado === 'alta' ? 'sage' : t.resultado === 'queda' ? 'blush' : 'plain')} <span class="sub">${brl(t.inclinacao_resultado_centavos_mes)}/mês</span></dd>
+            <dt>Variação trimestral</dt><dd>${i.variacao_trimestral_pct}%</dd>
+            <dt>Maior proprietário</dt><dd>${esc(i.maior_proprietario || '—')} · ${i.concentracao_maior_proprietario_pct}%</dd>
+          </dl>
+        </div></div>
+        <div class="card"><div class="card-body">
+          <h3>Riscos</h3>
+          ${dados.riscos.map(r => `<div class="doc"><div class="doc-ico">${icon('shield')}</div><div class="doc-meta"><strong>${riscoBadge(r.nivel)} ${esc(r.titulo)}</strong><small>${esc(r.descricao)}</small><small class="muted">Ação: ${esc(r.acao)}</small></div></div>`).join('')}
+        </div></div>
+      </div>
+      <div class="card mt-2"><div class="card-head"><div><h2>Histórico e projeção</h2><p>Receita da imobiliária por competência — barras claras são projeção.</p></div></div>
+        <div class="card-body">
+          ${barChart({
+            labels: serieCompleta.map(m => m.rotulo || compBR(m.competencia)),
+            series: [{ nome: 'Receita', valores: serieCompleta.map(m => m.receita_centavos), cor: '#7fa58e' }],
+            formato: brlShort,
+            rotuloEixo: 'Receita mensal',
+          })}
+          ${tableHtml([
+            { label: 'Competência', render: m => `${esc(m.rotulo || compBR(m.competencia))}${m.tipo === 'proj' ? ' <span class="badge sky">projeção</span>' : ''}` },
+            { label: 'Receita', num: true, render: m => brl(m.receita_centavos) },
+            { label: 'Resultado', num: true, render: m => brl(m.resultado_centavos) },
+            { label: 'Aluguéis', num: true, render: m => m.alugueis_centavos == null ? '—' : brl(m.alugueis_centavos) },
+          ], serieCompleta)}
+        </div></div>
+      <div class="card mt-2"><div class="card-head"><div><h2>Recomendações</h2><p>Ações objetivas derivadas dos indicadores.</p></div></div>
+        <div class="card-body"><ul class="list">${dados.recomendacoes.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+        <p class="small muted mt-2">Base: ${dados.base.meses_analisados} meses, ${dados.base.imoveis} imóveis, ${dados.base.cobrancas_vencidas} cobrança(s) vencida(s). ${esc(dados.base.fonte)}</p></div></div>`;
+  };
+
+  const simular = async () => {
+    const err = root.querySelector('[data-c-erro]');
+    err.hidden = true;
+    try {
+      const num = (sel, vazio = null) => {
+        const v = root.querySelector(sel).value;
+        return v === '' ? vazio : Number(v);
+      };
+      cenario = {
+        meses: num('[data-c-meses]', 6),
+        inadimplencia_pct: num('[data-c-inad]', null),
+        vacancia_pct: num('[data-c-vac]', 0),
+        reajuste_pct: num('[data-c-reaj]', 0),
+        aumento_despesa_pct: num('[data-c-desp]', 0),
+      };
+      projecaoCenario = await api('/analises/projecao', { method: 'POST', body: cenario });
+      const p = projecaoCenario;
+      resultado.innerHTML = `<div class="notice info">Premissas: ${p.premissas.meses} meses · inadimplência ${p.premissas.inadimplencia_pct}% · vacância ${p.premissas.vacancia_pct}% · reajuste ${p.premissas.reajuste_pct}% · despesa ${p.premissas.aumento_despesa_pct}%.</div>
+        <div class="kpis mt-2">
+          ${stat('Receita projetada', brl(p.totais.receita_centavos))}
+          ${stat('Despesa projetada', brl(p.totais.despesa_centavos), 'blush-ink')}
+          ${stat('Resultado projetado', brl(p.totais.resultado_centavos), p.totais.resultado_centavos < 0 ? 'blush-ink' : 'sage-ink')}
+          ${stat('Saldo final', brl(p.totais.saldo_final_centavos))}
+        </div>
+        ${tableHtml([
+          { label: 'Competência', render: m => esc(m.rotulo) },
+          { label: 'Receita', num: true, render: m => brl(m.receita_centavos) },
+          { label: 'Despesa', num: true, render: m => brl(m.despesa_centavos) },
+          { label: 'Resultado', num: true, render: m => `<strong style="color:${m.resultado_centavos < 0 ? 'var(--blush-ink)' : 'var(--sage-ink)'}">${brl(m.resultado_centavos)}</strong>` },
+          { label: 'Saldo acumulado', num: true, render: m => brl(m.saldo_acumulado_centavos) },
+        ], p.projecoes)}`;
+      toast('Cenário simulado.');
+    } catch (e) { err.hidden = false; err.textContent = e.message; }
+  };
+
+  try {
+    dados = await api("/analises?meses=12&horizonte=3");
+    render();
+    const inp = root.querySelector("[data-c-inad]");
+    if (inp) inp.placeholder = String(dados.indicadores.inadimplencia_pct);
+  } catch (e) { alvo.innerHTML = erroBox(e); }
+
+  root.querySelector("[data-simular]").onclick = simular;
 }

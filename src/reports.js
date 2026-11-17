@@ -8,7 +8,11 @@ import { construirRelatorioDre } from './dre.js';
 export const RELATORIOS = [
   { id: 'resumo-financeiro', nome: 'Resumo financeiro', descricao: 'Receitas, despesas, repasses e resultado mês a mês.', filtros: ['periodo'], cor: 'sage' },
   { id: 'lancamentos', nome: 'Lançamentos', descricao: 'Todas as entradas e saídas do período, com caixa e status.', filtros: ['periodo', 'proprietario'], cor: 'sky' },
-  { id: 'repasses', nome: 'Repasses', descricao: 'Repasses calculados e pagos por proprietário.', filtros: ['periodo', 'proprietario'], cor: 'lavender' },
+  { id: 'repasses', nome: 'Repasses', descricao: 'Repasses calculados e pagos por proprietário, com composição do cálculo.', filtros: ['periodo', 'proprietario'], cor: 'lavender' },
+  { id: 'cobrancas', nome: 'Cobranças', descricao: 'Cobranças por competência, encargos, baixas e saldo em aberto.', filtros: ['periodo', 'proprietario'], cor: 'blush' },
+  { id: 'fluxo-caixa', nome: 'Fluxo de caixa', descricao: 'Entradas, saídas e saldo mês a mês, separando os dois caixas.', filtros: ['periodo', 'proprietario'], cor: 'mint' },
+  { id: 'comissoes', nome: 'Comissões', descricao: 'Corretagem por contrato, corretor, status e lançamento financeiro.', filtros: ['periodo', 'proprietario'], cor: 'peach' },
+  { id: 'contas', nome: 'Contas a pagar/receber', descricao: 'Compromissos, recorrências, atrasos e baixas no período.', filtros: ['periodo', 'proprietario'], cor: 'sky' },
   { id: 'contratos', nome: 'Carteira de contratos', descricao: 'Vigência, valores, garantias e taxa aplicada.', filtros: ['proprietario'], cor: 'butter' },
   { id: 'inadimplencia', nome: 'Inadimplência', descricao: 'Aluguéis vencidos e não pagos na competência.', filtros: ['competencia'], cor: 'blush' },
   { id: 'proprietarios', nome: 'Proprietários', descricao: 'Cadastro, carteira e totais por proprietário.', filtros: [], cor: 'peach' },
@@ -92,18 +96,21 @@ export function construirRelatorio(tipo, { de, ate, competencia, proprietario_id
         { key: 'data', titulo: 'Data', largura: 9, tipo: 'date' },
         { key: 'competencia', titulo: 'Comp.', largura: 7, tipo: 'text' },
         { key: 'tipo', titulo: 'Tipo', largura: 7, tipo: 'text' },
-        { key: 'categoria', titulo: 'Categoria', largura: 14, tipo: 'text' },
-        { key: 'descricao', titulo: 'Descrição', largura: 20, tipo: 'text' },
-        { key: 'caixa', titulo: 'Caixa', largura: 10, tipo: 'text' },
-        { key: 'proprietario_nome', titulo: 'Proprietário', largura: 13, tipo: 'text' },
-        { key: 'valor_centavos', titulo: 'Valor (R$)', largura: 11, tipo: 'money', align: 'right' },
-        { key: 'status', titulo: 'Status', largura: 9, tipo: 'text' },
+        { key: 'categoria', titulo: 'Categoria', largura: 13, tipo: 'text' },
+        { key: 'descricao', titulo: 'Descrição', largura: 17, tipo: 'text' },
+        { key: 'caixa', titulo: 'Caixa', largura: 9, tipo: 'text' },
+        { key: 'proprietario_nome', titulo: 'Proprietário', largura: 11, tipo: 'text' },
+        { key: 'vinculo', titulo: 'Vínculo', largura: 12, tipo: 'text' },
+        { key: 'valor_centavos', titulo: 'Valor (R$)', largura: 10, tipo: 'money', align: 'right' },
+        { key: 'status', titulo: 'Status', largura: 8, tipo: 'text' },
+        { key: 'criado_por', titulo: 'Criado por', largura: 9, tipo: 'text' },
       ],
       linhas: linhas.map(l => ({
         ...l,
         data: l.data.split('-').reverse().join('/'),
         tipo: l.tipo === 'receita' ? 'Receita' : 'Despesa',
         caixa: l.caixa === 'imobiliaria' ? 'Imobiliária' : 'Proprietários',
+        vinculo: l.repasse_id ? `Repasse #${l.repasse_id}` : l.cobranca_id ? `Cobrança #${l.cobranca_id}` : l.estorno_de_id ? `Estorno de #${l.estorno_de_id}` : l.contrato_codigo || '—',
         valor_centavos: l.status === 'estornado' ? 0 : l.valor_centavos,
       })),
       resumo: [
@@ -327,6 +334,184 @@ export function construirRelatorio(tipo, { de, ate, competencia, proprietario_id
     };
   }
 
+  if (tipo === 'fluxo-caixa') {
+    const serie = serieMensal(de, ate, propId);
+    const linhas = serie.map(m => ({
+      ...m,
+      entradas: m.alugueis + m.taxa + m.outras_imob + m.outras_prop,
+      saidas: m.desp_imob + m.desp_prop + m.repasses,
+      resultado_caixa: (m.alugueis + m.taxa + m.outras_imob + m.outras_prop) - (m.desp_imob + m.desp_prop + m.repasses),
+      mes: m.mes.split('-').reverse().join('/'),
+    }));
+    const tot = linhas.reduce((a, m) => {
+      for (const k of ['alugueis', 'taxa', 'outras_imob', 'outras_prop', 'desp_imob', 'desp_prop', 'repasses', 'entradas', 'saidas', 'resultado_caixa']) a[k] = (a[k] || 0) + m[k];
+      return a;
+    }, {});
+    return {
+      ...base,
+      titulo: 'Fluxo de caixa',
+      subtitulo: `Entradas e saídas por competência · ${de} a ${ate}`,
+      colunas: [
+        { key: 'mes', titulo: 'Competência', largura: 9, tipo: 'text' },
+        { key: 'alugueis', titulo: 'Aluguéis', largura: 11, tipo: 'money', align: 'right' },
+        { key: 'taxa', titulo: 'Taxa admin.', largura: 10, tipo: 'money', align: 'right' },
+        { key: 'outras_imob', titulo: 'Outras rec. imob.', largura: 11, tipo: 'money', align: 'right' },
+        { key: 'desp_imob', titulo: 'Despesas imob.', largura: 11, tipo: 'money', align: 'right' },
+        { key: 'desp_prop', titulo: 'Despesas prop.', largura: 11, tipo: 'money', align: 'right' },
+        { key: 'repasses', titulo: 'Repasses', largura: 11, tipo: 'money', align: 'right' },
+        { key: 'entradas', titulo: 'Entradas', largura: 10, tipo: 'money', align: 'right' },
+        { key: 'saidas', titulo: 'Saídas', largura: 10, tipo: 'money', align: 'right' },
+        { key: 'resultado_caixa', titulo: 'Saldo do mês', largura: 11, tipo: 'money', align: 'right' },
+      ],
+      linhas,
+      resumo: [
+        { rotulo: 'Entradas', valor: money(tot.entradas), bruto: tot.entradas },
+        { rotulo: 'Saídas', valor: money(tot.saidas), bruto: tot.saidas },
+        { rotulo: 'Resultado do caixa', valor: money(tot.resultado_caixa), bruto: tot.resultado_caixa },
+        { rotulo: 'Meses', valor: String(linhas.length), bruto: linhas.length },
+      ],
+    };
+  }
+
+  if (tipo === 'cobrancas') {
+    const linhas = db.prepare(`
+      SELECT c.*, ct.codigo AS contrato_codigo, i.endereco, i.numero, i.complemento,
+             p.nome AS proprietario_nome, q.nome AS inquilino_nome, q.telefone AS inquilino_telefone
+      FROM cobrancas c
+      JOIN contratos ct ON ct.id = c.contrato_id
+      JOIN imoveis i ON i.id = ct.imovel_id
+      JOIN proprietarios p ON p.id = i.proprietario_id
+      JOIN inquilinos q ON q.id = ct.inquilino_id
+      WHERE c.competencia BETWEEN ? AND ?${propId ? ` AND p.id = ${propId}` : ''}
+      ORDER BY c.competencia, p.nome, i.endereco
+    `).all(de, ate).map(c => {
+      const saldo = Math.max((c.valor_original_centavos || 0) + (c.multa_centavos || 0) + (c.juros_centavos || 0) - (c.desconto_centavos || 0) - (c.valor_pago_centavos || 0), 0);
+      return {
+        ...c,
+        imovel: `${c.endereco}${c.numero ? ', ' + c.numero : ''}${c.complemento ? ' - ' + c.complemento : ''}`,
+        vencimento: c.vencimento?.split('-').reverse().join('/'),
+        status_label: c.status === 'pago' ? 'Pago' : c.status === 'cancelado' ? 'Cancelado' : c.status === 'pago_parcial' ? 'Pago parcial' : (c.vencimento && c.vencimento < hojeISO() ? 'Em atraso' : 'Em aberto'),
+        saldo_centavos: saldo,
+      };
+    });
+    const total = linhas.reduce((s, c) => s + c.valor_original_centavos, 0);
+    const pago = linhas.reduce((s, c) => s + c.valor_pago_centavos, 0);
+    const aberto = linhas.reduce((s, c) => s + c.saldo_centavos, 0);
+    return {
+      ...base,
+      titulo: 'Cobranças',
+      subtitulo: `Competências de ${de} a ${ate} · ${linhas.length} cobrança(s)`,
+      colunas: [
+        { key: 'competencia', titulo: 'Comp.', largura: 7, tipo: 'text' },
+        { key: 'contrato_codigo', titulo: 'Contrato', largura: 8, tipo: 'text' },
+        { key: 'imovel', titulo: 'Imóvel', largura: 15, tipo: 'text' },
+        { key: 'inquilino_nome', titulo: 'Inquilino', largura: 13, tipo: 'text' },
+        { key: 'vencimento', titulo: 'Vencimento', largura: 8, tipo: 'date' },
+        { key: 'valor_original_centavos', titulo: 'Original', largura: 9, tipo: 'money', align: 'right' },
+        { key: 'multa_centavos', titulo: 'Multa', largura: 7, tipo: 'money', align: 'right' },
+        { key: 'juros_centavos', titulo: 'Juros', largura: 7, tipo: 'money', align: 'right' },
+        { key: 'desconto_centavos', titulo: 'Desconto', largura: 8, tipo: 'money', align: 'right' },
+        { key: 'valor_pago_centavos', titulo: 'Pago', largura: 8, tipo: 'money', align: 'right' },
+        { key: 'saldo_centavos', titulo: 'Saldo', largura: 8, tipo: 'money', align: 'right' },
+        { key: 'status_label', titulo: 'Status', largura: 9, tipo: 'text' },
+      ],
+      linhas,
+      resumo: [
+        { rotulo: 'Cobranças', valor: String(linhas.length), bruto: linhas.length },
+        { rotulo: 'Valor original', valor: money(total), bruto: total },
+        { rotulo: 'Recebido', valor: money(pago), bruto: pago },
+        { rotulo: 'Saldo em aberto', valor: money(aberto), bruto: aberto },
+      ],
+    };
+  }
+
+  if (tipo === 'comissoes') {
+    const linhas = db.prepare(`
+      SELECT cm.*, ct.codigo AS contrato_codigo, i.endereco, i.numero, p.nome AS proprietario_nome, q.nome AS inquilino_nome
+      FROM comissoes cm
+      JOIN contratos ct ON ct.id = cm.contrato_id
+      JOIN imoveis i ON i.id = ct.imovel_id
+      JOIN proprietarios p ON p.id = i.proprietario_id
+      JOIN inquilinos q ON q.id = ct.inquilino_id
+      WHERE cm.competencia BETWEEN ? AND ?${propId ? ` AND p.id = ${propId}` : ''}
+      ORDER BY cm.competencia, cm.corretor
+    `).all(de, ate);
+    const total = linhas.reduce((s, c) => s + c.valor_centavos, 0);
+    const pagas = linhas.filter(c => c.status === 'paga').reduce((s, c) => s + c.valor_centavos, 0);
+    const label = { prevista: 'Prevista', liberada: 'Liberada', paga: 'Paga', cancelada: 'Cancelada' };
+    return {
+      ...base,
+      titulo: 'Comissões de corretagem',
+      subtitulo: `Competências de ${de} a ${ate}`,
+      colunas: [
+        { key: 'competencia', titulo: 'Comp.', largura: 7, tipo: 'text' },
+        { key: 'corretor', titulo: 'Corretor', largura: 14, tipo: 'text' },
+        { key: 'contrato_codigo', titulo: 'Contrato', largura: 8, tipo: 'text' },
+        { key: 'imovel', titulo: 'Imóvel', largura: 17, tipo: 'text' },
+        { key: 'inquilino_nome', titulo: 'Inquilino', largura: 13, tipo: 'text' },
+        { key: 'base_centavos', titulo: 'Base', largura: 10, tipo: 'money', align: 'right' },
+        { key: 'pct', titulo: '%', largura: 6, tipo: 'pct', align: 'right' },
+        { key: 'valor_centavos', titulo: 'Comissão', largura: 10, tipo: 'money', align: 'right' },
+        { key: 'status_label', titulo: 'Status', largura: 8, tipo: 'text' },
+      ],
+      linhas: linhas.map(c => ({
+        ...c,
+        imovel: `${c.endereco}${c.numero ? ', ' + c.numero : ''}`,
+        status_label: label[c.status] || c.status,
+      })),
+      resumo: [
+        { rotulo: 'Comissões', valor: String(linhas.length), bruto: linhas.length },
+        { rotulo: 'Total', valor: money(total), bruto: total },
+        { rotulo: 'Pagas', valor: money(pagas), bruto: pagas },
+        { rotulo: 'Pendentes', valor: money(total - pagas), bruto: total - pagas },
+      ],
+    };
+  }
+
+  if (tipo === 'contas') {
+    const linhas = db.prepare(`
+      SELECT c.*, p.nome AS proprietario_nome, i.endereco AS imovel_endereco
+      FROM contas c
+      LEFT JOIN proprietarios p ON p.id = c.proprietario_id
+      LEFT JOIN imoveis i ON i.id = c.imovel_id
+      WHERE c.competencia BETWEEN ? AND ?${propId ? ` AND c.proprietario_id = ${propId}` : ''}
+      ORDER BY c.vencimento, c.id
+    `).all(de, ate);
+    const aPagar = linhas.filter(c => c.tipo === 'pagar' && c.status === 'aberta').reduce((s, c) => s + c.valor_centavos, 0);
+    const aReceber = linhas.filter(c => c.tipo === 'receber' && c.status === 'aberta').reduce((s, c) => s + c.valor_centavos, 0);
+    const baixadas = linhas.filter(c => c.status === 'paga').reduce((s, c) => s + (c.pago_centavos || c.valor_centavos), 0);
+    const hoje = hojeISO();
+    return {
+      ...base,
+      titulo: 'Contas a pagar e a receber',
+      subtitulo: `Competências de ${de} a ${ate}`,
+      colunas: [
+        { key: 'vencimento', titulo: 'Vencimento', largura: 9, tipo: 'date' },
+        { key: 'tipo', titulo: 'Tipo', largura: 7, tipo: 'text' },
+        { key: 'descricao', titulo: 'Descrição', largura: 18, tipo: 'text' },
+        { key: 'categoria', titulo: 'Categoria', largura: 11, tipo: 'text' },
+        { key: 'fornecedor', titulo: 'Fornecedor', largura: 12, tipo: 'text' },
+        { key: 'valor_centavos', titulo: 'Valor', largura: 10, tipo: 'money', align: 'right' },
+        { key: 'pago_centavos', titulo: 'Baixado', largura: 10, tipo: 'money', align: 'right' },
+        { key: 'status_label', titulo: 'Status', largura: 9, tipo: 'text' },
+        { key: 'atraso', titulo: 'Atraso (dias)', largura: 8, tipo: 'int', align: 'right' },
+      ],
+      linhas: linhas.map(c => ({
+        ...c,
+        vencimento: c.vencimento?.split('-').reverse().join('/'),
+        tipo: c.tipo === 'pagar' ? 'A pagar' : 'A receber',
+        status_label: c.status === 'aberta' ? (c.vencimento < hoje ? 'Vencida' : 'Em aberto') : c.status === 'paga' ? 'Baixada' : 'Cancelada',
+        atraso: c.status === 'aberta' && c.vencimento < hoje ? Math.round((new Date(hoje) - new Date(c.vencimento)) / 86400000) : 0,
+      })),
+      resumo: [
+        { rotulo: 'A pagar (aberto)', valor: money(aPagar), bruto: aPagar },
+        { rotulo: 'A receber (aberto)', valor: money(aReceber), bruto: aReceber },
+        { rotulo: 'Baixado no período', valor: money(baixadas), bruto: baixadas },
+        { rotulo: 'Contas', valor: String(linhas.length), bruto: linhas.length },
+      ],
+    };
+  }
+
   throw Object.assign(new Error('Relatório desconhecido.'), { status: 404 });
 }
 
@@ -395,31 +580,79 @@ export function gerarXLSX(rel) {
       return v == null ? '' : v;
     }));
   }
+  // Linha de totais: somente colunas monetárias somam. Facilita a conferência
+  // no Excel sem depender de tabela dinâmica.
+  if (rel.linhas.length) {
+    const totais = rel.colunas.map((c, i) => {
+      if (i === 0) return 'TOTAL';
+      if (c.tipo === 'money') {
+        const soma = rel.linhas.reduce((s, l) => s + Number(l[c.key] || 0), 0);
+        return soma / 100;
+      }
+      return '';
+    });
+    aoa.push([]);
+    aoa.push(totais);
+  }
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = rel.colunas.map(c => ({ wch: Math.max(10, Math.round((c.largura || 10) * 1.1)) }));
+  ws['!cols'] = rel.colunas.map(c => ({ wch: Math.max(10, Math.round((c.largura || 10) * 1.12)) }));
   const range = XLSX.utils.decode_range(ws['!ref']);
-  for (let R = 7; R <= range.e.r; R++) {
+  const linhaCabecalho = 6; // zero-based: a sétima linha do arquivo
+  const ultimaLinhaDados = 6 + rel.linhas.length;
+  if (rel.linhas.length) {
+    ws['!autofilter'] = {
+      ref: XLSX.utils.encode_range({ s: { r: linhaCabecalho, c: 0 }, e: { r: ultimaLinhaDados, c: rel.colunas.length - 1 } }),
+    };
+  }
+  for (let R = linhaCabecalho; R <= range.e.r; R++) {
     for (let C = 0; C <= range.e.c; C++) {
       const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
       if (!cell) continue;
       const col = rel.colunas[C];
-      if (col?.tipo === 'money') cell.z = '#,##0.00';
+      if (col?.tipo === 'money') cell.z = 'R$ #,##0.00';
       if (col?.tipo === 'pct') cell.z = '0.00';
+      if (R === ultimaLinhaDados + 2) cell.z = col?.tipo === 'money' ? 'R$ #,##0.00' : cell.z;
     }
   }
   XLSX.utils.book_append_sheet(wb, ws, 'Relatório');
 
+  // Resumo com valor numérico separado do texto formatado, para o Excel poder
+  // somar/ordenar sem perder a apresentação em reais.
   const resumoAoa = [
     [rel.titulo],
     ['Resumo'],
+    rel.subtitulo ? [rel.subtitulo] : [],
     [],
-    ...rel.resumo.map(r => [r.rotulo, r.valor]),
+    ['Indicador', 'Valor formatado', 'Valor numérico'],
+    ...rel.resumo.map(r => [r.rotulo, r.valor, typeof r.bruto === 'number' ? r.bruto / 100 : '']),
     [],
     ['Gerado em', rel.gerado_em],
+    ['Fonte', 'Sistema de Gestão Imobiliária'],
   ];
   const ws2 = XLSX.utils.aoa_to_sheet(resumoAoa);
-  ws2['!cols'] = [{ wch: 32 }, { wch: 20 }];
+  ws2['!cols'] = [{ wch: 34 }, { wch: 22 }, { wch: 18 }];
+  const rr = XLSX.utils.decode_range(ws2['!ref']);
+  for (let R = 5; R <= rr.e.r; R++) {
+    const cell = ws2[XLSX.utils.encode_cell({ r: R, c: 2 })];
+    if (cell && typeof cell.v === 'number') cell.z = 'R$ #,##0.00';
+  }
   XLSX.utils.book_append_sheet(wb, ws2, 'Resumo');
+
+  const params = [
+    ['Parâmetros do relatório'],
+    [],
+    ['Empresa', rel.empresa],
+    ['CNPJ', rel.cnpj || '—'],
+    ['Relatório', rel.titulo],
+    ['Período / recorte', rel.subtitulo || '—'],
+    ['Proprietário', rel.filtro_proprietario || 'Todos'],
+    ['Colunas', String(rel.colunas.length)],
+    ['Registros', String(rel.linhas.length)],
+    ['Gerado em', rel.gerado_em],
+  ];
+  const ws3 = XLSX.utils.aoa_to_sheet(params);
+  ws3['!cols'] = [{ wch: 22 }, { wch: 52 }];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Parâmetros');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 

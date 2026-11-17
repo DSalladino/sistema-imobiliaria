@@ -187,6 +187,9 @@ há chamada a LLM ou serviço externo. Qualquer papel com permissão `ler` pode 
 |---|---|---|---|
 | `GET` | `/api/assistente` | autenticado | Contexto curto: competência, cobranças vencidas, alertas urgentes e sugestões |
 | `POST` | `/api/assistente` | autenticado | `{ pergunta }` (até 500 caracteres) |
+| `GET` | `/api/assistente/analise` | autenticado | Atalho para a análise futura |
+| `GET` | `/api/analises?meses=&horizonte=` | autenticado | Tendência, riscos, recomendações e projeção |
+| `POST` | `/api/analises/projecao` | autenticado | Simula cenário com `{ meses, inadimplencia_pct, vacancia_pct, reajuste_pct, aumento_despesa_pct }` |
 
 Resposta:
 
@@ -206,6 +209,22 @@ repasses, caixa/saldos, contas e previsão, contratos a vencer, reajustes,
 ocupação, rentabilidade por imóvel (DRE), comissões, ajuda por rotina, navegação
 e busca por nome de proprietário, inquilino, imóvel ou código de contrato.
 Quando não entende, devolve o resumo executivo em vez de inventar dados.
+
+## Análises futuras
+
+`GET /api/analises` devolve `indicadores`, `tendencia`, `serie`, `projecao`,
+`riscos`, `recomendacoes`, `base` e `cenario`. A projeção é uma regressão linear
+com faixa de erro (`faixa_min_centavos`/`faixa_max_centavos`) e nível de
+confiança (`alta`, `media`, `baixa`). `POST /api/analises/projecao` recalcula o
+caixa com as premissas informadas e devolve `premissas`, `projecoes` e `totais`.
+
+## Auditoria
+
+| Método | Rota | Acesso | Descrição |
+|---|---|---|---|
+| `GET` | `/api/auditoria` | admin | Filtros `usuario`, `acao`, `entidade`, `entidade_id`, `de`, `ate`, `busca`, `limite`, `offset`, `envelope=1` |
+| `GET` | `/api/auditoria/integridade` | admin | Recalcula a cadeia de hash e aponta a primeira divergência |
+| `GET` | `/api/auditoria/:id` | admin | Registro + `alteracoes` (diff antes/depois) |
 
 ## Listas e paginação
 
@@ -406,8 +425,9 @@ Limite: 10 MB; extensões `.pdf`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`,
 | Método | Rota | Acesso | Descrição |
 |---|---|---|---|
 | `GET` | `/api/lgpd/titular?tipo=&id=` | admin | Exporta os dados do titular em JSON |
+| `GET` | `/api/lgpd/inventario` | admin | Categorias, base legal, retenção, volume e controles |
 | `POST` | `/api/lgpd/anonimizar` | admin | Anonimiza com confirmação `ANONIMIZAR` |
-| `GET` | `/api/backup/verificar` | admin | Abre o banco exportado e conta registros |
+| `GET` | `/api/backup/verificar` | admin | Cria snapshot, roda `integrity_check` e ensaia a restauração comparando contagens |
 | `GET` | `/api/backup` | admin | ZIP com banco, documentos e chave local |
 
 ## Manutenção
@@ -417,6 +437,11 @@ Limite: 10 MB; extensões `.pdf`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`,
 | `GET` | `/api/manutencao/status` | admin | Contagens e arquivos |
 | `POST` | `/api/manutencao/limpar` | admin | Zera dados operacionais (`ZERAR`) |
 | `POST` | `/api/manutencao/demo` | admin | Recarrega demonstração (`DEMO`) |
+| `GET` | `/api/manutencao/retencao` | admin | Simula o expurgo por retenção |
+| `POST` | `/api/manutencao/retencao` | admin | Expurga com confirmação `RETENCAO`, backup e reencadeamento |
+| `GET` | `/api/manutencao/snapshots` | admin | Lista snapshots locais |
+| `POST` | `/api/manutencao/snapshots` | admin | Cria um snapshot manual |
+| `GET` | `/api/manutencao/integridade` | admin | `integrity_check` do banco e da auditoria |
 
 ## Limitações do contrato
 

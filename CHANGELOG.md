@@ -3,6 +3,28 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e versionamento
 semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
+## [0.10.0] — 2026-11
+
+### Adicionado
+- **Análises futuras** (`src/previsao.js`, `#/analises`, `/api/analises` e `/api/analises/projecao`): regressão linear sobre o histórico, tendência, faixa de erro, riscos da carteira, recomendações e simulador de cenário (inadimplência, vacância, reajuste e pressão de despesa). Tudo calculado no SQLite local.
+- **Assistente com previsão e riscos**: novas intenções para “previsão”, “próximos meses”, “cenário” e “riscos da carteira”.
+- **Auditoria encadeada por hash** (`src/auditoria.js`): cada registro guarda o hash do anterior, permitindo detectar edição direta no banco. Inclui verificação de integridade, filtros com envelope, detalhe com diff antes/depois e reencadeamento após expurgo legal.
+- **Validação real de CPF/CNPJ** (`src/validacao.js`): dígito verificador, normalização e bloqueio de documento duplicado em proprietários e inquilinos (configurável).
+- **Backup com ensaio de restauração** (`src/backup.js` + `scripts/verificar-restauracao.mjs`): snapshot por `VACUUM INTO`, `integrity_check`, `foreign_key_check`, comparação de contagens e limpeza automática por retenção.
+- **Retenção LGPD operacional**: expurgo de logs, comunicações e resets antigos com backup prévio, reencadeamento da auditoria e inventário de dados por categoria/base legal.
+- **Novos relatórios e Excel melhorado**: cobranças, fluxo de caixa, comissões e contas; XLSX com totais, autofiltro, resumo numérico e aba de parâmetros.
+- **Detalhes financeiros**: endpoint e modal de lançamento com vínculos (contrato, cobrança, repasse, estorno), comissão com trilha de auditoria e extrato de repasse já existente.
+- **Sessão com expiração por inatividade** (padrão 12h, configurável) e gravação de último uso.
+- Testes: `validacao`, `auditoria`, `previsao`, `backup` e `seguranca-avancada` (120 testes no total).
+
+### Alterado
+- **Mobile**: campos com 16px (sem zoom no iOS), alvos de toque de 42–46px, modais em folha inferior, respeito a `safe-area`, foco visível, redução de movimento e tabelas que não estouram a tela.
+- **XLSX**: valores monetários com formato `R$ #,##0.00`, linha de TOTAL, autofiltro e aba “Parâmetros”.
+- **Auditoria**: a tela agora filtra por ação/entidade/período, abre o diff e verifica a cadeia.
+- **Manutenção**: painel com snapshots, integridade, ensaio de restauração e expurgo de retenção.
+- **Privacidade**: inventário de dados com categoria, base legal, retenção e volume.
+- Dados de demonstração atualizados para CPF/CNPJ com dígito verificador válido.
+
 ## [0.9.0] — 2026-11
 
 ### Adicionado

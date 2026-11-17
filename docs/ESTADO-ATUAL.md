@@ -3,7 +3,7 @@
 Documento de referência técnica: o que está implementado, como executar, onde
 fica cada módulo e quais pendências permanecem.
 
-> **Versão:** 0.9.0 · **Última revisão:** novembro de 2026
+> **Versão:** 0.10.0 · **Última revisão:** novembro de 2026
 
 ## Stack e execução
 
@@ -47,6 +47,10 @@ src/
   seguranca.js   TOTP, AES do segredo, recovery codes
   email.js       SMTP
   reports.js     CSV, XLSX, PDF
+  previsao.js   análises futuras, regressão, cenários e riscos
+  auditoria.js  cadeia de hash, verificação e diff da trilha
+  backup.js     snapshots, integridade e ensaio de restauração
+  validacao.js  CPF/CNPJ por dígito verificador e duplicidade
   importacao.js  planilhas e modelos
   manutencao.js  limpeza, demo, backup prévio
   auth.js        hash de senha e token
@@ -58,7 +62,9 @@ public/
 tests/
   api.test.mjs, rules.test.mjs, seguranca.test.mjs, features.test.mjs,
   ui.test.mjs, seed.test.mjs, relatorios.test.mjs, conciliacao.test.mjs,
-  analytics.test.mjs
+  analytics.test.mjs, assistente.test.mjs, validacao.test.mjs,
+  auditoria.test.mjs, previsao.test.mjs, backup.test.mjs,
+  seguranca-avancada.test.mjs
 docs/
   README, PRODUTO, FUNCIONALIDADES, ARQUITETURA, MODELO-DE-DADOS, API,
   QUALIDADE, OPERACAO, DECISOES, ESTUDO-DE-CASO, ESTADO-ATUAL,
@@ -98,7 +104,10 @@ aviso de truncamento, cache de configurações, fontes locais, health check real
 desligamento gracioso. A 0.8.1 adicionou a análise de segurança do Pix, a
 validação de chave/tamanho EMV e o txid como dica de conciliação. A 0.9.0 trouxe
 o assistente interno, o novo login, a verificação de ambiente, a proteção contra
-tela em branco e os artefatos de demo online (Docker, Render e Fly.io).
+tela em branco e os artefatos de demo online (Docker, Render e Fly.io). A 0.10.0
+acrescentou análises futuras com cenários, auditoria encadeada por hash, validação
+de CPF/CNPJ, ensaio real de restauração, retenção LGPD, quatro novos relatórios,
+detalhes financeiros, sessão com inatividade e melhorias de mobile.
 
 ## Rotas principais
 
@@ -130,7 +139,7 @@ O contrato completo está em [API.md](API.md).
 
 ## Qualidade
 
-- 84 testes automatizados distribuídos em 11 arquivos.
+- 120 testes automatizados distribuídos em 16 arquivos.
 - CI em Node 22 e 24 (`npm ci`, `npm run deps:check`, `npm run check`,
   `npm test`).
 - Testes de UI renderizam as 22 telas em jsdom com dados reais.
@@ -149,9 +158,10 @@ O contrato completo está em [API.md](API.md).
 4. **PDF/e-mail síncronos:** podem segurar uma requisição por alguns segundos.
 5. **Sem antivírus/criptografia em repouso** nos uploads.
 6. **Sem backup offsite nativo:** depende do cron + rclone do deploy.
-7. **Auditoria sem retenção automática:** o prazo é configurável, mas não há job
-   de expurgo.
-8. **CPF/CNPJ não é validado por dígito verificador**, apenas formatado/mascarado.
+7. **Auditoria com expurgo manual:** a retenção é aplicada por `POST /api/manutencao/retencao`,
+   com backup prévio e reencadeamento; ainda não há agendador interno.
+8. **CPF/CNPJ validado por dígito verificador e duplicidade** na API; a importação
+   em lote continua permissiva para bases legadas (configurável).
 9. **Importação limitada a 5.000 linhas e 60 colunas**, sem processamento em
    streaming.
 10. **Sem observabilidade estruturada:** logs em texto e monitor HTTP externo.
@@ -171,6 +181,7 @@ O contrato completo está em [API.md](API.md).
 ## Próximos passos técnicos
 
 1. Controles de paginação e busca full-text na interface.
+1.1. Antivírus/criptografia em repouso nos uploads e retenção automática agendada.
 2. Lint/formatador e verificação de tipos.
 3. Teste E2E de navegador e acessibilidade automatizada.
 4. Logs estruturados, métricas e alertas.
