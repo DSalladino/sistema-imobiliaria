@@ -37,6 +37,7 @@ import {
 import { pixDaCobranca, pixDoMes, pixConfigurado, configuracaoPix } from './pix.js';
 import { enviarWhatsapp, statusWhatsapp, linkWhatsapp } from './whatsapp.js';
 import { drePorImovel } from './dre.js';
+import { responder as responderAssistente, contextoRapido } from './assistente.js';
 import {
   hojeISO, competenciaAtual, getSetting, getSettingNum, setSetting, calcularRepasse, gerarRepasses,
   pagarRepasse, alertas, resumoDashboard, saldos, mesFechado, exigirMesAberto, brl,
@@ -858,6 +859,20 @@ export async function handleApi(req, res, url, user, ip, body) {
         uploads,
       });
     }
+    if (p === '/config' && m === 'GET') {
+      // Configuração pública mínima para a tela de login: identifica a
+      // demonstração e permite preencher as credenciais de teste sem expor
+      // nada além do que já é público por definição.
+      const demo = process.env.DEMO_MODE === '1' || /(^|[\\/])data-demo([\\/]|$)/.test(DATA_DIR);
+      return json(res, 200, {
+        versao: PKG.version,
+        demo,
+        nome: getSetting('imob_nome', 'Imobiliária'),
+        cadastro: String(getSetting('permitir_cadastro', '1')) === '1',
+        demo_email: demo ? (process.env.DEMO_EMAIL || 'admin@imobiliaria.local') : null,
+        demo_senha: demo ? (process.env.DEMO_SENHA || 'Demo#2026') : null,
+      });
+    }
     if (p === '/login' && m === 'POST') return login(req, res, body, ip);
     if (p === '/login/2fa' && m === 'POST') return login2fa(req, res, body, ip);
 
@@ -1064,6 +1079,21 @@ export async function handleApi(req, res, url, user, ip, body) {
       return json(res, 200, r);
     }
     if (!user) return erro(res, 401, 'Não autenticado.');
+
+    if (p === '/assistente' && m === 'GET') {
+      exigir(user, 'ler');
+      return json(res, 200, contextoRapido());
+    }
+    if (p === '/assistente' && m === 'POST') {
+      exigir(user, 'ler');
+      const pergunta = texto(body.pergunta);
+      if (!pergunta) return erro(res, 400, 'Escreva uma pergunta.');
+      if (pergunta.length > 500) return erro(res, 400, 'Pergunta longa demais (máximo 500 caracteres).');
+      const espera = limitar('ia:' + (user.id || ip), 60, 60 * 1000);
+      if (espera > 0) { res.setHeader('Retry-After', String(espera)); return erro(res, 429, 'Muitas perguntas em pouco tempo. Aguarde um instante.'); }
+      contarTentativa('ia:' + (user.id || ip));
+      return json(res, 200, responderAssistente(pergunta));
+    }
 
     if (p === '/dashboard' && m === 'GET') return json(res, 200, resumoDashboard());
     if (p === '/analytics' && m === 'GET') {

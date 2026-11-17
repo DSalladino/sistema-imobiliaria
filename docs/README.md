@@ -4,7 +4,7 @@ Esta pasta reúne a documentação do **Sistema de Gestão Imobiliária**. O obj
 é permitir que uma pessoa entenda o produto, rode o projeto, avalie as decisões
 técnicas, opere em produção e evolua o código sem depender de conhecimento tácito.
 
-> **Versão documentada:** 0.8.1 · **Última revisão:** novembro de 2026
+> **Versão documentada:** 0.9.0 · **Última revisão:** novembro de 2026
 
 ## Comece por aqui
 
@@ -12,7 +12,7 @@ técnicas, opere em produção e evolua o código sem depender de conhecimento t
 |---|---|
 | **Recrutador, cliente ou visitante do portfólio** | [README principal](../README.md) → [Demonstração](DEMONSTRACAO.md) → [Estudo de caso](ESTUDO-DE-CASO.md) → [Funcionalidades](FUNCIONALIDADES.md) → [Arquitetura](ARQUITETURA.md) |
 | **Desenvolvedor que vai rodar o projeto** | [README principal](../README.md) → [Arquitetura](ARQUITETURA.md) → [Modelo de dados](MODELO-DE-DADOS.md) → [API](API.md) → [Qualidade](QUALIDADE.md) |
-| **Pessoa que vai publicar e operar** | [Publicação](../deploy/README.md) → [Operação](OPERACAO.md) → [Checklist de segurança](checklist-seguranca.md) |
+| **Pessoa que vai publicar e operar** | [Publicação](../deploy/README.md) → [Demo online](DEPLOY-DEMO.md) → [Operação](OPERACAO.md) → [Checklist de segurança](checklist-seguranca.md) |
 | **Revisor de segurança ou LGPD** | [Segurança e vulnerabilidades](SEGURANCA.md) → [Checklist de segurança](checklist-seguranca.md) → [Política de segurança](../SECURITY.md) → [Arquitetura](ARQUITETURA.md) → [Operação](OPERACAO.md) |
 | **Produto / negócio** | [Produto](PRODUTO.md) → [Funcionalidades](FUNCIONALIDADES.md) → [Roadmap](roadmap.md) |
 
@@ -30,6 +30,7 @@ técnicas, opere em produção e evolua o código sem depender de conhecimento t
 | [DECISOES.md](DECISOES.md) | Registro de decisões de arquitetura (ADRs) e trade-offs |
 | [ESTUDO-DE-CASO.md](ESTUDO-DE-CASO.md) | Narrativa do problema, solução, resultados e aprendizados |
 | [DEMONSTRACAO.md](DEMONSTRACAO.md) | Como rodar a demonstração, credenciais, capturas e roteiro do vídeo |
+| [DEPLOY-DEMO.md](DEPLOY-DEMO.md) | Demo online em Render, Fly.io ou Docker, com reset e segurança |
 | [ESTADO-ATUAL.md](ESTADO-ATUAL.md) | Fotografia técnica da versão atual, dívidas e próximos passos |
 | [roadmap.md](roadmap.md) | Prioridades de evolução em fases |
 | [checklist-seguranca.md](checklist-seguranca.md) | Auditoria de 21 pontos com evidências e pendências |

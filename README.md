@@ -15,7 +15,7 @@
   </a>
   <img src="https://img.shields.io/badge/Node.js-22.13%2B-2E4A40?logo=node.js&logoColor=white" alt="Node.js 22.13+">
   <img src="https://img.shields.io/badge/SQLite-node%3Asqlite-5C8571?logo=sqlite&logoColor=white" alt="SQLite">
-  <img src="https://img.shields.io/badge/vers%C3%A3o-0.8.1-C9A87C" alt="Versão 0.8.1">
+  <img src="https://img.shields.io/badge/vers%C3%A3o-0.9.0-C9A87C" alt="Versão 0.9.0">
   <img src="https://img.shields.io/badge/licen%C3%A7a-MIT-2E4A40" alt="Licença MIT">
   <img src="https://img.shields.io/badge/PRs-bem--vindos-5C8571" alt="PRs bem-vindos">
 </p>
@@ -49,7 +49,7 @@ poucos usuários — e prioriza **simplicidade operacional**, **rastreabilidade*
 **baixo custo**. O resultado é um monólito Node.js + SQLite com frontend sem
 build, testes automatizados e documentação de ponta a ponta.
 
-> **Status:** versão 0.8.1, em evolução ativa. O repositório não contém dados
+> **Status:** versão 0.9.0, em evolução ativa. O repositório não contém dados
 > reais; a base de demonstração é separada da produção.
 
 ### Por que este projeto é diferente
@@ -64,6 +64,9 @@ build, testes automatizados e documentação de ponta a ponta.
   régua e pagamento parcial.
 - **Funciona no celular.** Layout responsivo, cartões em vez de tabelas largas e
   gráficos SVG sem biblioteca externa.
+- **Assistente que conhece os números.** Perguntas em português sobre
+  inadimplência, caixa, repasses, contratos e ocupação são respondidas pelo
+  próprio banco, sem enviar dados a serviços externos.
 - **Segurança de verdade.** Sessão server-side, CSRF, CSP, rate limit, 2FA TOTP,
   upload privado, LGPD e backup com verificação de integridade.
 
@@ -87,6 +90,10 @@ A senha é fixa **apenas na base descartável**; em produção não existe senha
 padrão publicada. O roteiro de avaliação, o conteúdo da base de exemplo e as
 instruções para gerar **capturas de tela** e o **vídeo de 90 s** estão em
 [docs/DEMONSTRACAO.md](docs/DEMONSTRACAO.md).
+
+Para divulgar uma demo pública, o repositório traz `render.yaml`, `fly.toml`,
+`Dockerfile` e `docker-compose.yml` prontos, com reset automático e `noindex`.
+Passo a passo em [docs/DEPLOY-DEMO.md](docs/DEPLOY-DEMO.md).
 
 | Painel | Cobranças |
 |---|---|
@@ -113,6 +120,7 @@ instruções para gerar **capturas de tela** e o **vídeo de 90 s** estão em
 | **Relatórios** | Oito relatórios em CSV, XLSX e PDF — incluindo **DRE por imóvel** — com cabeçalho, indicadores e paginação |
 | **Importação** | Modelos de planilha, prévia linha a linha e atualização de registros existentes |
 | **Comunicação** | WhatsApp por link `wa.me` ou API oficial (Cloud API), e e-mail SMTP com modelos, histórico e assinatura |
+| **Assistente** | Perguntas em linguagem natural sobre inadimplência, caixa, repasses, contratos, reajustes, ocupação, comissões e contas — com números e atalhos para a tela certa |
 | **Administração** | Usuários, papéis, auditoria, 2FA, LGPD, backup, manutenção e configurações |
 
 Detalhes de cada fluxo, regras e telas em [docs/FUNCIONALIDADES.md](docs/FUNCIONALIDADES.md).
@@ -143,7 +151,12 @@ npm install
 npm start
 ```
 
-Abra **http://127.0.0.1:3000**.
+Abra **http://localhost:3000**. O servidor escuta em `0.0.0.0` por padrão, então
+também aceita acesso pelo IP da máquina na rede local. Para restringir à própria
+máquina, use `HOST=127.0.0.1 npm start`.
+
+Se algo não abrir, rode `npm run check` (ele valida Node, SQLite e permissão da
+pasta de dados) e consulte [Solução de problemas](#solução-de-problemas).
 
 - **E-mail inicial:** `admin@imobiliaria.local`
 - **Senha:** gerada automaticamente na primeira execução e exibida **uma única
@@ -151,17 +164,9 @@ Abra **http://127.0.0.1:3000**.
 - No primeiro login o sistema **obriga a criação de uma senha própria** (mínimo
   8 caracteres). Não existe senha padrão publicada.
 
-Para abrir no celular na mesma rede:
-
-```bash
-HOST=0.0.0.0 PORT=3000 npm start
-```
-
-No Windows (PowerShell):
-
-```powershell
-$env:HOST="0.0.0.0"; npm start
-```
+Para abrir no celular na mesma rede, use o endereço `Na rede local` mostrado no
+terminal. Se estiver em Docker ou atrás de proxy, mantenha `HOST=0.0.0.0` e
+defina `TRUST_PROXY=1`.
 
 ### Base de demonstração separada
 
@@ -182,7 +187,7 @@ demonstração. O seed **nunca** roda por omissão, mesmo em desenvolvimento.
 |---|---|
 | `npm start` | Sobe a aplicação |
 | `npm run dev` | Sobe com `--watch` |
-| `npm test` | API, regras, interface (jsdom) e seed |
+| `npm test` | 84 testes: API, regras, interface (jsdom), seed, relatórios e assistente |
 | `npm run check` | Verifica a sintaxe de todos os `.js`/`.mjs` |
 | `npm run deps:check` | Confere versão, origem e integrity da dependência `xlsx` (CDN) |
 | `npm run test:coverage` | Testes com cobertura experimental do Node |
@@ -298,6 +303,9 @@ npm test
 - `tests/conciliacao.test.mjs` — OFX, CSV, sugestão, duplicidade, txid e confirmação.
 - `tests/analytics.test.mjs` — série, ocupação, composição, KPIs e cache de settings.
 
+- `tests/assistente.test.mjs` — interpretação de período, resumo, caixa,
+  ocupação, ajuda, busca por nome e inadimplência.
+
 O CI roda em Node 22 e 24. A estratégia e as lacunas estão em
 [docs/QUALIDADE.md](docs/QUALIDADE.md).
 
@@ -319,7 +327,8 @@ Runbook completo em [docs/OPERACAO.md](docs/OPERACAO.md).
 
 O sistema precisa de **um servidor com disco persistente** (Node + SQLite +
 arquivos). Vercel e hospedagem compartilhada não servem. O guia completo está em
-[deploy/README.md](deploy/README.md).
+[deploy/README.md](deploy/README.md). Para uma demo pública, use o passo a passo
+de [docs/DEPLOY-DEMO.md](docs/DEPLOY-DEMO.md) (Render, Fly.io ou Docker).
 
 - **Menor custo com persistência:** VPS pequena (1 GB RAM) ou Oracle Cloud
   Always Free.
@@ -342,7 +351,7 @@ arquivos). Vercel e hospedagem compartilhada não servem. O guia completo está 
 | Variável | Para que serve |
 |---|---|
 | `PORT` | Porta HTTP (padrão 3000) |
-| `HOST` | Interface de escuta (padrão `127.0.0.1`) |
+| `HOST` | Interface de escuta (padrão `0.0.0.0`; use `127.0.0.1` para acesso só local) |
 | `DATA_DIR` | Pasta do banco (padrão `./data`) |
 | `TRUST_PROXY=1` | Usa `X-Forwarded-For`/`X-Forwarded-Proto` atrás de proxy |
 | `APP_SECRET` | Cifra segredos de 2FA e códigos de recuperação |
@@ -353,8 +362,22 @@ arquivos). Vercel e hospedagem compartilhada não servem. O guia completo está 
 | `WHATSAPP_PHONE_ID` | ID do número na Cloud API |
 | `WHATSAPP_API_VERSION` | Versão da Graph API (padrão `v21.0`) |
 | `SEED_DEMO=1` | Carrega demonstração em produção (use com cuidado) |
+| `DEMO_MODE=1` | Ativa a faixa de demo, credenciais de teste e `noindex` |
+| `DEMO_DATA_DIR` | Pasta isolada da demonstração (padrão `./data-demo`) |
+| `DEMO_RESET_HORAS` | Restaura a demo a cada N horas (padrão 6; `0` desliga) |
 
 Sem `SEED_DEMO=1` a base começa sempre vazia, inclusive fora de produção.
+
+### Solução de problemas
+
+| Sintoma | Causa provável | O que fazer |
+|---|---|---|
+| Tela branca/spinner eterno | JavaScript não carregou ou servidor fora do ar | Abra `/api/health`; depois de 12s a própria tela mostra o diagnóstico |
+| `ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite` | Node anterior a 22.13 | Instale o Node 24 LTS (`nvm install 24`) e rode `npm start` |
+| `A porta 3000 já está em uso` | Outra instância rodando | `PORT=3010 npm start` |
+| `EACCES`/`EPERM` na pasta de dados | Permissão de escrita | Use `DATA_DIR` apontando para uma pasta gravável |
+| Abre só em `localhost`, não no celular | `HOST=127.0.0.1` | Use o padrão `0.0.0.0` e o IP mostrado no terminal |
+| Login demo pede troca de senha | Banco criado fora de `npm run demo:servir` | Rode `npm run demo:preparar` antes |
 
 ## Estrutura
 

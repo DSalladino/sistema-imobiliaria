@@ -51,6 +51,7 @@ O cookie `SameSite=Lax` complementa a proteção. Não há token CSRF separado.
 | Login por IP | 10 tentativas / 5 min |
 | 2FA por IP | 10 tentativas / 5 min |
 | API por IP | 600 requisições / min |
+| Assistente por usuário | 60 perguntas / min |
 | Importação por IP | 30 / 10 min |
 | Comunicação por IP | 30 / 10 min |
 | Recuperação de senha por IP | 5 / 15 min |
@@ -66,6 +67,7 @@ reset) recebe **403** em qualquer rota protegida até chamar
 | Método | Rota | Acesso | Descrição |
 |---|---|---|---|
 | `GET` | `/api/health` | público | `{ ok, versao, uptime_s, em, banco, uploads }`; `503` se o banco não responder ou `data/uploads` não for gravável |
+| `GET` | `/api/config` | público | `{ versao, demo, nome, cadastro, demo_email, demo_senha }`; credenciais só são preenchidas no modo demonstração |
 | `POST` | `/api/login` | público | E-mail + senha; devolve usuário ou desafio 2FA |
 | `POST` | `/api/login/2fa` | público | Código TOTP ou de recuperação |
 | `POST` | `/api/logout` | autenticado | Encerra a sessão atual |
@@ -175,6 +177,35 @@ Validações relevantes:
 | `GET` | `/api/settings` | Configurações editáveis |
 | `PUT` | `/api/settings` | Atualiza configurações (admin) |
 | `GET` | `/api/auditoria?limite=200` | Auditoria (admin, máximo 1.000) |
+
+## Assistente interno
+
+Interpreta a pergunta no próprio servidor e responde com dados do SQLite. Não
+há chamada a LLM ou serviço externo. Qualquer papel com permissão `ler` pode usar.
+
+| Método | Rota | Acesso | Descrição |
+|---|---|---|---|
+| `GET` | `/api/assistente` | autenticado | Contexto curto: competência, cobranças vencidas, alertas urgentes e sugestões |
+| `POST` | `/api/assistente` | autenticado | `{ pergunta }` (até 500 caracteres) |
+
+Resposta:
+
+```json
+{
+  "intencao": "inadimplencia",
+  "resposta": "Há 2 cobrança(s) vencida(s)...",
+  "destaques": [{ "rotulo": "Vencido", "valor": "R$ 2.557,36" }],
+  "itens": [{ "titulo": "Carlos Mendes · Rua das Flores, 120", "detalhe": "...", "valor": "R$ 1.843,13", "rota": "#/cobrancas?busca=Carlos%20Mendes" }],
+  "acoes": [{ "rotulo": "Abrir cobranças", "rota": "#/cobrancas" }],
+  "sugestoes": ["Resumo do mês", "Quem está inadimplente?"]
+}
+```
+
+Intenções reconhecidas: resumo executivo, inadimplência, cobranças/recebimentos,
+repasses, caixa/saldos, contas e previsão, contratos a vencer, reajustes,
+ocupação, rentabilidade por imóvel (DRE), comissões, ajuda por rotina, navegação
+e busca por nome de proprietário, inquilino, imóvel ou código de contrato.
+Quando não entende, devolve o resumo executivo em vez de inventar dados.
 
 ## Listas e paginação
 

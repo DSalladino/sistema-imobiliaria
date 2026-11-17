@@ -1,0 +1,42 @@
+# Fly.io — demo com volume persistente.
+# 1) fly launch --no-deploy
+# 2) fly volumes create demo_data --size 1 --region gru
+# 3) fly deploy
+app = "sistema-imobiliaria-demo"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  HOST = "0.0.0.0"
+  PORT = "3009"
+  DEMO_MODE = "1"
+  DEMO_DATA_DIR = "/data"
+  DEMO_RESET_HORAS = "6"
+  DEMO_EMAIL = "admin@imobiliaria.local"
+  DEMO_SENHA = "Demo#2026"
+
+[mounts]
+  source = "demo_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3009
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/api/health"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

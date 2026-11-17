@@ -55,6 +55,14 @@ test('fluxo principal da API', async (t) => {
     assert.equal(data.uploads, 'ok', 'health deve checar a escrita dos uploads');
   });
 
+  await t.test('configuração pública identifica o ambiente', async () => {
+    const { res, data } = await req('/api/config');
+    assert.equal(res.status, 200);
+    assert.equal(data.demo, false);
+    assert.ok(data.versao);
+    assert.equal(data.demo_senha, null, 'fora do demo não expõe credenciais');
+  });
+
   await t.test('rejeita credenciais inválidas', async () => {
     const { res } = await req('/api/login', { method: 'POST', body: { email: 'admin@imobiliaria.local', senha: 'errada' } });
     assert.equal(res.status, 401);
@@ -108,6 +116,21 @@ test('fluxo principal da API', async (t) => {
     const r = await req(`/api/usuarios/${me.data.usuario.id}`, { method: 'PUT', body: { papel: 'operador' } });
     assert.equal(r.res.status, 400);
     assert.match(r.data.erro, /administrador/i);
+  });
+
+  await t.test('assistente responde com dados e exige autenticação', async () => {
+    const semSessao = await fetch(base + '/api/assistente', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ pergunta: 'resumo' }),
+    });
+    assert.equal(semSessao.status, 401);
+    const { res, data } = await req('/api/assistente', { method: 'POST', body: { pergunta: 'quem está inadimplente?' } });
+    assert.equal(res.status, 200);
+    assert.equal(data.intencao, 'inadimplencia');
+    assert.ok(data.resposta);
+    assert.ok(Array.isArray(data.destaques));
+    const vazia = await req('/api/assistente', { method: 'POST', body: { pergunta: '' } });
+    assert.equal(vazia.res.status, 400);
   });
 
   await t.test('CRUD com auditoria e precedência de taxa', async () => {

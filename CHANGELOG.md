@@ -3,6 +3,40 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e versionamento
 semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
+## [0.9.0] — 2026-11
+
+### Adicionado
+- **Assistente interno de gestão** (`src/assistente.js` + painel na interface):
+  responde em português sobre inadimplência, cobranças, repasses, caixa,
+  contratos a vencer, reajustes, ocupação, rentabilidade, comissões, contas e
+  rotinas do sistema. Usa somente o SQLite local, não envia dados para fora e
+  devolve destaques, itens e atalhos para a tela certa. Atalho `Ctrl K`.
+- **Endpoint `POST /api/assistente`** e `GET /api/assistente` (contexto e
+  sugestões), com permissão de leitura, limite de perguntas e teste automatizado.
+- **Modo demonstração detectável**: `GET /api/config`, faixa “Demonstração”,
+  botão “Preencher acesso demo” e credenciais públicas apenas no demo.
+- **Deploy de demo online**: `Dockerfile`, `docker-compose.yml`, `render.yaml`,
+  `fly.toml` e [docs/DEPLOY-DEMO.md](docs/DEPLOY-DEMO.md), com reset automático
+  (`DEMO_RESET_HORAS`) e `X-Robots-Tag: noindex`.
+- **Verificação de ambiente** (`scripts/verificar-ambiente.mjs`) executada antes
+  de `start`, `dev` e das tarefas de demo: valida Node 22.13+, `node:sqlite` e
+  escrita na pasta de dados, com mensagens acionáveis.
+- **Rede de segurança da interface** (`public/boot-guard.js`): se o JavaScript
+  não carregar, o spinner vira um diagnóstico com recarregar e `/api/health`.
+- **Novo login**: painel ilustrado com cenário, cartões de recursos, métricas,
+  revelar senha, estado de carregamento, foco e layout mobile revisado.
+- Testes `tests/assistente.test.mjs` e cobertura de `/api/config` e do assistente
+  na API (84 testes no total).
+
+### Alterado
+- `HOST` padrão passa a ser `0.0.0.0`, permitindo abrir pelo celular na mesma
+  rede, em Docker e em PaaS; para acesso só local use `HOST=127.0.0.1`.
+- `demo-server.js` respeita `PORT` injetada pela plataforma, ativa `DEMO_MODE`,
+  restaura a senha demo no reset e não sobrescreve a porta de produção.
+- `npm start` falha cedo e explica o problema quando a porta está ocupada ou o
+  ambiente é incompatível.
+- Documentação de execução, demonstração, testes e publicação atualizada.
+
 ## [0.8.1] — 2026-11
 
 ### Adicionado

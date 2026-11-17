@@ -16,6 +16,10 @@ O `demo:preparar` sempre recria a base com dados novos; o `demo:servir`
 reaproveita a base existente e só a cria se ainda não houver. Para recomeçar do
 zero, rode `npm run demo:preparar` de novo (ou apague `data-demo/`).
 
+Para colocar a demo online e compartilhar uma URL com o time, use o
+[guia de demo online](DEPLOY-DEMO.md): há configuração pronta para Render,
+Fly.io e Docker, com reset automático e `noindex`.
+
 ### Credenciais de demonstração
 
 | Campo | Valor |
@@ -38,6 +42,8 @@ a senha inicial vem de `ADMIN_SENHA` ou é gerada aleatoriamente e exibida uma
   índices de reajuste distintos e uma **exceção de taxa** aprovada.
 - **12 meses de histórico**: cobranças geradas por competência, pagamentos totais
   e parciais, multa e juros, e repasses calculados e pagos com snapshot da taxa.
+- **Credenciais conhecidas** e botão de preenchimento automático na tela de
+  login, além de um assistente interno para explorar os números sem planilha.
 - **Dois caixas** (imobiliária e proprietários) com lançamentos por competência.
 - Telas de **conciliação** e **documentos** começam vazias de propósito: mostram
   o estado inicial de quem ainda não importou extrato nem anexou arquivos.
@@ -48,18 +54,22 @@ atual — a demonstração nunca “envelhece”.
 
 ## Roteiro de avaliação (10 minutos)
 
-1. **Painel** — KPIs do mês, composição de receitas, ocupação, inadimplência,
+1. **Login** — use “Preencher acesso demo” e observe a faixa de demonstração.
+2. **Painel** — KPIs do mês, composição de receitas, ocupação, inadimplência,
    alertas e atividade recente.
-2. **Contratos** — abra um contrato e veja garantia, reajuste e a regra de taxa
+3. **Assistente** — abra com `Ctrl K` (ou pelo botão no topo) e pergunte
+   “quem está inadimplente?”, “resumo do mês” ou “quais contratos vencem em 90
+   dias?”. As respostas vêm do banco local, com números e atalhos.
+4. **Contratos** — abra um contrato e veja garantia, reajuste e a regra de taxa
    com a justificativa da exceção.
-3. **Cobranças** — filtre por competência, veja o aging e faça uma baixa parcial
+5. **Cobranças** — filtre por competência, veja o aging e faça uma baixa parcial
    para observar multa e juros.
-4. **Conciliação** — importe um OFX/CSV fictício e confirme uma sugestão de
+6. **Conciliação** — importe um OFX/CSV fictício e confirme uma sugestão de
    vínculo (a confirmação é sempre humana).
-5. **Repasses** — abra o extrato de um repasse: taxa aplicada, origem da regra e
+7. **Repasses** — abra o extrato de um repasse: taxa aplicada, origem da regra e
    o cálculo contrato a contrato.
-6. **Relatórios** — exporte o mesmo relatório em CSV, XLSX e PDF.
-7. **Celular** — reduza a janela ou abra no telefone: as tabelas viram cartões.
+8. **Relatórios** — exporte o mesmo relatório em CSV, XLSX e PDF.
+9. **Celular** — reduza a janela ou abra no telefone: as tabelas viram cartões.
 
 ## Capturas de tela
 
@@ -77,6 +87,8 @@ da própria demonstração, para não envelhecerem:
 | ![Relatórios](assets/telas/07-relatorios.png) | ![Alertas](assets/telas/08-alertas.png) |
 | **Painel no celular** | **Cobranças no celular** |
 | ![Painel no celular](assets/telas/09-painel-celular.png) | ![Cobranças no celular](assets/telas/10-cobrancas-celular.png) |
+| **Assistente de gestão** | |
+| ![Assistente respondendo sobre inadimplência](assets/telas/11-assistente.png) | |
 
 Para regerar depois de mudar a interface:
 
@@ -116,7 +128,7 @@ A suíte é pública e roda sem a demonstração no ar:
 ```bash
 npm run check   # sintaxe
 npm run deps:check  # integridade da dependência xlsx de CDN
-npm test        # 72 testes: API, regras, segurança, funcionalidades, interface (jsdom), seed, relatórios, conciliação e analytics
+npm test        # 84 testes: API, regras, segurança, funcionalidades, interface (jsdom), seed, relatórios, conciliação, analytics e assistente
 ```
 
 Ela cobre login e sessão, CSRF, permissões, precedência de taxas, geração e baixa
