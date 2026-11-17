@@ -26,10 +26,10 @@ npm audit
 | `tests/rules.test.mjs` | Precedência de taxas, snapshot do repasse, política de senha, CSV, repasse com contrato encerrado, juros em baixa parcial e importação sem duplicar inquilino |
 | `tests/seguranca.test.mjs` | Vetores do RFC 6238 para TOTP, base32, cifragem AES-256-GCM (ida e volta e adulteração), códigos de recuperação de uso único (v1 e v2), política de senha e hash de token de sessão |
 | `tests/ui.test.mjs` | Renderiza as 22 telas com dados reais em jsdom e verifica conteúdo |
-| `tests/features.test.mjs` | Pix (CRC/EMV), WhatsApp (link e API), contas e recorrência, previsão de caixa, reajuste em lote, rescisão e comissões, DRE por imóvel e geração de CSV |
+| `tests/features.test.mjs` | Pix (CRC/EMV, chave inválida, saldo e txid), WhatsApp (link e API), contas e recorrência, previsão de caixa, reajuste em lote, rescisão e comissões, DRE por imóvel e geração de CSV |
 | `tests/seed.test.mjs` | Primeira execução completa a demonstração com cobranças e repasses |
 | `tests/relatorios.test.mjs` | Construção dos 8 relatórios, CSV (BOM, fórmula, `;`), XLSX relido, PDF com e sem dados, DRE por imóvel |
-| `tests/conciliacao.test.mjs` | Parser OFX, CSV com mapeamento e sugestão, deduplicação por FITID, sugestão de cobrança, confirmação e bloqueio de transação já tratada |
+| `tests/conciliacao.test.mjs` | Parser OFX, CSV com mapeamento e sugestão, deduplicação por FITID, sugestão por valor/data, txid como dica (valor obrigatório), confirmação e bloqueio de transação já tratada |
 | `tests/analytics.test.mjs` | Série mensal, filtro por proprietário, ocupação, composição, ranking, KPIs, período invertido e cache de configurações |
 
 ### O que cada suíte protege
@@ -167,6 +167,9 @@ teste.
 | Atraso ficava escondido atrás do rótulo da régua | `features.test.mjs` / revisão de `statusEfetivo` |
 | Lista truncada sem aviso | `api.test.mjs` (`envelope=1` com total) |
 | Seed automático fora de produção | `seed.test.mjs` com `SEED_DEMO=1` explícito |
+| Chave Pix multibyte gerava BR Code com tamanho inválido | `features.test.mjs` |
+| Txid não era usado na conciliação apesar de exibido na tela | `conciliacao.test.mjs` |
+| Memo forjado podia sugerir cobrança sem valor compatível | `conciliacao.test.mjs` |
 
 ## Padrão para novos testes
 

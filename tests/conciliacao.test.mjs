@@ -11,6 +11,7 @@ process.env.ADMIN_SENHA = 'admin123';
 
 const { db } = await import('../src/db.js');
 const { parseOFX, parseCSV, previewConciliacao, listarPendentes, resumoConciliacao, confirmarConciliacao } = await import('../src/conciliacao.js');
+const { txidDaCobranca } = await import('../src/pix.js');
 
 test.after(() => {
   try { db.close(); } catch {}
@@ -115,4 +116,29 @@ test('valor maior que o saldo não é sugerido como pagamento de cobrança', () 
   assert.ok(pendente);
   // Não existe cobrança em aberto com saldo suficiente para 5.000,00.
   assert.notEqual(pendente.sugestao_tipo, 'cobranca');
+});
+
+test('txid no memo identifica a cobrança mesmo fora da janela de 20 dias', () => {
+  const { cobranca } = cenario();
+  const txid = txidDaCobranca({ id: cobranca, competencia: '2026-03' });
+  const ofx = `<OFX><STMTTRN><DTPOSTED>20260430<TRNAMT>1000.00<FITID>TXID1<MEMO>PIX ${txid}</STMTTRN></OFX>`;
+  previewConciliacao({ arquivo_base64: Buffer.from(ofx).toString('base64'), nome: 'txid.ofx' });
+
+  const pendente = listarPendentes('pendente').find(p => p.fitid === 'TXID1');
+  assert.ok(pendente);
+  assert.equal(pendente.sugestao_tipo, 'cobranca');
+  assert.equal(pendente.sugestao_id, cobranca);
+  assert.match(pendente.sugestao_label, /Txid/);
+});
+
+test('txid no memo não vincula quando o valor não confere', () => {
+  const { cobranca } = cenario();
+  const txid = txidDaCobranca({ id: cobranca, competencia: '2026-03' });
+  const ofx = `<OFX><STMTTRN><DTPOSTED>20260430<TRNAMT>300.00<FITID>TXID2<MEMO>PIX ${txid}</STMTTRN></OFX>`;
+  previewConciliacao({ arquivo_base64: Buffer.from(ofx).toString('base64'), nome: 'txid2.ofx' });
+
+  const pendente = listarPendentes('pendente').find(p => p.fitid === 'TXID2');
+  assert.ok(pendente);
+  assert.ok(!(pendente.sugestao_tipo === 'cobranca' && pendente.sugestao_id === cobranca),
+    'memo é digitado pelo pagador; o valor precisa conferir');
 });

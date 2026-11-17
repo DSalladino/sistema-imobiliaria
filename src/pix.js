@@ -26,7 +26,9 @@ export function crc16(texto) {
 
 function campo(id, valor) {
   const texto = String(valor ?? '');
-  return `${id}${String(texto.length).padStart(2, '0')}${texto}`;
+  // O EMV mede o campo em bytes, não em caracteres. Usar `length` quebrava o
+  // payload quando a chave ou o texto tinha caractere multibyte.
+  return `${id}${String(Buffer.byteLength(texto, 'utf8')).padStart(2, '0')}${texto}`;
 }
 
 /** Nome e cidade no BR Code não aceitam acentos e têm limite de caracteres. */
@@ -55,9 +57,15 @@ export function pixPayload({ chave, nome, cidade, valorCentavos = 0, txid = '***
   if (!chave || !String(chave).trim()) {
     throw Object.assign(new Error('Cadastre a chave Pix em Configurações → Integrações.'), { status: 409 });
   }
+  const chaveLimpa = String(chave).trim();
+  // A chave precisa ser ASCII imprimível e caber no campo 26/01 (máx. 77 bytes).
+  // Sem isso o BR Code sai com tamanho inválido e o banco do pagador recusa.
+  if (!/^[\x20-\x7E]+$/.test(chaveLimpa) || Buffer.byteLength(chaveLimpa, 'utf8') > 77) {
+    throw Object.assign(new Error('Chave Pix inválida: use CPF/CNPJ, e-mail, telefone ou chave aleatória (ASCII, até 77 caracteres).'), { status: 409 });
+  }
   const conta =
     campo('00', 'br.gov.bcb.pix') +
-    campo('01', String(chave).trim()) +
+    campo('01', chaveLimpa) +
     (descricao ? campo('02', textoPix(descricao, 40)) : '');
   let payload =
     campo('00', '01') +
@@ -131,5 +139,15 @@ export function pixDaCobranca(id) {
 export function pixDoMes(competencia) {
   const cobrancas = db.prepare(`SELECT id FROM cobrancas
     WHERE competencia = ? AND status IN ('em_aberto','pago_parcial') ORDER BY vencimento`).all(competencia);
-  return cobrancas.map(c => pixDaCobranca(c.id));
+  const out = [];
+  for (const c of cobrancas) {
+    try {
+      out.push(pixDaCobranca(c.id));
+    } catch (e) {
+      // A cobrança pode ter sido paga/cancelada entre a consulta e a geração.
+      // Uma linha resolvida não deve derrubar a lista inteira.
+      if (e.status !== 409) throw e;
+    }
+  }
+  return out;
 }

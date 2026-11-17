@@ -344,11 +344,16 @@ CSV, deduplicação, sugestão, KPIs e cache).
 ### Pix: o txid determinístico é um problema?
 
 O `txid` é `IMOB<id><competência>`, portanto previsível. Ele **não** é tratado
-como prova de pagamento em nenhum ponto: a conciliação usa valor/data para
-sugerir um vínculo e exige confirmação humana; não há webhook de PSP nem baixa
-automática. O risco residual é de sugestão errada (operacional), não de fraude
-lógica. Se no futuro houver baixa automática por PSP, o txid deve vir do banco
-ou incluir um sufixo aleatório e a confirmação deve validar o valor pago.
+como prova de pagamento: a conciliação usa valor/data para sugerir um vínculo e,
+desde a 0.8.1, usa o txid presente no memo apenas como **dica** para reconhecer
+pagamento fora da janela de 20 dias — sempre exigindo que o valor confira (≤5%).
+Não há webhook de PSP nem baixa automática; a confirmação é humana e auditada. O
+risco residual é de sugestão errada (operacional), não de fraude lógica. Se no
+futuro houver baixa automática por PSP, o txid deve vir do retorno assinado do
+PSP e a confirmação deve validar o valor pago.
+
+O capítulo completo do Pix (P-01…P-14, checklist e runbook) está em
+[SEGURANCA.md](SEGURANCA.md).
 
 ### Riscos residuais acrescentados
 

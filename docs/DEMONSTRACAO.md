@@ -116,7 +116,7 @@ A suíte é pública e roda sem a demonstração no ar:
 ```bash
 npm run check   # sintaxe
 npm run deps:check  # integridade da dependência xlsx de CDN
-npm test        # 69 testes: API, regras, segurança, funcionalidades, interface (jsdom), seed, relatórios, conciliação e analytics
+npm test        # 72 testes: API, regras, segurança, funcionalidades, interface (jsdom), seed, relatórios, conciliação e analytics
 ```
 
 Ela cobre login e sessão, CSRF, permissões, precedência de taxas, geração e baixa

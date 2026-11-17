@@ -4,7 +4,7 @@ Esta pasta reúne a documentação do **Sistema de Gestão Imobiliária**. O obj
 é permitir que uma pessoa entenda o produto, rode o projeto, avalie as decisões
 técnicas, opere em produção e evolua o código sem depender de conhecimento tácito.
 
-> **Versão documentada:** 0.8.0 · **Última revisão:** novembro de 2026
+> **Versão documentada:** 0.8.1 · **Última revisão:** novembro de 2026
 
 ## Comece por aqui
 
@@ -13,7 +13,7 @@ técnicas, opere em produção e evolua o código sem depender de conhecimento t
 | **Recrutador, cliente ou visitante do portfólio** | [README principal](../README.md) → [Demonstração](DEMONSTRACAO.md) → [Estudo de caso](ESTUDO-DE-CASO.md) → [Funcionalidades](FUNCIONALIDADES.md) → [Arquitetura](ARQUITETURA.md) |
 | **Desenvolvedor que vai rodar o projeto** | [README principal](../README.md) → [Arquitetura](ARQUITETURA.md) → [Modelo de dados](MODELO-DE-DADOS.md) → [API](API.md) → [Qualidade](QUALIDADE.md) |
 | **Pessoa que vai publicar e operar** | [Publicação](../deploy/README.md) → [Operação](OPERACAO.md) → [Checklist de segurança](checklist-seguranca.md) |
-| **Revisor de segurança ou LGPD** | [Checklist de segurança](checklist-seguranca.md) → [Política de segurança](../SECURITY.md) → [Arquitetura](ARQUITETURA.md) → [Operação](OPERACAO.md) |
+| **Revisor de segurança ou LGPD** | [Segurança e vulnerabilidades](SEGURANCA.md) → [Checklist de segurança](checklist-seguranca.md) → [Política de segurança](../SECURITY.md) → [Arquitetura](ARQUITETURA.md) → [Operação](OPERACAO.md) |
 | **Produto / negócio** | [Produto](PRODUTO.md) → [Funcionalidades](FUNCIONALIDADES.md) → [Roadmap](roadmap.md) |
 
 ## Mapa dos documentos
@@ -33,6 +33,7 @@ técnicas, opere em produção e evolua o código sem depender de conhecimento t
 | [ESTADO-ATUAL.md](ESTADO-ATUAL.md) | Fotografia técnica da versão atual, dívidas e próximos passos |
 | [roadmap.md](roadmap.md) | Prioridades de evolução em fases |
 | [checklist-seguranca.md](checklist-seguranca.md) | Auditoria de 21 pontos com evidências e pendências |
+| [SEGURANCA.md](SEGURANCA.md) | Modelo de ameaças, análise do Pix (P-01…P-14), riscos residuais e runbook |
 | [AUDITORIA.md](AUDITORIA.md) | Achados da revisão técnica, correções e riscos residuais |
 | [Publicação](../deploy/README.md) | Guia prático de VPS, domínio, HTTPS, systemd, backup e go-live |
 | [Contribuição](../CONTRIBUTING.md) | Ambiente, padrões, testes e fluxo de pull request |
