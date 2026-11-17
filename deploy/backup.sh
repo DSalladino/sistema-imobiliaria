@@ -27,6 +27,13 @@ echo "[$(date -Is)] iniciando backup $STAMP"
 sqlite3 "$DATA_DIR/imobiliaria.db" ".backup '$DB'"
 sqlite3 "$DB" "PRAGMA integrity_check;" | grep -qx "ok"
 
+# Ensaio de restauração: abre o backup recém-gerado e compara as contagens.
+if [ -f "$APP_DIR/scripts/verificar-restauracao.mjs" ]; then
+  (cd "$APP_DIR" && DATA_DIR="$DATA_DIR" node scripts/verificar-restauracao.mjs "$DB")
+else
+  echo "[$(date -Is)] AVISO: script de ensaio de restauração não encontrado" >&2
+fi
+
 # Inclui uploads e, quando não há APP_SECRET, a chave local que decifra o 2FA.
 ITENS=()
 [ -d "$DATA_DIR/uploads" ] && ITENS+=("uploads")

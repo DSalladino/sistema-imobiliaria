@@ -6,6 +6,7 @@ import { resumo as resumoCobrancas, listar as listarCobrancas } from './cobranca
 import { analytics } from './analytics.js';
 import { resumo as resumoContas, previsaoCaixa } from './contas.js';
 import { resumo as resumoComissoes } from './comissoes.js';
+import { resumoAnaliseFutura, analiseFutura } from './previsao.js';
 import { drePorImovel } from './dre.js';
 
 /**
@@ -379,6 +380,35 @@ function rentabilidade(pergunta) {
   });
 }
 
+function previsao() {
+  return resumoAnaliseFutura();
+}
+
+function riscosCarteira() {
+  const a = analiseFutura({ meses: 12, horizonte: 3 });
+  const criticos = a.riscos.filter(r => r.nivel !== 'info');
+  return resposta({
+    intencao: 'riscos',
+    texto: criticos.length
+      ? `Encontrei ${criticos.length} ponto(s) de atenção na carteira. ${criticos.map(r => `${r.titulo}: ${r.descricao}`).join(' ')}`
+      : 'Nenhum risco crítico pelos indicadores atuais. A ocupação e a inadimplência estão dentro da faixa de referência.',
+    destaques: [
+      { rotulo: 'Inadimplência', valor: `${a.indicadores.inadimplencia_pct}%` },
+      { rotulo: 'Ocupação', valor: `${a.indicadores.ocupacao_pct}%` },
+      { rotulo: 'Meses de caixa', valor: a.indicadores.meses_de_caixa == null ? '—' : String(a.indicadores.meses_de_caixa) },
+      { rotulo: 'Tendência', valor: a.tendencia.receita },
+    ],
+    itens: a.riscos.slice(0, 6).map(r => ({
+      titulo: r.titulo,
+      detalhe: `${r.descricao} Ação: ${r.acao}`,
+      valor: r.nivel === 'alto' ? 'Alto' : r.nivel === 'atencao' ? 'Atenção' : 'OK',
+      rota: '#/analises',
+    })),
+    acoes: [link('#/analises', 'Abrir análises'), link('#/alertas', 'Ver alertas')],
+    sugestoes: ['Qual a previsão dos próximos meses?', 'Quem está inadimplente?', 'Resumo do mês', 'Quanto tenho a receber e a pagar?'],
+  });
+}
+
 function comissoes() {
   const comp = competenciaAtual();
   const r = resumoComissoes(comp);
@@ -437,7 +467,7 @@ function ajuda(pergunta) {
   }
   return resposta({
     intencao: 'ajuda',
-    texto: 'Posso consultar a carteira e explicar rotinas: inadimplência, cobranças, repasses, caixa, contratos a vencer, reajustes, ocupação, rentabilidade por imóvel, comissões e contas a pagar/receber. Também indico onde fica cada tela. Tudo é calculado no seu banco, sem enviar dados para fora.',
+    texto: 'Posso consultar a carteira e explicar rotinas: inadimplência, cobranças, repasses, caixa, contratos a vencer, reajustes, ocupação, rentabilidade por imóvel, comissões, contas a pagar/receber, previsões e riscos. Também indico onde fica cada tela. Tudo é calculado no seu banco, sem enviar dados para fora.',
     acoes: [link('#/painel', 'Ver painel'), link('#/relatorios', 'Relatórios')],
     sugestoes: ['Resumo do mês', 'Quem está inadimplente?', 'Como faço uma baixa parcial?', 'Quanto tenho a receber e a pagar?'],
   });
@@ -493,6 +523,8 @@ export function responder(pergunta) {
     });
   }
 
+  if (/previsao|previsão|projec|futuro|proximos meses|próximos meses|tendencia|tendência|cenario|cenário|simular/.test(t)) return previsao();
+  if (/risco|riscos|saude|saúde da carteira|ameaca|ameaça/.test(t)) return riscosCarteira();
   if (/inadimpl|atrasad|vencid|quem deve|devedor|nao pagou|nao recebi|em atraso/.test(t)) return inadimplencia();
   if (/reajuste|dissidio|aniversario|igp-m|igpm|ipca/.test(t)) return reajustes();
   if (/contrato/.test(t) && /venc|termin|fim|garantia|proxim|alerta/.test(t)) return contratosAlerta(original);

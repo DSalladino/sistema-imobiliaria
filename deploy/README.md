@@ -199,6 +199,15 @@ Agende diariamente às 2h15:
 (crontab -l 2>/dev/null; echo "15 2 * * * /usr/local/bin/imobiliaria-backup.sh >> /var/log/imobiliaria-backup.log 2>&1") | sudo crontab -
 ```
 
+O script roda `PRAGMA integrity_check` e, quando o repositório está em
+`/opt/imobiliaria`, executa `scripts/verificar-restauracao.mjs` contra o arquivo
+recém-gerado. Para testar um backup antigo manualmente:
+
+```bash
+cd /opt/imobiliaria
+DATA_DIR=/opt/imobiliaria/data node scripts/verificar-restauracao.mjs /var/backups/imobiliaria/imobiliaria-AAAA-MM-DD-HHMM.db
+```
+
 ### 9.1 Recuperação do administrador
 
 Se ninguém conseguir entrar:

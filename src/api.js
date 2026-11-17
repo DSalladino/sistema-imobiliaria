@@ -1,4 +1,3 @@
-import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -19,7 +18,8 @@ import {
   registrarAcao, definirCobrancaStatus,
 } from './cobrancas.js';
 import { previewConciliacao, listarPendentes, resumoConciliacao, confirmarConciliacao } from './conciliacao.js';import { criarSolicitacao, validarToken, usarToken, listarSolicitacoes } from './senha-recuperacao.js';
-import { statusManutencao, limparBase, carregarDemo } from './manutencao.js';
+import { statusManutencao, limparBase, carregarDemo, expurgarRetencao } from './manutencao.js';
+import { testarRestauracao, criarSnapshot, listarSnapshots, integridadeBanco, expurgarSnapshots } from './backup.js';
 import {
   UPLOADS, listarDocumentos, salvarDocumento, obterDocumento, caminhoFisico, removerDocumento, nomeArquivoSeguro, versoesDocumento,
 } from './documentos.js';
@@ -32,12 +32,15 @@ import {
 import { previewReajuste, aplicarReajuste, historicoReajustes, rescindir, obterRescisao } from './contratos-acoes.js';
 import {
   listar as listarComissoes, resumo as resumoComissoes, criar as criarComissao, atualizarStatus as atualizarStatusComissao,
-  pagar as pagarComissao, cancelar as cancelarComissao, gerarLote as gerarComissoesLote,
+  pagar as pagarComissao, cancelar as cancelarComissao, gerarLote as gerarComissoesLote, obter as obterComissao,
 } from './comissoes.js';
 import { pixDaCobranca, pixDoMes, pixConfigurado, configuracaoPix } from './pix.js';
 import { enviarWhatsapp, statusWhatsapp, linkWhatsapp } from './whatsapp.js';
 import { drePorImovel } from './dre.js';
 import { responder as responderAssistente, contextoRapido } from './assistente.js';
+import { analiseFutura, projetarCenario } from './previsao.js';
+import { validarDocumentoObrigatorio, somenteDigitos, documentoValido } from './validacao.js';
+import { verificarIntegridadeAuditoria, detalharAuditoria, consultarAuditoria } from './auditoria.js';
 import {
   hojeISO, competenciaAtual, getSetting, getSettingNum, setSetting, calcularRepasse, gerarRepasses,
   pagarRepasse, alertas, resumoDashboard, saldos, mesFechado, exigirMesAberto, brl,
@@ -206,7 +209,8 @@ function criarSessao(req, res, u, ip) {
   const expira = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
   // Remove sessões expiradas antes de criar outra, mantendo a tabela pequena.
   db.prepare('DELETE FROM sessoes WHERE expira_em < ?').run(new Date().toISOString());
-  db.prepare('INSERT INTO sessoes (token, usuario_id, expira_em) VALUES (?,?,?)').run(hashToken(token), u.id, expira);
+  db.prepare('INSERT INTO sessoes (token, usuario_id, expira_em, ultimo_uso) VALUES (?,?,?,?)')
+    .run(hashToken(token), u.id, expira, new Date().toISOString());
   auditar({ id: u.id, nome: u.nome }, 'login', 'usuarios', u.id, null, ip);
   const secure = cookieSeguro(req) ? '; Secure' : '';
   res.setHeader('Set-Cookie', `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 7}${secure}`);
@@ -358,6 +362,24 @@ function erroValidacao(msg) {
 
 function validarDados(entidade, dados, idAtual = null) {
   const tem = (campo) => Object.prototype.hasOwnProperty.call(dados, campo);
+  // Documento é validado por dígito verificador e não pode se repetir. A
+  // checagem pode ser desligada para importar bases legadas, mas fica ligada
+  // por padrão justamente para impedir cadastros duplicados silenciosos.
+  if (['proprietarios', 'inquilinos'].includes(entidade) && tem('cpf_cnpj')) {
+    const atualCadastro = idAtual ? db.prepare(`SELECT cpf_cnpj FROM ${entidade} WHERE id = ?`).get(idAtual) : null;
+    const mudouDocumento = !atualCadastro || somenteDigitos(dados.cpf_cnpj) !== somenteDigitos(atualCadastro.cpf_cnpj);
+    // Um cadastro legado com documento inválido continua editável; só exigimos
+    // dígito verificador quando o documento é novo ou foi alterado.
+    if (mudouDocumento && String(getSetting('validar_documento', '1')) === '1') {
+      dados.cpf_cnpj = validarDocumentoObrigatorio(dados.cpf_cnpj);
+    }
+    const digitos = somenteDigitos(dados.cpf_cnpj);
+    if (digitos) {
+      const outro = db.prepare(`SELECT id, nome FROM ${entidade} WHERE replace(replace(replace(cpf_cnpj,'.',''),'-',''),'/','') LIKE ? AND id <> ?`)
+        .get(`%${digitos}%`, idAtual ?? -1);
+      if (outro) throw erroValidacao(`Este CPF/CNPJ já está cadastrado para ${outro.nome}.`);
+    }
+  }
   const atual = entidade === 'contratos' && idAtual
     ? db.prepare('SELECT * FROM contratos WHERE id = ?').get(idAtual)
     : null;
@@ -367,6 +389,9 @@ function validarDados(entidade, dados, idAtual = null) {
   }
   if (tem('email') && dados.email && !EMAIL.test(String(dados.email))) {
     throw erroValidacao('E-mail inválido.');
+  }
+  if (tem('cpf_cnpj') && dados.cpf_cnpj && documentoValido(dados.cpf_cnpj) === false) {
+    throw erroValidacao('O CPF/CNPJ informado não é válido.');
   }
   if (entidade === 'imoveis' && tem('proprietario_id')) {
     if (!Number.isFinite(dados.proprietario_id) || dados.proprietario_id <= 0) throw erroValidacao('Proprietário inválido.');
@@ -1078,11 +1103,60 @@ export async function handleApi(req, res, url, user, ip, body) {
       registrar(user, 'carregar_demo', 'sistema', null, null, ip);
       return json(res, 200, r);
     }
+    if (p === '/manutencao/retencao' && m === 'GET') {
+      exigir(user, 'admin');
+      return json(res, 200, expurgarRetencao({ confirmar: false }));
+    }
+    if (p === '/manutencao/retencao' && m === 'POST') {
+      exigir(user, 'admin');
+      if (String(body.confirmacao || '') !== 'RETENCAO') return erro(res, 400, 'Digite RETENCAO para confirmar.');
+      const r = expurgarRetencao({ confirmar: true });
+      registrar(user, 'expurgar_retencao', 'sistema', null, r, ip);
+      return json(res, 200, r);
+    }
+    if (p === '/manutencao/integridade' && m === 'GET') {
+      exigir(user, 'admin');
+      return json(res, 200, { banco: integridadeBanco(), auditoria: verificarIntegridadeAuditoria() });
+    }
+    if (p === '/manutencao/snapshots' && m === 'GET') {
+      exigir(user, 'admin');
+      return json(res, 200, { itens: listarSnapshots(), retencao_dias: getSettingNum('backup_retencao_dias', 30) });
+    }
+    if (p === '/manutencao/snapshots' && m === 'POST') {
+      exigir(user, 'admin');
+      const arquivo = criarSnapshot({ prefixo: 'manual' });
+      registrar(user, 'criar_snapshot', 'sistema', null, { arquivo: path.basename(arquivo) }, ip);
+      return json(res, 201, { ok: true, arquivo: path.basename(arquivo), snapshots: listarSnapshots() });
+    }
     if (!user) return erro(res, 401, 'Não autenticado.');
 
     if (p === '/assistente' && m === 'GET') {
       exigir(user, 'ler');
       return json(res, 200, contextoRapido());
+    }
+    if (p === '/assistente/analise' && m === 'GET') {
+      exigir(user, 'ler');
+      return json(res, 200, analiseFutura({
+        meses: url.searchParams.get('meses'),
+        horizonte: url.searchParams.get('horizonte'),
+      }));
+    }
+    if (p === '/analises' && m === 'GET') {
+      exigir(user, 'ler');
+      return json(res, 200, analiseFutura({
+        meses: url.searchParams.get('meses'),
+        horizonte: url.searchParams.get('horizonte'),
+      }));
+    }
+    if (p === '/analises/projecao' && m === 'POST') {
+      exigir(user, 'ler');
+      return json(res, 200, projetarCenario({
+        meses: body.meses,
+        inadimplencia_pct: body.inadimplencia_pct,
+        vacancia_pct: body.vacancia_pct,
+        reajuste_pct: body.reajuste_pct,
+        aumento_despesa_pct: body.aumento_despesa_pct,
+      }));
     }
     if (p === '/assistente' && m === 'POST') {
       exigir(user, 'ler');
@@ -1132,9 +1206,32 @@ export async function handleApi(req, res, url, user, ip, body) {
 
     if (p === '/auditoria' && m === 'GET') {
       exigir(user, 'admin');
-      const bruto = Number(url.searchParams.get('limite') || 200);
-      const limite = Number.isFinite(bruto) ? Math.min(Math.max(Math.trunc(bruto), 1), 1000) : 200;
-      return json(res, 200, db.prepare('SELECT * FROM auditoria ORDER BY id DESC LIMIT ?').all(limite));
+      const pagina = paginar(url, 200);
+      const dados = consultarAuditoria({
+        usuario: url.searchParams.get('usuario') || undefined,
+        acao: url.searchParams.get('acao') || undefined,
+        entidade: url.searchParams.get('entidade') || undefined,
+        entidade_id: url.searchParams.get('entidade_id') || undefined,
+        de: url.searchParams.get('de') || undefined,
+        ate: url.searchParams.get('ate') || undefined,
+        busca: url.searchParams.get('busca') || undefined,
+        limite: pagina.limite,
+        offset: pagina.offset,
+        envelope: pagina.envelope,
+      });
+      return json(res, 200, dados);
+    }
+    if (p === '/auditoria/integridade' && m === 'GET') {
+      exigir(user, 'admin');
+      const r = verificarIntegridadeAuditoria({ limite: url.searchParams.get('limite') });
+      registrar(user, 'verificar_auditoria', 'auditoria', null, { ok: r.ok, total: r.total }, ip);
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'auditoria' && seg[1] && m === 'GET') {
+      exigir(user, 'admin');
+      const r = detalharAuditoria(Number(seg[1]));
+      if (!r) return erro(res, 404, 'Registro de auditoria não encontrado.');
+      return json(res, 200, r);
     }
 
     if (p === '/lancamentos' && m === 'GET') {
@@ -1149,6 +1246,23 @@ export async function handleApi(req, res, url, user, ip, body) {
       });
     }
     if (p === '/lancamentos' && m === 'POST') { exigir(user, 'financeiro'); return json(res, 201, criarLancamento(body, user, ip)); }
+    if (seg[0] === 'lancamentos' && seg[1] && !seg[2] && m === 'GET') {
+      const l = db.prepare(`SELECT l.*, p.nome AS proprietario_nome, i.endereco AS imovel_endereco, i.numero AS imovel_numero,
+          c.codigo AS contrato_codigo, cb.competencia AS cobranca_competencia, r.competencia AS repasse_competencia
+        FROM lancamentos l
+        LEFT JOIN proprietarios p ON p.id = l.proprietario_id
+        LEFT JOIN imoveis i ON i.id = l.imovel_id
+        LEFT JOIN contratos c ON c.id = l.contrato_id
+        LEFT JOIN cobrancas cb ON cb.id = l.cobranca_id
+        LEFT JOIN repasses r ON r.id = l.repasse_id
+        WHERE l.id = ?`).get(Number(seg[1]));
+      if (!l) return erro(res, 404, 'Lançamento não encontrado.');
+      const estorno = l.estorno_de_id ? db.prepare('SELECT id, data, descricao, motivo_estorno FROM lancamentos WHERE id = ?').get(l.estorno_de_id) : null;
+      const estornadoPor = db.prepare('SELECT id, data, descricao, motivo_estorno FROM lancamentos WHERE estorno_de_id = ? ORDER BY id LIMIT 1').get(l.id);
+      const trilha = db.prepare(`SELECT id, usuario_nome, acao, detalhe, criado_em FROM auditoria
+        WHERE entidade = 'lancamentos' AND entidade_id = ? ORDER BY id DESC LIMIT 20`).all(String(l.id));
+      return json(res, 200, { ...l, estorno, estornado_por: estornadoPor, auditoria: trilha });
+    }
     if (seg[0] === 'lancamentos' && seg[1] && seg[2] === 'estornar' && m === 'POST') {
       exigir(user, 'financeiro');
       return json(res, 200, estornarLancamento(Number(seg[1]), texto(body.motivo), user, ip));
@@ -1338,6 +1452,14 @@ export async function handleApi(req, res, url, user, ip, body) {
       const r = criarComissao(body, user);
       registrar(user, 'criar', 'comissoes', r.id, { corretor: r.corretor, valor_centavos: r.valor_centavos }, ip);
       return json(res, 201, r);
+    }
+    if (seg[0] === 'comissoes' && seg[1] && !seg[2] && m === 'GET') {
+      exigir(user, 'ler');
+      const r = obterComissao(Number(seg[1]));
+      if (!r) return erro(res, 404, 'Comissão não encontrada.');
+      const trilha = db.prepare(`SELECT id, usuario_nome, acao, detalhe, criado_em FROM auditoria
+        WHERE entidade = 'comissoes' AND entidade_id = ? ORDER BY id DESC LIMIT 20`).all(String(r.id));
+      return json(res, 200, { ...r, auditoria: trilha });
     }
     if (seg[0] === 'comissoes' && seg[1] && seg[2] === 'pagar' && m === 'POST') {
       exigir(user, 'financeiro');
@@ -1718,6 +1840,32 @@ export async function handleApi(req, res, url, user, ip, body) {
       return res.end(JSON.stringify(payload, null, 2));
     }
 
+    if (p === '/lgpd/inventario' && m === 'GET') {
+      exigir(user, 'admin');
+      const contar = (sql) => { try { return db.prepare(sql).get().n; } catch { return null; } };
+      return json(res, 200, {
+        gerado_em: new Date().toISOString(),
+        categorias: [
+          { categoria: 'Cadastro de titulares', dados: 'nome, CPF/CNPJ, contato, endereço, dados bancários/Pix', base: 'Execução de contrato', retencao: 'Enquanto houver relação + prazo legal', registros: (contar('SELECT COUNT(*) AS n FROM proprietarios') || 0) + (contar('SELECT COUNT(*) AS n FROM inquilinos') || 0) },
+          { categoria: 'Contratos e imóveis', dados: 'partes, vigência, valores, garantia, documentos', base: 'Execução de contrato', retencao: `Financeiro por ${getSetting('lgpd_retencao_financeira_anos', '5')} anos`, registros: (contar('SELECT COUNT(*) AS n FROM contratos') || 0) + (contar('SELECT COUNT(*) AS n FROM imoveis') || 0) },
+          { categoria: 'Financeiro', dados: 'cobranças, lançamentos, repasses, comissões, contas', base: 'Obrigação legal e execução de contrato', retencao: `${getSetting('lgpd_retencao_financeira_anos', '5')} anos`, registros: (contar('SELECT COUNT(*) AS n FROM lancamentos') || 0) + (contar('SELECT COUNT(*) AS n FROM cobrancas') || 0) + (contar('SELECT COUNT(*) AS n FROM repasses') || 0) },
+          { categoria: 'Documentos', dados: 'arquivos enviados, versões e validade', base: 'Execução de contrato', retencao: 'Vinculada ao cadastro/contrato', registros: contar('SELECT COUNT(*) AS n FROM documentos WHERE ativo = 1') },
+          { categoria: 'Comunicações', dados: 'e-mails, WhatsApp, mensagens e status de envio', base: 'Legítimo interesse e histórico de atendimento', retencao: `${getSetting('lgpd_retencao_comunicacoes_dias', '730')} dias`, registros: contar('SELECT COUNT(*) AS n FROM comunicacoes') },
+          { categoria: 'Segurança e auditoria', dados: 'logs de acesso, IP, ações administrativas', base: 'Obrigação legal e segurança da informação', retencao: `${getSetting('lgpd_retencao_logs_dias', '365')} dias`, registros: contar('SELECT COUNT(*) AS n FROM auditoria') },
+          { categoria: 'Sessões e credenciais', dados: 'hash de token, hash de senha, segredo 2FA cifrado', base: 'Segurança da informação', retencao: 'Sessão ativa ou até revogação', registros: contar('SELECT COUNT(*) AS n FROM sessoes') },
+        ],
+        encarregado: { nome: getSetting('lgpd_encarregado', ''), email: getSetting('lgpd_email', '') },
+        controles: {
+          mascarar_cpf_consulta: String(getSetting('mascarar_cpf_consulta', '1')) === '1',
+          validar_documento: String(getSetting('validar_documento', '1')) === '1',
+          auditoria_encadeada: true,
+          cpf_criptografado_em_repouso: false,
+          uploads_criptografados: false,
+        },
+        observacao: 'O inventário é um retrato interno para apoiar a revisão de privacidade; não substitui parecer jurídico.',
+      });
+    }
+
     if (p === '/lgpd/anonimizar' && m === 'POST') {
       exigir(user, 'admin');
       if (String(body.confirmacao || '') !== 'ANONIMIZAR') return erro(res, 400, 'Confirmação inválida. Digite ANONIMIZAR.');
@@ -1759,19 +1907,7 @@ export async function handleApi(req, res, url, user, ip, body) {
 
     if (p === '/backup/verificar' && m === 'GET') {
       exigir(user, 'admin');
-      const tmp = path.join(os.tmpdir(), `imob-verificar-${Date.now()}.db`);
-      db.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
-      try { fs.chmodSync(tmp, 0o600); } catch {}
-      let contagens = {};
-      try {
-        const b = new DatabaseSync(tmp);
-        for (const t of ['usuarios', 'proprietarios', 'imoveis', 'inquilinos', 'contratos', 'lancamentos', 'cobrancas', 'repasses', 'documentos', 'comunicacoes']) {
-          try { contagens[t] = b.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n; } catch { contagens[t] = null; }
-        }
-        b.close();
-      } finally {
-        try { fs.unlinkSync(tmp); } catch {}
-      }
+      const ensaio = testarRestauracao();
       let arquivos = 0;
       let bytes = 0;
       if (fs.existsSync(UPLOADS)) {
@@ -1779,8 +1915,14 @@ export async function handleApi(req, res, url, user, ip, body) {
           try { const st = fs.statSync(path.join(UPLOADS, f)); if (st.isFile()) { arquivos++; bytes += st.size; } } catch {}
         }
       }
-      registrar(user, 'verificar_backup', 'sistema', null, { contagens, arquivos }, ip);
-      return json(res, 200, { ok: true, gerado_em: new Date().toISOString(), contagens, documentos_arquivos: arquivos, documentos_bytes: bytes });
+      registrar(user, 'verificar_backup', 'sistema', null, { ok: ensaio.ok, contagens: ensaio.contagens, arquivos }, ip);
+      return json(res, 200, {
+        ...ensaio,
+        gerado_em: new Date().toISOString(),
+        documentos_arquivos: arquivos,
+        documentos_bytes: bytes,
+        snapshots: listarSnapshots().slice(0, 10),
+      });
     }
 
     if (p === '/backup' && m === 'GET') {

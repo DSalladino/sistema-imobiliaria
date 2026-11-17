@@ -7,6 +7,23 @@
 
 **Versão revisada:** 0.6.0 (corpo) e 0.7/0.8 (adendo) · **Data:** novembro de 2026
 
+## Adendo 0.10 — nova rodada de segurança
+
+**Data:** novembro de 2026 · **Escopo:** API autenticada, trilha de auditoria, validação cadastral, backup/restauração e retenção.
+
+| Área | Achado/risco | Tratamento |
+|---|---|---|
+| Cadastro | CPF/CNPJ era apenas formatado, permitindo documento inválido e duplicado | Validação por dígito verificador, normalização e bloqueio de duplicidade |
+| Auditoria | Trilha podia ser editada diretamente no SQLite sem evidência | Hash encadeado SHA-256, verificação e diff; expurgo reencadeia |
+| Sessão | Só havia expiração absoluta de 7 dias | Expiração por inatividade (12h padrão, configurável) |
+| Backup | Verificação abria uma cópia, mas não comparava todas as tabelas | Ensaio abre o snapshot, roda `integrity_check`/`foreign_key_check` e compara contagens |
+| Retenção | Prazo configurável sem job de expurgo | Endpoint com simulação, backup prévio e reencadeamento |
+| Testes | Sem prova de RBAC/CSRF/injeção em filtros na API real | `tests/seguranca-avancada.test.mjs` com servidor real |
+
+Nenhuma falha crítica de execução remota foi encontrada nesta rodada. Os riscos
+residuais permanecem os já documentados (sem criptografia em repouso, sem
+automação de expurgo e projeções estatísticas simples).
+
 ## Método
 
 - Leitura do backend (`src/`), frontend (`public/`), testes, scripts de deploy e

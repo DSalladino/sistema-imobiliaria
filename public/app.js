@@ -8,7 +8,7 @@ import {
 import {
   viewCobrancas, viewConciliacao, viewLancamentos, viewRepasses, viewFechamentos, viewDocumentos,
   viewImportacao, viewRelatorios, viewUsuarios, viewAuditoria, viewConfiguracoes, viewLGPD, viewManutencao,
-  viewContas, viewComissoes,
+  viewContas, viewComissoes, viewAnalises,
 } from './views-fin.js';
 import { bindAssistente } from './ia.js';
 
@@ -25,6 +25,7 @@ const VIEWS = {
   lancamentos: viewLancamentos,
   contas: viewContas,
   comissoes: viewComissoes,
+  analises: viewAnalises,
   repasses: viewRepasses,
   fechamentos: viewFechamentos,
   documentos: viewDocumentos,
@@ -50,6 +51,7 @@ const META = {
   lancamentos: ['Financeiro', 'Lançamentos'],
   contas: ['Financeiro', 'Contas a pagar/receber'],
   comissoes: ['Financeiro', 'Comissões'],
+  analises: ['Visão geral', 'Análises futuras'],
   repasses: ['Financeiro', 'Repasses'],
   fechamentos: ['Financeiro', 'Fechamento'],
   documentos: ['Operação', 'Documentos'],
@@ -63,7 +65,7 @@ const META = {
 };
 
 const NAVEAS = [
-  { grupo: 'Visão geral', itens: [['painel', 'Painel', 'painel'], ['alertas', 'Alertas', 'bell']] },
+  { grupo: 'Visão geral', itens: [['painel', 'Painel', 'painel'], ['analises', 'Análises futuras', 'chart'], ['alertas', 'Alertas', 'bell']] },
   { grupo: 'Carteira', itens: [['proprietarios', 'Proprietários', 'owners'], ['imoveis', 'Imóveis', 'home'], ['inquilinos', 'Inquilinos', 'tenant'], ['contratos', 'Contratos', 'contract'], ['excecoes', 'Exceções', 'receipt']] },
   { grupo: 'Financeiro', itens: [['cobrancas', 'Cobranças', 'receipt'], ['conciliacao', 'Conciliação', 'bank'], ['lancamentos', 'Lançamentos', 'wallet'], ['contas', 'Contas', 'receipt'], ['comissoes', 'Comissões', 'owners'], ['repasses', 'Repasses', 'send'], ['fechamentos', 'Fechamento', 'check']] },
   { grupo: 'Operação', itens: [['documentos', 'Documentos', 'folder'], ['importacao', 'Importar', 'upload'], ['relatorios', 'Relatórios', 'chart']] },

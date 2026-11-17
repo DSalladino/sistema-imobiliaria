@@ -135,7 +135,7 @@ test('fluxo principal da API', async (t) => {
 
   await t.test('CRUD com auditoria e precedência de taxa', async () => {
     const prop = await req('/api/proprietarios', { method: 'POST', body: {
-      nome: 'Proprietário Teste', cpf_cnpj: '000.000.000-00', email: 'teste@exemplo.com', telefone: '11999999999', taxa_admin_pct: 6,
+      nome: 'Proprietário Teste', cpf_cnpj: '390.533.447-05', email: 'teste@exemplo.com', telefone: '11999999999', taxa_admin_pct: 6,
     } });
     assert.equal(prop.res.status, 201);
     const imovel = await req('/api/imoveis', { method: 'POST', body: {

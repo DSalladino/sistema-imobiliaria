@@ -408,6 +408,38 @@ garantirColuna('conciliacoes', 'sugestao_id', 'INTEGER');
 garantirColuna('conciliacoes', 'sugestao_label', 'TEXT');
 garantirColuna('contratos', 'corretor', 'TEXT');
 garantirColuna('contratos', 'comissao_pct', 'REAL');
+garantirColuna('auditoria', 'hash_anterior', 'TEXT');
+garantirColuna('auditoria', 'hash', 'TEXT');
+garantirColuna('sessoes', 'ultimo_uso', 'TEXT');
+db.prepare("UPDATE sessoes SET ultimo_uso = criado_em WHERE ultimo_uso IS NULL").run();
+
+// Cadeia de auditoria: bancos criados antes desta versão recebem a cadeia
+// retroativa uma única vez. A partir daí cada novo registro é encadeado ao
+// anterior, permitindo provar que a trilha não foi editada.
+function hashLegado(anterior, r) {
+  const partes = [anterior || '', r.usuario_id ?? '', r.usuario_nome ?? '', r.acao ?? '', r.entidade ?? '',
+    r.entidade_id ?? '', r.detalhe ?? '', r.ip ?? '', r.criado_em ?? ''];
+  return crypto.createHash('sha256').update(partes.join('|')).digest('hex');
+}
+const semHash = db.prepare('SELECT COUNT(*) AS n FROM auditoria WHERE hash IS NULL').get().n;
+if (semHash > 0) {
+  const pendentes = db.prepare(`SELECT id, usuario_id, usuario_nome, acao, entidade, entidade_id, detalhe, ip, criado_em
+    FROM auditoria ORDER BY id`).all();
+  const atualizar = db.prepare('UPDATE auditoria SET hash_anterior = ?, hash = ? WHERE id = ?');
+  db.exec('BEGIN');
+  try {
+    let anterior = '';
+    for (const linha of pendentes) {
+      const hash = hashLegado(anterior, linha);
+      atualizar.run(anterior || null, hash, linha.id);
+      anterior = hash;
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
 
 const SETTINGS_PADRAO = [
   ['imob_nome', 'Imobiliária Exemplo', 'Nome da imobiliária', 'empresa', 'texto', null, 1],
@@ -427,6 +459,8 @@ const SETTINGS_PADRAO = [
   ['dias_alerta_garantia', '30', 'Aviso de fim de garantia (dias antes)', 'alertas', 'numero', null, 22],
   ['comissao_padrao_pct', '0', 'Comissão padrão de corretagem (%)', 'regras', 'percentual', null, 16],
   ['previsao_caixa_meses', '6', 'Meses de previsão de caixa', 'financeiro', 'numero', null, 62],
+  ['previsao_analise_meses', '12', 'Meses de histórico usados nas análises futuras', 'financeiro', 'numero', null, 63],
+  ['previsao_horizonte_meses', '3', 'Horizonte padrão das projeções (meses)', 'financeiro', 'numero', null, 64],
   ['dias_alerta_atraso', '1', 'Aviso de aluguel atrasado (dias após vencimento)', 'alertas', 'numero', null, 23],
   ['mensagem_cobranca', 'Olá, {inquilino}! Identificamos que o aluguel referente a {competencia} do imóvel {imovel} está em aberto. Valor: {valor}. Se já pagou, desconsidere. Obrigado!', 'Modelo de mensagem de cobrança', 'mensagens', 'texto_longo', null, 30],
   ['mensagem_lembrete', 'Olá, {inquilino}! Lembrete: o aluguel do imóvel {imovel} vence em {vencimento}. Valor: {valor}. Qualquer dúvida, estamos à disposição.', 'Modelo de lembrete de vencimento', 'mensagens', 'texto_longo', null, 31],
@@ -442,6 +476,8 @@ const SETTINGS_PADRAO = [
   ['lgpd_retencao_financeira_anos', '5', 'Retenção de registros financeiros (anos)', 'lgpd', 'numero', null, 72],
   ['lgpd_retencao_logs_dias', '365', 'Retenção de logs de auditoria (dias)', 'lgpd', 'numero', null, 73],
   ['mascarar_cpf_consulta', '1', 'Mascarar CPF/CNPJ para o perfil consulta', 'lgpd', 'lista', '1,0', 74],
+  ['validar_documento', '1', 'Validar CPF/CNPJ por dígito verificador e impedir duplicidade', 'lgpd', 'lista', '1,0', 75],
+  ['lgpd_retencao_comunicacoes_dias', '730', 'Retenção de mensagens e comunicações (dias)', 'lgpd', 'numero', null, 76],
   ['email_recuperacao', '', 'E-mail para receber solicitações de redefinição de senha', 'seguranca', 'texto', null, 80],
   ['reset_validade_min', '30', 'Validade do link de redefinição (minutos)', 'seguranca', 'numero', null, 81],
   ['permitir_cadastro', '1', 'Permitir solicitação de acesso pela tela de login', 'seguranca', 'lista', '1,0', 82],
@@ -453,6 +489,8 @@ const SETTINGS_PADRAO = [
   ['whatsapp_modo', 'link', 'Modo de envio do WhatsApp', 'integracao', 'lista', 'link,api', 93],
   ['whatsapp_numero', '', 'WhatsApp da empresa no formato wa.me (DDI + DDD + número)', 'integracao', 'texto', null, 94],
   ['backup_aviso_dias', '7', 'Aviso se o último backup tiver mais de (dias)', 'seguranca', 'numero', null, 40],
+  ['backup_retencao_dias', '30', 'Retenção dos snapshots automáticos de segurança (dias)', 'seguranca', 'numero', null, 42],
+  ['sessao_horas', '12', 'Encerrar sessão após inatividade (horas)', 'seguranca', 'numero', null, 43],
   ['ultimo_backup', '', 'Último backup registrado', 'seguranca', 'data', null, 41],
 ];
 
@@ -493,9 +531,9 @@ export function seedDemo() {
   const compAtual = iso(hoje).slice(0, 7);
 
   const insProp = db.prepare(`INSERT INTO proprietarios (nome, cpf_cnpj, email, telefone, endereco, banco, agencia, conta, pix, taxa_admin_pct, observacoes) VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
-  const p1 = Number(insProp.run('Maria Souza', '123.456.789-00', 'maria@exemplo.com', '(11) 98888-1111', 'Rua das Acácias, 45', 'Banco do Brasil', '1234-5', '67890-1', 'maria@exemplo.com', 6, 'Contrato antigo: taxa diferenciada de 6%.').lastInsertRowid);
+  const p1 = Number(insProp.run('Maria Souza', '123.456.789-09', 'maria@exemplo.com', '(11) 98888-1111', 'Rua das Acácias, 45', 'Banco do Brasil', '1234-5', '67890-1', 'maria@exemplo.com', 6, 'Contrato antigo: taxa diferenciada de 6%.').lastInsertRowid);
   const p2 = Number(insProp.run('João Pereira', '987.654.321-00', 'joao@exemplo.com', '(11) 97777-2222', 'Av. Paulista, 1000', 'Itaú', '4321-0', '12345-6', '', null, 'Parceiro da casa: condição especial combinada.').lastInsertRowid);
-  const p3 = Number(insProp.run('Ana Lima', '111.222.333-44', 'ana@exemplo.com', '(11) 96666-3333', 'Rua Verde, 12', 'Caixa', '1111-1', '22222-2', '', null, '').lastInsertRowid);
+  const p3 = Number(insProp.run('Ana Lima', '111.222.333-96', 'ana@exemplo.com', '(11) 96666-3333', 'Rua Verde, 12', 'Caixa', '1111-1', '22222-2', '', null, '').lastInsertRowid);
 
   const insImovel = db.prepare(`INSERT INTO imoveis (proprietario_id, apelido, endereco, numero, complemento, bairro, cidade, uf, cep, tipo, situacao, taxa_admin_pct) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`);
   const i1 = Number(insImovel.run(p1, 'Apto 302', 'Rua das Flores', '120', 'Apto 302', 'Centro', 'São Paulo', 'SP', '01000-000', 'apartamento', 'alugado', null).lastInsertRowid);
@@ -504,10 +542,10 @@ export function seedDemo() {
   const i4 = Number(insImovel.run(p3, 'Apto Verde', 'Rua Verde', '12', 'Apto 71', 'Vila Nova', 'São Paulo', 'SP', '04000-000', 'apartamento', 'alugado', null).lastInsertRowid);
 
   const insInq = db.prepare(`INSERT INTO inquilinos (nome, cpf_cnpj, email, telefone) VALUES (?,?,?,?)`);
-  const q1 = Number(insInq.run('Carlos Mendes', '222.333.444-55', 'carlos@exemplo.com', '(11) 95555-4444').lastInsertRowid);
-  const q2 = Number(insInq.run('Fernanda Alves', '333.444.555-66', 'fernanda@exemplo.com', '(11) 94444-5555').lastInsertRowid);
-  const q3 = Number(insInq.run('Studio Design Ltda', '12.345.678/0001-90', 'contato@studio.com', '(11) 93333-6666').lastInsertRowid);
-  const q4 = Number(insInq.run('Rafael Costa', '444.555.666-77', 'rafael@exemplo.com', '(11) 92222-7777').lastInsertRowid);
+  const q1 = Number(insInq.run('Carlos Mendes', '222.333.444-05', 'carlos@exemplo.com', '(11) 95555-4444').lastInsertRowid);
+  const q2 = Number(insInq.run('Fernanda Alves', '333.444.555-08', 'fernanda@exemplo.com', '(11) 94444-5555').lastInsertRowid);
+  const q3 = Number(insInq.run('Studio Design Ltda', '12.345.678/0001-95', 'contato@studio.com', '(11) 93333-6666').lastInsertRowid);
+  const q4 = Number(insInq.run('Rafael Costa', '444.555.666-19', 'rafael@exemplo.com', '(11) 92222-7777').lastInsertRowid);
 
   const insContrato = db.prepare(`INSERT INTO contratos (codigo, imovel_id, inquilino_id, inicio, fim, aluguel_centavos, dia_vencimento, indice_reajuste, ultimo_reajuste, garantia_tipo, garantia_valor_centavos, garantia_fim, taxa_admin_pct, justificativa_taxa, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const c1 = Number(insContrato.run('CT-001', i1, q1, addDias(-700), addDias(28), 180000, 5, 'IGP-M', addDias(-335), 'fiador', 0, null, null, null, 'ativo').lastInsertRowid);

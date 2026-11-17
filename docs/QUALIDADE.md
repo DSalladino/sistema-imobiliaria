@@ -13,8 +13,9 @@ toca a base real.
 npm ci
 npm run deps:check # versão, origem e integrity do xlsx (CDN)
 npm run check      # sintaxe de todos os .js/.mjs
-npm test           # 84 testes: API, regras, interface, relatórios, conciliação, analytics, seed e assistente
+npm test           # 120 testes: API, regras, interface, relatórios, conciliação, analytics, seed, assistente, validação, auditoria, previsão, backup e segurança avançada
 npm run test:coverage
+npm run backup:testar # ensaio real de restauração (ou passe o caminho de um .db)
 npm audit
 ```
 
@@ -25,13 +26,18 @@ npm audit
 | `tests/api.test.mjs` | Login, troca de senha, sessão hash, CSRF, CRUD, autorização, precedência de taxa, cobrança, baixa, repasse, PDF, backup, fechamento e proteção do último admin |
 | `tests/rules.test.mjs` | Precedência de taxas, snapshot do repasse, política de senha, CSV, repasse com contrato encerrado, juros em baixa parcial e importação sem duplicar inquilino |
 | `tests/seguranca.test.mjs` | Vetores do RFC 6238 para TOTP, base32, cifragem AES-256-GCM (ida e volta e adulteração), códigos de recuperação de uso único (v1 e v2), política de senha e hash de token de sessão |
-| `tests/ui.test.mjs` | Renderiza as 22 telas com dados reais em jsdom e verifica conteúdo |
+| `tests/ui.test.mjs` | Renderiza as 23 telas com dados reais em jsdom e verifica conteúdo |
 | `tests/features.test.mjs` | Pix (CRC/EMV, chave inválida, saldo e txid), WhatsApp (link e API), contas e recorrência, previsão de caixa, reajuste em lote, rescisão e comissões, DRE por imóvel e geração de CSV |
 | `tests/seed.test.mjs` | Primeira execução completa a demonstração com cobranças e repasses |
-| `tests/relatorios.test.mjs` | Construção dos 8 relatórios, CSV (BOM, fórmula, `;`), XLSX relido, PDF com e sem dados, DRE por imóvel |
+| `tests/relatorios.test.mjs` | Construção dos 12 relatórios, CSV (BOM, fórmula, `;`), XLSX relido, PDF com e sem dados, DRE por imóvel |
 | `tests/conciliacao.test.mjs` | Parser OFX, CSV com mapeamento e sugestão, deduplicação por FITID, sugestão por valor/data, txid como dica (valor obrigatório), confirmação e bloqueio de transação já tratada |
 | `tests/analytics.test.mjs` | Série mensal, filtro por proprietário, ocupação, composição, ranking, KPIs, período invertido e cache de configurações |
 | `tests/assistente.test.mjs` | Normalização, períodos (mês passado, nome do mês, últimos N meses), resumo, caixa, ocupação, ajuda, busca por nome, inadimplência e limites de pergunta |
+| `tests/validacao.test.mjs` | CPF/CNPJ por dígito verificador, sequências repetidas, normalização e mensagens de erro |
+| `tests/auditoria.test.mjs` | Encadeamento de hash, detecção de adulteração, reencadeamento, filtros, envelope e diff antes/depois |
+| `tests/previsao.test.mjs` | Regressão, indicadores, riscos, recomendações, cenário estressado, limites e intenções do assistente |
+| `tests/backup.test.mjs` | `integrity_check`, snapshot, comparação de contagens, ensaio de restauração, retenção e simulação LGPD |
+| `tests/seguranca-avancada.test.mjs` | Cabeçalhos, CSRF, content-type, RBAC, travessia de diretório, injeção em filtros, CPF duplicado, rate limit, auditoria e backup |
 
 ### O que cada suíte protege
 

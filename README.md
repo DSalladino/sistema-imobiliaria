@@ -15,7 +15,7 @@
   </a>
   <img src="https://img.shields.io/badge/Node.js-22.13%2B-2E4A40?logo=node.js&logoColor=white" alt="Node.js 22.13+">
   <img src="https://img.shields.io/badge/SQLite-node%3Asqlite-5C8571?logo=sqlite&logoColor=white" alt="SQLite">
-  <img src="https://img.shields.io/badge/vers%C3%A3o-0.9.0-C9A87C" alt="Versão 0.9.0">
+  <img src="https://img.shields.io/badge/vers%C3%A3o-0.10.0-C9A87C" alt="Versão 0.10.0">
   <img src="https://img.shields.io/badge/licen%C3%A7a-MIT-2E4A40" alt="Licença MIT">
   <img src="https://img.shields.io/badge/PRs-bem--vindos-5C8571" alt="PRs bem-vindos">
 </p>
@@ -49,7 +49,7 @@ poucos usuários — e prioriza **simplicidade operacional**, **rastreabilidade*
 **baixo custo**. O resultado é um monólito Node.js + SQLite com frontend sem
 build, testes automatizados e documentação de ponta a ponta.
 
-> **Status:** versão 0.9.0, em evolução ativa. O repositório não contém dados
+> **Status:** versão 0.10.0, em evolução ativa. O repositório não contém dados
 > reais; a base de demonstração é separada da produção.
 
 ### Por que este projeto é diferente
@@ -67,8 +67,13 @@ build, testes automatizados e documentação de ponta a ponta.
 - **Assistente que conhece os números.** Perguntas em português sobre
   inadimplência, caixa, repasses, contratos e ocupação são respondidas pelo
   próprio banco, sem enviar dados a serviços externos.
-- **Segurança de verdade.** Sessão server-side, CSRF, CSP, rate limit, 2FA TOTP,
-  upload privado, LGPD e backup com verificação de integridade.
+- **Segurança de verdade.** Sessão server-side com expiração por inatividade, CSRF, CSP,
+  rate limit, 2FA TOTP, upload privado, validação de CPF/CNPJ, LGPD e backup com
+  ensaio real de restauração.
+- **Auditoria que prova.** Cada registro da trilha encadeia o hash do anterior;
+  editar o banco diretamente quebra a verificação.
+- **Decisão com horizonte.** Análises futuras projetam receita, resultado e caixa
+  com faixa de erro, riscos e simulador de cenário — tudo no banco local.
 
 ## Demonstração
 

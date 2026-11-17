@@ -89,7 +89,28 @@ Imobiliária**, com análise específica do fluxo **Pix**. Ele complementa o
 | Auditoria | Login, CRUD, baixa, estorno, repasse, fechamento, conciliação, importação, backup, LGPD | `src/permissoes.js` |
 | LGPD | Exportação do titular, anonimização preservando financeiro, mascaramento de CPF para `consulta` | `src/api.js` |
 | Operação | `secure_delete`, permissões `0700/0600`, backup com `VACUUM INTO` + integridade, desligamento gracioso | `src/db.js`, `src/server.js` |
+| Documento | CPF/CNPJ validados por dígito verificador; duplicidade bloqueada (configurável) | `src/validacao.js`, `src/api.js` |
+| Auditoria | Trilha encadeada por SHA-256: edição direta no banco quebra a verificação | `src/auditoria.js`, `GET /api/auditoria/integridade` |
+| Sessão | Expiração por inatividade (padrão 12h) além da expiração absoluta | `src/server.js`, `setting sessao_horas` |
+| Backups | `VACUUM INTO`, `integrity_check`, `foreign_key_check`, comparação de contagens e ensaio de restauração | `src/backup.js`, `scripts/verificar-restauracao.mjs` |
+| Retenção | Expurgo de logs/comunicações/resets com backup prévio e reencadeamento da auditoria | `src/manutencao.js`, `POST /api/manutencao/retencao` |
 | Dependências | `npm audit` limpo; `npm run deps:check` para o `xlsx` de CDN | `scripts/verificar-dependencias.mjs` |
+
+### 4.1 Rodada 0.10 (novembro de 2026)
+
+Controles adicionados e cobertos por `tests/seguranca-avancada.test.mjs`:
+
+- validação de CPF/CNPJ e bloqueio de duplicidade;
+- auditoria com hash encadeado e endpoint de verificação;
+- expiração de sessão por inatividade;
+- ensaio real de restauração de backup, não apenas criação do ZIP;
+- inventário LGPD por categoria, base legal e retenção;
+- RBAC exercitado por perfil `consulta` (leitura sim, escrita/auditoria/exportação não);
+- injeção em filtros de busca, travessia de diretório no estático e CSRF.
+
+Riscos residuais que continuam válidos: dados sensíveis sem criptografia em
+repouso no SQLite/uploads; retenção ainda não agendada automaticamente; a
+projeção é estatística simples e não substitui decisão humana.
 
 ## 5. Pix — arquitetura e fronteira de confiança
 
