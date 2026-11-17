@@ -166,6 +166,28 @@ Validações relevantes:
 - referências precisam existir;
 - exceção exige contrato, competência, valor e motivo.
 
+### Parceiros (corretores, fornecedores e clientes)
+
+| Método | Rota | Acesso | Descrição |
+|---|---|---|---|
+| `GET` | `/api/parceiros?tipo=corretor&busca=` | leitura | Lista; `tipo` aceita `corretor`, `fornecedor`, `cliente` |
+| `GET` | `/api/parceiros/:id` | leitura | Detalhe |
+| `POST` | `/api/parceiros` | escrita | Cria com nome, tipo, CRECI e Pix |
+| `PUT` | `/api/parceiros/:id` | escrita | Atualiza |
+| `DELETE` | `/api/parceiros/:id` | escrita | Desativa (histórico preservado) |
+
+### Categorias financeiras
+
+| Método | Rota | Acesso | Descrição |
+|---|---|---|---|
+| `GET` | `/api/categorias?contexto=lancamento&tipo=&inativas=1` | leitura | Lista por contexto |
+| `POST` | `/api/categorias` | escrita | Cria com `contexto`, `nome`, `tipo`, `caixa` e `ordem` |
+| `PUT` | `/api/categorias/:id` | escrita | Atualiza |
+| `DELETE` | `/api/categorias/:id` | escrita | Desativa |
+
+Contextos: `lancamento`, `conta_pagar` e `conta_receber`. Categorias digitadas em um
+lançamento ou conta são incluídas automaticamente na lista.
+
 ## Painel e consultas
 
 | Método | Rota | Descrição |
@@ -324,7 +346,7 @@ Corpo do preview:
 | `GET` | `/api/contas/resumo` | A pagar, a receber, vencidos e saldo previsto |
 | `GET` | `/api/contas/previsao?meses=6&de=` | Previsão de caixa com recorrências projetadas |
 | `GET` | `/api/contas/:id` | Detalhe |
-| `POST` | `/api/contas` | Cria conta (recorrência `unica`, `mensal`, `semanal` ou `anual`) |
+| `POST` | `/api/contas` | Cria conta (recorrência `unica`, `semanal`, `mensal`, `bimestral`, `trimestral`, `semestral` ou `anual`) |
 | `PUT` | `/api/contas/:id` | Edita conta em aberto |
 | `POST` | `/api/contas/:id/pagar` | Baixa: gera lançamento e a próxima parcela |
 | `POST` | `/api/contas/:id/cancelar` | Cancela com motivo |
@@ -335,8 +357,8 @@ Corpo do preview:
 |---|---|---|
 | `GET` | `/api/comissoes?status=&competencia=&contrato_id=&corretor=` | Lista comissões |
 | `GET` | `/api/comissoes/resumo?competencia=` | Previstas, liberadas, pagas e corretores |
-| `POST` | `/api/comissoes` | Cria comissão para um contrato |
-| `POST` | `/api/comissoes/gerar-lote` | Gera as comissões da competência para contratos ativos |
+| `POST` | `/api/comissoes` | Cria comissão; aceita `corretor_id` do cadastro de parceiros ou `corretor` por nome |
+| `POST` | `/api/comissoes/gerar-lote` | Gera as comissões da competência para contratos ativos (`corretor_id` opcional) |
 | `POST` | `/api/comissoes/:id/status` | Marca como `liberada` ou `prevista` |
 | `POST` | `/api/comissoes/:id/pagar` | Paga e lança a despesa no caixa da imobiliária |
 | `POST` | `/api/comissoes/:id/cancelar` | Cancela comissão ainda não paga |

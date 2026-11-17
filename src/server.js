@@ -7,6 +7,7 @@ import { db } from './db.js';
 import { parseCookies, hashToken } from './auth.js';
 import { handleApi } from './api.js';
 import { getSettingNum } from './regras.js';
+import { backupAutomatico } from './backup.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -248,6 +249,12 @@ server.on('error', (e) => {
 });
 
 server.listen(PORT, HOST, () => {
+  try {
+    const backup = backupAutomatico();
+    if (backup) console.log(`  Snapshot automático criado: ${backup.arquivo}`);
+  } catch (e) {
+    console.warn('  Aviso: snapshot automático falhou:', e.message);
+  }
   db.prepare('DELETE FROM sessoes WHERE expira_em < ?').run(new Date().toISOString());
   db.prepare("DELETE FROM password_resets WHERE expira_em < ? OR (usado_em IS NOT NULL AND usado_em < datetime('now','-30 days'))")
     .run(new Date().toISOString());

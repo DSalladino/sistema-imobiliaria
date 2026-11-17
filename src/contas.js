@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { hojeISO, competenciaAtual, brl } from './regras.js';
+import { garantirCategoria, resolverParceiro } from './cadastros.js';
 
 /**
  * Contas a pagar e a receber, com recorrência e previsão de caixa.
@@ -9,10 +10,15 @@ import { hojeISO, competenciaAtual, brl } from './regras.js';
 
 export const RECORRENCIAS = [
   ['unica', 'Única'],
-  ['mensal', 'Mensal'],
   ['semanal', 'Semanal'],
+  ['mensal', 'Mensal'],
+  ['bimestral', 'Bimestral'],
+  ['trimestral', 'Trimestral'],
+  ['semestral', 'Semestral'],
   ['anual', 'Anual'],
 ];
+
+const MESES_POR_RECORRENCIA = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
 
 export const STATUS_CONTA = {
   aberta: 'Em aberto',
@@ -34,8 +40,8 @@ export function proximoVencimento(dataISO, recorrencia) {
     const d = new Date(ano, mes - 1, dia + 7);
     return iso(d);
   }
-  const meses = recorrencia === 'anual' ? 12 : 1;
-  if (!['mensal', 'anual'].includes(recorrencia)) {
+  const meses = MESES_POR_RECORRENCIA[recorrencia];
+  if (!meses) {
     throw Object.assign(new Error('Recorrência inválida.'), { status: 400 });
   }
   const alvo = new Date(ano, mes - 1 + meses, 1);
@@ -68,11 +74,15 @@ function normalizar(dados, atual = null) {
   if (!['imobiliaria', 'proprietarios'].includes(caixa)) {
     throw Object.assign(new Error('Caixa inválido.'), { status: 400 });
   }
+  const parceiro = resolverParceiro({
+    id: v('parceiro_id', null), nome: v('fornecedor', null), tipo: tipo === 'pagar' ? 'fornecedor' : 'cliente',
+  });
   return {
     tipo,
     descricao,
     categoria: String(v('categoria', 'Outros') || 'Outros').trim(),
-    fornecedor: v('fornecedor', null) || null,
+    fornecedor: parceiro?.nome || v('fornecedor', null) || null,
+    parceiro_id: parceiro?.id || null,
     valor_centavos: valor,
     vencimento,
     competencia: vencimento.slice(0, 7),
@@ -87,11 +97,12 @@ function normalizar(dados, atual = null) {
 }
 
 const baseSelect = `SELECT c.*, p.nome AS proprietario_nome, i.endereco AS imovel_endereco, i.numero AS imovel_numero,
-  ct.codigo AS contrato_codigo
+  ct.codigo AS contrato_codigo, pc.nome AS parceiro_nome, pc.tipo AS parceiro_tipo, pc.pix AS parceiro_pix
   FROM contas c
   LEFT JOIN proprietarios p ON p.id = c.proprietario_id
   LEFT JOIN imoveis i ON i.id = c.imovel_id
-  LEFT JOIN contratos ct ON ct.id = c.contrato_id`;
+  LEFT JOIN contratos ct ON ct.id = c.contrato_id
+  LEFT JOIN parceiros pc ON pc.id = c.parceiro_id`;
 
 function enriquecer(c) {
   if (!c) return c;
@@ -161,12 +172,13 @@ export function criar(dados, user) {
   if (existente) {
     throw Object.assign(new Error('Já existe uma conta em aberto com a mesma descrição, vencimento e valor.'), { status: 409 });
   }
-  const r = db.prepare(`INSERT INTO contas (tipo, descricao, categoria, fornecedor, valor_centavos, vencimento, competencia,
+  const r = db.prepare(`INSERT INTO contas (tipo, descricao, categoria, fornecedor, parceiro_id, valor_centavos, vencimento, competencia,
       recorrencia, recorrencia_fim, caixa, proprietario_id, imovel_id, contrato_id, observacoes, criado_por)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(d.tipo, d.descricao, d.categoria, d.fornecedor, d.valor_centavos, d.vencimento, d.competencia,
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(d.tipo, d.descricao, d.categoria, d.fornecedor, d.parceiro_id, d.valor_centavos, d.vencimento, d.competencia,
       d.recorrencia, d.recorrencia_fim, d.caixa, d.proprietario_id, d.imovel_id, d.contrato_id,
       d.observacoes, user?.nome || null);
+  garantirCategoria(`conta_${d.tipo}`, d.categoria, d.tipo === 'pagar' ? 'despesa' : 'receita', d.caixa);
   return obter(Number(r.lastInsertRowid));
 }
 
@@ -177,12 +189,13 @@ export function atualizar(id, dados, user) {
     throw Object.assign(new Error('Somente contas em aberto podem ser editadas.'), { status: 409 });
   }
   const d = normalizar(dados, atual);
-  db.prepare(`UPDATE contas SET tipo=?, descricao=?, categoria=?, fornecedor=?, valor_centavos=?, vencimento=?,
+  db.prepare(`UPDATE contas SET tipo=?, descricao=?, categoria=?, fornecedor=?, parceiro_id=?, valor_centavos=?, vencimento=?,
       competencia=?, recorrencia=?, recorrencia_fim=?, caixa=?, proprietario_id=?, imovel_id=?, contrato_id=?,
       observacoes=?, atualizado_em=datetime('now','localtime') WHERE id=?`)
-    .run(d.tipo, d.descricao, d.categoria, d.fornecedor, d.valor_centavos, d.vencimento, d.competencia,
+    .run(d.tipo, d.descricao, d.categoria, d.fornecedor, d.parceiro_id, d.valor_centavos, d.vencimento, d.competencia,
       d.recorrencia, d.recorrencia_fim, d.caixa, d.proprietario_id, d.imovel_id, d.contrato_id,
       d.observacoes, atual.id);
+  garantirCategoria(`conta_${d.tipo}`, d.categoria, d.tipo === 'pagar' ? 'despesa' : 'receita', d.caixa);
   return obter(atual.id);
 }
 
@@ -204,10 +217,10 @@ function criarProximaParcela(conta, user) {
   const jaExiste = db.prepare(`SELECT id FROM contas WHERE recorrencia_origem_id = ? AND vencimento = ? AND status <> 'cancelada'`)
     .get(conta.recorrencia_origem_id || conta.id, proximo);
   if (jaExiste) return Number(jaExiste.id);
-  const r = db.prepare(`INSERT INTO contas (tipo, descricao, categoria, fornecedor, valor_centavos, vencimento, competencia,
+  const r = db.prepare(`INSERT INTO contas (tipo, descricao, categoria, fornecedor, parceiro_id, valor_centavos, vencimento, competencia,
       recorrencia, recorrencia_fim, recorrencia_origem_id, caixa, proprietario_id, imovel_id, contrato_id, observacoes, criado_por)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(conta.tipo, conta.descricao, conta.categoria, conta.fornecedor, conta.valor_centavos, proximo,
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(conta.tipo, conta.descricao, conta.categoria, conta.fornecedor, conta.parceiro_id, conta.valor_centavos, proximo,
       proximo.slice(0, 7), conta.recorrencia, conta.recorrencia_fim, conta.recorrencia_origem_id || conta.id,
       conta.caixa, conta.proprietario_id, conta.imovel_id, conta.contrato_id, conta.observacoes, user?.nome || null);
   return Number(r.lastInsertRowid);

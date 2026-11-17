@@ -345,6 +345,33 @@ CREATE TABLE IF NOT EXISTS comissoes (
   UNIQUE (contrato_id, competencia, corretor)
 );
 
+CREATE TABLE IF NOT EXISTS parceiros (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tipo TEXT NOT NULL DEFAULT 'fornecedor',
+  nome TEXT NOT NULL,
+  cpf_cnpj TEXT,
+  creci TEXT,
+  email TEXT,
+  telefone TEXT,
+  pix TEXT,
+  endereco TEXT,
+  observacoes TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS categorias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  contexto TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  tipo TEXT,
+  caixa TEXT,
+  ordem INTEGER NOT NULL DEFAULT 0,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  UNIQUE (contexto, nome)
+);
+
 CREATE TABLE IF NOT EXISTS reajustes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   contrato_id INTEGER NOT NULL REFERENCES contratos(id),
@@ -375,6 +402,8 @@ CREATE TABLE IF NOT EXISTS rescisoes (
 CREATE INDEX IF NOT EXISTS idx_contas_venc ON contas(vencimento, status);
 CREATE INDEX IF NOT EXISTS idx_contas_tipo ON contas(tipo, status);
 CREATE INDEX IF NOT EXISTS idx_comissoes_status ON comissoes(status, competencia);
+CREATE INDEX IF NOT EXISTS idx_parceiros_tipo ON parceiros(tipo, ativo);
+CREATE INDEX IF NOT EXISTS idx_categorias_contexto ON categorias(contexto, ativo, ordem);
 CREATE INDEX IF NOT EXISTS idx_reajustes_contrato ON reajustes(contrato_id);
 CREATE INDEX IF NOT EXISTS idx_lanc_comp ON lancamentos(competencia);
 CREATE INDEX IF NOT EXISTS idx_lanc_prop ON lancamentos(proprietario_id);
@@ -407,7 +436,10 @@ garantirColuna('conciliacoes', 'sugestao_tipo', 'TEXT');
 garantirColuna('conciliacoes', 'sugestao_id', 'INTEGER');
 garantirColuna('conciliacoes', 'sugestao_label', 'TEXT');
 garantirColuna('contratos', 'corretor', 'TEXT');
+garantirColuna('contratos', 'corretor_id', 'INTEGER REFERENCES parceiros(id)');
 garantirColuna('contratos', 'comissao_pct', 'REAL');
+garantirColuna('comissoes', 'corretor_id', 'INTEGER REFERENCES parceiros(id)');
+garantirColuna('contas', 'parceiro_id', 'INTEGER REFERENCES parceiros(id)');
 garantirColuna('auditoria', 'hash_anterior', 'TEXT');
 garantirColuna('auditoria', 'hash', 'TEXT');
 garantirColuna('sessoes', 'ultimo_uso', 'TEXT');
@@ -489,6 +521,7 @@ const SETTINGS_PADRAO = [
   ['whatsapp_modo', 'link', 'Modo de envio do WhatsApp', 'integracao', 'lista', 'link,api', 93],
   ['whatsapp_numero', '', 'WhatsApp da empresa no formato wa.me (DDI + DDD + número)', 'integracao', 'texto', null, 94],
   ['backup_aviso_dias', '7', 'Aviso se o último backup tiver mais de (dias)', 'seguranca', 'numero', null, 40],
+  ['backup_automatico_horas', '24', 'Criar snapshot automático ao iniciar após (horas)', 'seguranca', 'numero', null, 44],
   ['backup_retencao_dias', '30', 'Retenção dos snapshots automáticos de segurança (dias)', 'seguranca', 'numero', null, 42],
   ['sessao_horas', '12', 'Encerrar sessão após inatividade (horas)', 'seguranca', 'numero', null, 43],
   ['ultimo_backup', '', 'Último backup registrado', 'seguranca', 'data', null, 41],
@@ -496,6 +529,48 @@ const SETTINGS_PADRAO = [
 
 const insSetting = db.prepare(`INSERT OR IGNORE INTO settings (chave, valor, rotulo, grupo, tipo, opcoes, ordem) VALUES (?,?,?,?,?,?,?)`);
 for (const s of SETTINGS_PADRAO) insSetting.run(...s);
+
+// Dicionário inicial de categorias. O usuário pode acrescentar ou desativar
+// itens na tela Cadastros › Categorias; categorias novas usadas em lançamentos
+// ou contas também entram automaticamente, sem obrigar ninguém a configurar
+// tudo antes do primeiro uso.
+export const CATEGORIAS_PADRAO = [
+  ['lancamento', 'Aluguel', 'receita', 'proprietarios', 10],
+  ['lancamento', 'Taxa de administração', 'receita', 'imobiliaria', 20],
+  ['lancamento', 'Multa e juros', 'receita', 'proprietarios', 30],
+  ['lancamento', 'Comissão recebida', 'receita', 'imobiliaria', 40],
+  ['lancamento', 'Reembolso', 'receita', 'imobiliaria', 50],
+  ['lancamento', 'Outras receitas', 'receita', 'imobiliaria', 90],
+  ['lancamento', 'Repasse ao proprietário', 'despesa', 'proprietarios', 10],
+  ['lancamento', 'Manutenção', 'despesa', 'proprietarios', 20],
+  ['lancamento', 'Condomínio', 'despesa', 'proprietarios', 30],
+  ['lancamento', 'IPTU', 'despesa', 'proprietarios', 40],
+  ['lancamento', 'Comissão de corretagem', 'despesa', 'imobiliaria', 50],
+  ['lancamento', 'Pessoal', 'despesa', 'imobiliaria', 60],
+  ['lancamento', 'Impostos', 'despesa', 'imobiliaria', 70],
+  ['lancamento', 'Marketing', 'despesa', 'imobiliaria', 80],
+  ['lancamento', 'Material de escritório', 'despesa', 'imobiliaria', 85],
+  ['lancamento', 'Serviços', 'despesa', 'imobiliaria', 86],
+  ['lancamento', 'Outras despesas', 'despesa', 'imobiliaria', 90],
+  ['conta_pagar', 'Ocupação', 'despesa', 'imobiliaria', 10],
+  ['conta_pagar', 'Condomínio', 'despesa', 'proprietarios', 20],
+  ['conta_pagar', 'IPTU', 'despesa', 'proprietarios', 30],
+  ['conta_pagar', 'Manutenção', 'despesa', 'proprietarios', 40],
+  ['conta_pagar', 'Impostos', 'despesa', 'imobiliaria', 50],
+  ['conta_pagar', 'Pessoal', 'despesa', 'imobiliaria', 60],
+  ['conta_pagar', 'Comissão de corretagem', 'despesa', 'imobiliaria', 70],
+  ['conta_pagar', 'Marketing', 'despesa', 'imobiliaria', 80],
+  ['conta_pagar', 'Serviços', 'despesa', 'imobiliaria', 85],
+  ['conta_pagar', 'Outros', 'despesa', 'imobiliaria', 90],
+  ['conta_receber', 'Aluguel', 'receita', 'proprietarios', 10],
+  ['conta_receber', 'Taxa de administração', 'receita', 'imobiliaria', 20],
+  ['conta_receber', 'Multa e juros', 'receita', 'proprietarios', 30],
+  ['conta_receber', 'Comissão recebida', 'receita', 'imobiliaria', 40],
+  ['conta_receber', 'Reembolso', 'receita', 'imobiliaria', 50],
+  ['conta_receber', 'Outros', 'receita', 'imobiliaria', 90],
+];
+const insCategoria = db.prepare(`INSERT OR IGNORE INTO categorias (contexto, nome, tipo, caixa, ordem) VALUES (?,?,?,?,?)`);
+for (const c of CATEGORIAS_PADRAO) insCategoria.run(...c);
 
 const qtdUsuarios = db.prepare('SELECT COUNT(*) AS n FROM usuarios').get().n;
 if (qtdUsuarios === 0) {
@@ -540,6 +615,13 @@ export function seedDemo() {
   const i2 = Number(insImovel.run(p1, 'Casa do Sol', 'Rua do Sol', '9', '', 'Jardim', 'São Paulo', 'SP', '02000-000', 'casa', 'alugado', null).lastInsertRowid);
   const i3 = Number(insImovel.run(p2, 'Sala Central', 'Av. Central', '45', 'Sala 12', 'Centro', 'São Paulo', 'SP', '03000-000', 'comercial', 'alugado', 5).lastInsertRowid);
   const i4 = Number(insImovel.run(p3, 'Apto Verde', 'Rua Verde', '12', 'Apto 71', 'Vila Nova', 'São Paulo', 'SP', '04000-000', 'apartamento', 'alugado', null).lastInsertRowid);
+
+  const insParceiro = db.prepare(`INSERT INTO parceiros (tipo, nome, cpf_cnpj, creci, email, telefone, pix, observacoes) VALUES (?,?,?,?,?,?,?,?)`);
+  insParceiro.run('corretor', 'Corretora Horizonte', '12.345.678/0001-95', 'CRECI-SP 12345-J', 'contato@horizonte.com', '(11) 97777-1010', 'contato@horizonte.com', 'Parceira para indicações da zona sul.');
+  insParceiro.run('corretor', 'Bruno Almeida', '222.333.444-05', 'CRECI-SP 98765-F', 'bruno@exemplo.com', '(11) 96666-2020', '222.333.444-05', 'Corretor autônomo.');
+  insParceiro.run('fornecedor', 'Oficina Hidráulica Silva', '33.444.555/0001-81', null, 'contato@hidraulicasilva.com', '(11) 95555-3030', '33444555000181', 'Manutenção hidráulica e elétrica.');
+  insParceiro.run('fornecedor', 'Condomínio Edifício Central', null, null, 'sindico@central.com', '(11) 94444-4040', null, 'Cobrança mensal de condomínio.');
+  insParceiro.run('cliente', 'Studio Design Ltda', '12.345.678/0001-95', null, 'contato@studio.com', '(11) 93333-6666', 'contato@studio.com', 'Inquilino comercial, também compra serviços.');
 
   const insInq = db.prepare(`INSERT INTO inquilinos (nome, cpf_cnpj, email, telefone) VALUES (?,?,?,?)`);
   const q1 = Number(insInq.run('Carlos Mendes', '222.333.444-05', 'carlos@exemplo.com', '(11) 95555-4444').lastInsertRowid);

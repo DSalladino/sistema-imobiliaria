@@ -312,7 +312,7 @@ const camposProprietario = () => [
   { name: 'agencia', label: 'Agência' },
   { name: 'conta', label: 'Conta' },
   { name: 'tipo_conta', label: 'Tipo de conta', type: 'select', options: ['corrente', 'poupanca', 'pagamento'] },
-  { name: 'pix', label: 'Pix' },
+  { name: 'pix', label: 'Chave Pix', hint: 'CPF/CNPJ, e-mail, telefone com DDD ou chave aleatória. Usada no comprovante de repasse.' },
   { name: 'documento_url', label: 'Link de documentos', span: 2, placeholder: 'https://…' },
   { name: 'observacoes', label: 'Observações', type: 'textarea' },
   { name: 'ativo', label: 'Ativo', type: 'checkbox', checkLabel: 'Cadastro ativo', span: 2 },
@@ -347,7 +347,7 @@ export async function viewProprietarios(root) {
     lista.innerHTML = tableHtml([
       { label: 'Nome', render: p => `<strong>${esc(p.nome)}</strong>${p.observacoes ? `<span class="sub">${esc(p.observacoes)}</span>` : ''}` },
       { label: 'CPF/CNPJ', render: p => esc(p.cpf_cnpj || '—') },
-      { label: 'Contato', render: p => `${esc(p.telefone || '—')}${p.email ? `<span class="sub">${esc(p.email)}</span>` : ''}` },
+      { label: 'Contato', render: p => `${esc(p.telefone || '—')}${p.email ? `<span class="sub">${esc(p.email)}</span>` : ''}${p.pix ? `<span class="sub">Pix: ${esc(p.pix)}</span>` : ''}` },
       { label: 'Taxa', num: true, render: p => p.taxa_admin_pct != null ? `${p.taxa_admin_pct}%` : '<span class="muted">padrão</span>' },
       { label: 'Situação', render: p => badge(p.ativo ? 'Ativo' : 'Inativo', p.ativo ? 'sage' : 'plain') },
       { label: 'Ações', acao: p => `
@@ -525,7 +525,7 @@ export async function viewInquilinos(root) {
    CONTRATOS
    ============================================================ */
 export async function viewContratos(root) {
-  let dados = [], imoveis = [], inquilinos = [], filtro = 'todos', busca = '';
+  let dados = [], imoveis = [], inquilinos = [], parceiros = [], filtro = 'todos', busca = '';
   root.innerHTML = head('Contratos', 'Vigência, aluguel, reajuste, garantia e exceção de taxa.', `${podeEscrever() ? `<button class="btn" data-reajuste>${icon('chart')} Reajuste em lote</button>` : ''}${podeEscrever() ? `<button class="btn primary" data-novo>${icon('plus')} Novo contrato</button>` : ''}`)
     + `<div class="filters">
         <div class="search grow">${icon('search')}<input placeholder="Buscar por código, imóvel, inquilino ou proprietário" data-busca></div>
@@ -547,6 +547,8 @@ export async function viewContratos(root) {
     { name: 'garantia_tipo', label: 'Garantia', type: 'select', options: [['nenhuma', 'Nenhuma'], ['caucao', 'Caução'], ['fiador', 'Fiador'], ['seguro', 'Seguro fiança']] },
     { name: 'garantia_valor_centavos', label: 'Valor da garantia (R$)', type: 'money' },
     { name: 'garantia_fim', label: 'Fim da garantia', type: 'date' },
+    { name: 'corretor', label: 'Corretor(a)', type: 'datalist', options: parceiros.filter(p => p.ativo && (p.tipo === 'corretor' || p.tipo === 'ambos')).map(p => ({ value: p.nome, label: p.creci ? `${p.nome} — ${p.creci}` : p.nome })), hint: 'Cadastre em Cadastros › Corretores e parceiros. Também pode digitar um nome novo.' },
+    { name: 'comissao_pct', label: 'Comissão do contrato (%)', type: 'percent', hint: 'Vazio usa a comissão padrão.' },
     { name: 'taxa_admin_pct', label: 'Exceção de taxa (%)', type: 'percent', hint: 'Exige justificativa. Vence imóvel, proprietário e regra geral.' },
     { name: 'justificativa_taxa', label: 'Justificativa da exceção', span: 2 },
     { name: 'documento_url', label: 'Link do contrato assinado', span: 2 },
@@ -641,7 +643,7 @@ export async function viewContratos(root) {
       { label: 'Contrato', render: c => `<strong>${esc(c.codigo || '#' + c.id)}</strong><span class="sub">${dataBR(c.inicio)} → ${c.fim ? dataBR(c.fim) : 'sem fim'}</span>` },
       { label: 'Imóvel', render: c => `${esc(c.endereco)}${c.numero ? ', ' + esc(c.numero) : ''}<span class="sub">${esc(c.proprietario_nome)}</span>` },
       { label: 'Inquilino', key: 'inquilino_nome' },
-      { label: 'Aluguel', num: true, render: c => `<strong>${brl(c.aluguel_centavos)}</strong><span class="sub">dia ${c.dia_vencimento}</span>` },
+      { label: 'Aluguel', num: true, render: c => `<strong>${brl(c.aluguel_centavos)}</strong><span class="sub">dia ${c.dia_vencimento}${c.corretor ? ' · ' + esc(c.corretor) : ''}</span>` },
       { label: 'Taxa', num: true, render: c => c.taxa_admin_pct != null ? `${c.taxa_admin_pct}% <span class="badge butter">exceção</span>` : '<span class="muted">regra</span>' },
       { label: 'Status', render: c => badge(c.status, c.status === 'ativo' ? 'sage' : c.status === 'encerrado' ? 'plain' : 'butter') },
       { label: 'Ações', acao: c => `
@@ -676,7 +678,7 @@ export async function viewContratos(root) {
   };
   const carregar = async () => {
     try {
-      [dados, imoveis, inquilinos] = await Promise.all([api('/contratos'), api('/imoveis'), api('/inquilinos')]);
+      [dados, imoveis, inquilinos, parceiros] = await Promise.all([api('/contratos'), api('/imoveis'), api('/inquilinos'), api('/parceiros')]);
       render();
     } catch (e) { lista.innerHTML = erroBox(e); }
   };
@@ -778,5 +780,140 @@ export async function abrirGerarCobrancas(aoConcluir) {
       aoConcluir?.();
     } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
   };
+  await carregar();
+}
+
+/* ============================================================
+   PARCEIROS (CORRETORES, FORNECEDORES E CLIENTES)
+   ============================================================ */
+const TIPOS_PARCEIRO = [
+  ['corretor', 'Corretor(a)'], ['fornecedor', 'Fornecedor(a)'],
+  ['cliente', 'Cliente'], ['ambos', 'Fornecedor e cliente'],
+];
+
+const camposParceiro = () => [
+  { name: 'tipo', label: 'Tipo', type: 'select', required: true, options: TIPOS_PARCEIRO },
+  { name: 'nome', label: 'Nome / razão social', required: true },
+  { name: 'cpf_cnpj', label: 'CPF/CNPJ' },
+  { name: 'creci', label: 'CRECI', hint: 'Obrigatório para corretor de imóveis.' },
+  { name: 'telefone', label: 'Telefone / WhatsApp' },
+  { name: 'email', label: 'E-mail', type: 'email' },
+  { name: 'pix', label: 'Chave Pix', hint: 'Usada no pagamento de comissões e repasses.' },
+  { name: 'endereco', label: 'Endereço', span: 2 },
+  { name: 'observacoes', label: 'Observações', type: 'textarea', span: 2 },
+  { name: 'ativo', label: 'Ativo', type: 'checkbox', checkLabel: 'Cadastro ativo', span: 2 },
+];
+
+export async function viewParceiros(root) {
+  let dados = [], busca = '', tipo = '';
+  root.innerHTML = head('Corretores e parceiros', 'Quem recebe comissões, fornece serviços ou compra da imobiliária.', podeEscrever() ? `<button class="btn primary" data-novo>${icon('plus')} Novo parceiro</button>` : '')
+    + `<div class="filters">
+        <label class="field"><span>Tipo</span><select data-tipo><option value="">Todos</option>${TIPOS_PARCEIRO.map(t => `<option value="${t[0]}">${t[1]}</option>`).join('')}</select></label>
+        <div class="search grow">${icon('search')}<input placeholder="Buscar por nome, CPF/CNPJ, CRECI, e-mail ou telefone" data-busca></div>
+      </div><div data-lista>${loadingBox()}</div>`;
+  const lista = root.querySelector('[data-lista]');
+  const rotuloTipo = (t) => (TIPOS_PARCEIRO.find(x => x[0] === t) || [, t])[1];
+
+  const abrirForm = (p = null) => formModal({
+    titulo: p ? 'Editar parceiro' : 'Novo parceiro',
+    subtitulo: 'Corretores cadastrados aqui aparecem na seleção de comissões e contratos.',
+    fields: camposParceiro(), wide: true,
+    valores: p || { tipo: 'corretor', ativo: 1 },
+    onSubmit: async (d) => {
+      if (p) await api(`/parceiros/${p.id}`, { method: 'PUT', body: d });
+      else await api('/parceiros', { method: 'POST', body: d });
+      toast(p ? 'Parceiro atualizado.' : 'Parceiro cadastrado.'); carregar();
+    },
+  });
+
+  const render = () => {
+    const termo = busca.toLowerCase();
+    const filtrados = dados.filter(p => (!tipo || p.tipo === tipo || p.tipo === 'ambos')
+      && (!termo || [p.nome, p.cpf_cnpj, p.creci, p.email, p.telefone, p.pix].some(v => String(v || '').toLowerCase().includes(termo))));
+    lista.innerHTML = tableHtml([
+      { label: 'Parceiro', render: p => `<strong>${esc(p.nome)}</strong><span class="sub">${esc(rotuloTipo(p.tipo))}${p.creci ? ' · ' + esc(p.creci) : ''}</span>` },
+      { label: 'Contato', render: p => `${esc(p.telefone || '—')}${p.email ? `<span class="sub">${esc(p.email)}</span>` : ''}` },
+      { label: 'CPF/CNPJ', render: p => esc(p.cpf_cnpj || '—') },
+      { label: 'Pix', render: p => esc(p.pix || '—') },
+      { label: 'Situação', render: p => badge(p.ativo ? 'Ativo' : 'Inativo', p.ativo ? 'sage' : 'plain') },
+      { label: 'Ações', acao: p => `${podeEscrever() ? `<button class="icon-btn" data-edit="${p.id}" title="Editar">${icon('edit')}</button>` : ''}
+        ${podeEscrever() && p.ativo ? `<button class="icon-btn" data-del="${p.id}" title="Desativar">${icon('trash')}</button>` : ''}` },
+    ], filtrados);
+    lista.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => abrirForm(dados.find(x => x.id === Number(b.dataset.edit))));
+    lista.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+      const p = dados.find(x => x.id === Number(b.dataset.del));
+      if (!await confirmar({ titulo: 'Desativar parceiro', mensagem: `Desativar ${p.nome}? O histórico de comissões e contas é preservado.`, textoBotao: 'Desativar', perigo: true })) return;
+      try { await api(`/parceiros/${p.id}`, { method: 'DELETE' }); toast('Parceiro desativado.'); carregar(); } catch (e) { toast(e.message, 'err'); }
+    });
+  };
+
+  const carregar = async () => {
+    try { dados = await api('/parceiros'); render(); } catch (e) { lista.innerHTML = erroBox(e); }
+  };
+  root.querySelector('[data-tipo]').onchange = (e) => { tipo = e.target.value; render(); };
+  root.querySelector('[data-busca]').addEventListener('input', (e) => { busca = e.target.value; render(); });
+  const novo = root.querySelector('[data-novo]'); if (novo) novo.onclick = () => abrirForm();
+  await carregar();
+}
+
+/* ============================================================
+   CATEGORIAS FINANCEIRAS
+   ============================================================ */
+const CONTEXTOS_CATEGORIA = [
+  ['lancamento', 'Lançamentos'], ['conta_pagar', 'Contas a pagar'], ['conta_receber', 'Contas a receber'],
+];
+const contextoLabel = (c) => (CONTEXTOS_CATEGORIA.find(x => x[0] === c) || [, c])[1];
+
+export async function viewCategorias(root) {
+  let dados = [], contexto = '';
+  root.innerHTML = head('Categorias financeiras', 'Opções que aparecem nos lançamentos e nas contas a pagar/receber.', podeEscrever() ? `<button class="btn primary" data-nova>${icon('plus')} Nova categoria</button>` : '')
+    + `<div class="filters">
+        <label class="field"><span>Contexto</span><select data-contexto><option value="">Todos</option>${CONTEXTOS_CATEGORIA.map(c => `<option value="${c[0]}">${c[1]}</option>`).join('')}</select></label>
+        <div class="notice grow">Categorias novas digitadas em um lançamento ou conta entram automaticamente nesta lista.</div>
+      </div><div data-lista>${loadingBox()}</div>`;
+  const lista = root.querySelector('[data-lista]');
+
+  const abrirForm = (c = null) => formModal({
+    titulo: c ? 'Editar categoria' : 'Nova categoria',
+    fields: [
+      { name: 'contexto', label: 'Onde aparece', type: 'select', required: true, options: CONTEXTOS_CATEGORIA },
+      { name: 'nome', label: 'Nome', required: true },
+      { name: 'tipo', label: 'Tipo', type: 'select', options: [['receita', 'Receita'], ['despesa', 'Despesa']] },
+      { name: 'caixa', label: 'Caixa sugerido', type: 'select', options: [['proprietarios', 'Proprietários'], ['imobiliaria', 'Imobiliária']] },
+      { name: 'ordem', label: 'Ordem na lista', type: 'number', min: 0 },
+      { name: 'ativo', label: 'Ativa', type: 'checkbox', checkLabel: 'Mostrar nas seleções', span: 2 },
+    ],
+    valores: c || { contexto: 'lancamento', ordem: 50, ativo: 1 },
+    onSubmit: async (d) => {
+      if (c) await api(`/categorias/${c.id}`, { method: 'PUT', body: d });
+      else await api('/categorias', { method: 'POST', body: d });
+      toast(c ? 'Categoria atualizada.' : 'Categoria criada.'); carregar();
+    },
+  });
+
+  const render = () => {
+    const filtrados = dados.filter(c => !contexto || c.contexto === contexto);
+    lista.innerHTML = tableHtml([
+      { label: 'Categoria', render: c => `<strong>${esc(c.nome)}</strong><span class="sub">${esc(contextoLabel(c.contexto))}</span>` },
+      { label: 'Tipo', render: c => c.tipo ? badge(c.tipo === 'receita' ? 'Receita' : 'Despesa', c.tipo === 'receita' ? 'sage' : 'blush') : '<span class="muted">—</span>' },
+      { label: 'Caixa sugerido', render: c => esc(c.caixa === 'proprietarios' ? 'Proprietários' : c.caixa === 'imobiliaria' ? 'Imobiliária' : '—') },
+      { label: 'Ordem', num: true, render: c => esc(c.ordem) },
+      { label: 'Situação', render: c => badge(c.ativo ? 'Ativa' : 'Inativa', c.ativo ? 'sage' : 'plain') },
+      { label: 'Ações', acao: c => `${podeEscrever() ? `<button class="icon-btn" data-edit="${c.id}" title="Editar">${icon('edit')}</button>` : ''}
+        ${podeEscrever() && c.ativo ? `<button class="icon-btn" data-del="${c.id}" title="Desativar">${icon('trash')}</button>` : ''}` },
+    ], filtrados);
+    lista.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => abrirForm(dados.find(x => x.id === Number(b.dataset.edit))));
+    lista.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+      const c = dados.find(x => x.id === Number(b.dataset.del));
+      if (!await confirmar({ titulo: 'Desativar categoria', mensagem: `Desativar “${c.nome}”? Lançamentos antigos não são alterados.`, textoBotao: 'Desativar', perigo: true })) return;
+      try { await api(`/categorias/${c.id}`, { method: 'DELETE' }); toast('Categoria desativada.'); carregar(); } catch (e) { toast(e.message, 'err'); }
+    });
+  };
+
+  const carregar = async () => {
+    try { dados = await api('/categorias?inativas=1'); render(); } catch (e) { lista.innerHTML = erroBox(e); }
+  };
+  root.querySelector('[data-contexto]').onchange = (e) => { contexto = e.target.value; render(); };
+  const nova = root.querySelector('[data-nova]'); if (nova) nova.onclick = () => abrirForm();
   await carregar();
 }
