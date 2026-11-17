@@ -1,6 +1,6 @@
 {
   "name": "sistema-imobiliaria",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "type": "module",
   "description": "Sistema de gestão para imobiliária familiar: cadastros, contratos, cobranças, conciliação, repasses, documentos e relatórios.",

@@ -6,7 +6,8 @@ Correções de segurança são aplicadas na versão estável publicada em `main`
 
 | Versão | Suporte |
 |---|---|
-| 0.6.x | Sim |
+| 0.8.x | Sim |
+| 0.6.x–0.7.x | Correções críticas sob demanda |
 | Anteriores | Recomenda-se atualizar |
 
 ## Como reportar uma vulnerabilidade
@@ -32,7 +33,13 @@ Fazem parte do escopo:
 - injeção de SQL, XSS, CSRF, path traversal e upload de arquivos;
 - exposição de dados pessoais, documentos e backups;
 - configuração de produção, HTTPS e cabeçalhos de segurança;
+- **Pix**: geração de BR Code/QR, chave do recebedor, `txid`, envio por WhatsApp
+  e conciliação de pagamentos;
 - dependências com vulnerabilidades conhecidas.
+
+A análise completa, o modelo de ameaças e o runbook de incidentes estão em
+[docs/SEGURANCA.md](docs/SEGURANCA.md). O checklist ponto a ponto está em
+[docs/checklist-seguranca.md](docs/checklist-seguranca.md).
 
 ## Práticas adotadas
 
@@ -50,6 +57,11 @@ Fazem parte do escopo:
 - Backup em ZIP inclui banco, documentos e, quando existir, `.app-key`; o arquivo é tratado como confidencial.
 - Auditoria de login, alterações, estornos, fechamentos, importações, backups e LGPD.
 - Exportações CSV protegidas contra injeção de fórmula.
+- **Pix estático sem PSP**: o BR Code é gerado localmente, a chave é validada
+  como ASCII e medida em bytes, o `txid` é apenas uma dica de conciliação e a
+  baixa depende de extrato + confirmação humana. Não há webhook de pagamento.
+- Tela de configuração de integrações exige autenticação; a chave Pix é
+  considerada informação de recebimento, não segredo.
 
 ## Recomendações de produção
 
@@ -60,7 +72,11 @@ Fazem parte do escopo:
 - Configurar `PUBLIC_URL` para os links de recuperação de senha.
 - Executar backup externo diário e testar a restauração periodicamente.
 - Manter `npm audit` limpo e atualizar dependências.
+- Rodar `npm run deps:check` (o `xlsx` vem de CDN e não aparece no `npm audit`).
 - Revisar os fluxos de LGPD e a retenção de dados com apoio jurídico.
+- **Pix**: usar chave EVP dedicada, orientar inquilinos a conferir o nome do
+  recebedor no app, baixar somente após conferir o extrato e tratar
+  devoluções/MED diretamente no banco.
 
 ## Divulgação
 

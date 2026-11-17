@@ -3,7 +3,7 @@
 Documento de referência técnica: o que está implementado, como executar, onde
 fica cada módulo e quais pendências permanecem.
 
-> **Versão:** 0.8.0 · **Última revisão:** novembro de 2026
+> **Versão:** 0.8.1 · **Última revisão:** novembro de 2026
 
 ## Stack e execução
 
@@ -90,7 +90,8 @@ Pix por cobrança, WhatsApp Cloud API, contas a pagar/receber com recorrência e
 previsão de caixa, comissões, reajuste em lote, rescisão e DRE por imóvel. A
 0.8.0 acrescentou troca de senha exigida no servidor, seed opt-in, paginação com
 aviso de truncamento, cache de configurações, fontes locais, health check real e
-desligamento gracioso.
+desligamento gracioso. A 0.8.1 adicionou a análise de segurança do Pix, a
+validação de chave/tamanho EMV e o txid como dica de conciliação.
 
 ## Rotas principais
 
@@ -120,7 +121,7 @@ O contrato completo está em [API.md](API.md).
 
 ## Qualidade
 
-- 69 testes automatizados distribuídos em 10 arquivos.
+- 72 testes automatizados distribuídos em 10 arquivos.
 - CI em Node 22 e 24 (`npm ci`, `npm run deps:check`, `npm run check`,
   `npm test`).
 - Testes de UI renderizam as 22 telas em jsdom com dados reais.

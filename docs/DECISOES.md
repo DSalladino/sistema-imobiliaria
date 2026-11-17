@@ -376,3 +376,28 @@ lockfile e a versão instalada; a CI executa antes dos testes.
 - troca acidental de origem/versão falha cedo;
 - atualização exige revisão consciente;
 - não substitui monitoramento de CVE (risco residual R-13).
+
+---
+
+## ADR-019 — Pix estático sem PSP
+
+**Status:** aceito (0.7, revisado na 0.8.1)
+
+**Contexto:** imobiliária pequena, sem contrato com PSP, precisa cobrar por Pix
+com o menor custo e a menor superfície de ataque possível. Integrar PSP exigiria
+credenciais, webhook público, conciliação de retorno e tratamento de falhas.
+
+**Decisão:** gerar BR Code estático (EMV) com CRC16, QR local e copia e cola, sem
+webhook e sem baixa automática. O `txid` (`IMOB<id><AAAAMM>`) é apenas uma dica
+de conciliação; a confirmação exige valor compatível e ação humana sobre o
+extrato bancário. A chave é validada como ASCII e os campos EMV são medidos em
+bytes.
+
+**Consequências:**
+
+- nenhuma credencial de PSP para proteger e nenhum endpoint público de pagamento;
+- a garantia de recebimento depende do processo (conferir extrato, conciliação);
+- QR/chave adulterados e comprovante falso são riscos residuais de engenharia
+  social, tratados por checklist e runbook em `docs/SEGURANCA.md`;
+- se houver PSP no futuro, o txid deve vir do retorno assinado e o valor pago
+  deve ser validado antes de qualquer baixa automática.

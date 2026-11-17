@@ -4,6 +4,7 @@ import { db } from './db.js';
 import { hojeISO, exigirMesAberto } from './regras.js';
 import { pagar as pagarCobranca, calcularEncargos } from './cobrancas.js';
 import { pagarRepasse } from './regras.js';
+import { txidDaCobranca } from './pix.js';
 
 const brl = (c) => (Number(c || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -133,6 +134,10 @@ function hashTx(t) {
 
 function candidato(t) {
   const abs = Math.abs(t.valor_centavos);
+  // O txid do BR Code pode aparecer no memo do extrato. Ele ajuda a identificar
+  // a competência e permite reconhecer pagamento atrasado — mas NUNCA dispensa
+  // a conferência de valor: o memo é digitado pelo pagador.
+  const memo = String(t.descricao || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   if (t.valor_centavos > 0) {
     const cobrancas = db.prepare(`
       SELECT c.*, ct.codigo, i.endereco, i.numero, q.nome AS inquilino
@@ -151,12 +156,14 @@ function candidato(t) {
       if (saldo <= 0) continue;
       const diffPct = Math.abs(saldo - abs) / Math.max(abs, 1) * 100;
       const dias = Math.abs(Math.round((new Date(t.data) - new Date(c.vencimento)) / 86400000));
-      if (diffPct <= 5 && dias <= 20) {
-        const score = Math.round(Math.max(0, 100 - diffPct * 4 - dias));
+      const txid = txidDaCobranca(c);
+      const porTxid = txid.length >= 8 && memo.includes(txid.toUpperCase());
+      if (diffPct <= 5 && (dias <= 20 || porTxid)) {
+        const score = Math.min(100, Math.round(Math.max(0, 100 - diffPct * 4 - (porTxid ? 0 : dias))));
         if (!melhor || score > melhor.score) {
           melhor = {
             tipo: 'cobranca', id: c.id, score,
-            label: `Cobrança ${c.codigo || '#' + c.id} · ${c.inquilino} · ${brl(saldo)} · venc. ${c.vencimento.split('-').reverse().join('/')}`,
+            label: `${porTxid ? 'Txid ' + txid + ' · ' : ''}Cobrança ${c.codigo || '#' + c.id} · ${c.inquilino} · ${brl(saldo)} · venc. ${c.vencimento.split('-').reverse().join('/')}`,
           };
         }
       }
