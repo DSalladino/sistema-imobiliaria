@@ -67,6 +67,16 @@ CREATE TABLE IF NOT EXISTS auditoria (
   criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
+-- Âncora externa da trilha: guarda o último hash e o tamanho esperado. Sem
+-- isso, apagar os últimos registros não quebra a cadeia restante e passaria
+-- despercebido. A verificação compara a trilha real com esta âncora.
+CREATE TABLE IF NOT EXISTS auditoria_estado (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  ultimo_hash TEXT,
+  total INTEGER NOT NULL DEFAULT 0,
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
 CREATE TABLE IF NOT EXISTS proprietarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nome TEXT NOT NULL,
@@ -508,6 +518,15 @@ if (semHash > 0) {
   }
 }
 
+// Inicializa a âncora em bases que já tinham auditoria antes desta versão. A
+// partir daqui, qualquer remoção das últimas linhas é detectável.
+const ancoraExistente = db.prepare('SELECT id FROM auditoria_estado WHERE id = 1').get();
+if (!ancoraExistente) {
+  const ultima = db.prepare('SELECT hash FROM auditoria WHERE hash IS NOT NULL ORDER BY id DESC LIMIT 1').get();
+  const totalAuditoria = db.prepare('SELECT COUNT(*) AS n FROM auditoria').get().n;
+  db.prepare('INSERT INTO auditoria_estado (id, ultimo_hash, total) VALUES (1, ?, ?)').run(ultima?.hash || null, totalAuditoria);
+}
+
 const SETTINGS_PADRAO = [
   ['imob_nome', 'Imobiliária Exemplo', 'Nome da imobiliária', 'empresa', 'texto', null, 1],
   ['imob_cnpj', '', 'CNPJ', 'empresa', 'texto', null, 2],
@@ -656,7 +675,7 @@ export function seedDemo() {
   const i4 = Number(insImovel.run(p3, 'Apto Verde', 'Rua Verde', '12', 'Apto 71', 'Vila Nova', 'São Paulo', 'SP', '04000-000', 'apartamento', 'alugado', null).lastInsertRowid);
 
   const insParceiro = db.prepare(`INSERT INTO parceiros (tipo, nome, cpf_cnpj, creci, email, telefone, pix, observacoes) VALUES (?,?,?,?,?,?,?,?)`);
-  insParceiro.run('corretor', 'Corretora Horizonte', '12.345.678/0001-95', 'CRECI-SP 12345-J', 'contato@horizonte.com', '(11) 97777-1010', 'contato@horizonte.com', 'Parceira para indicações da zona sul.');
+  insParceiro.run('corretor', 'Corretora Horizonte', '11.222.333/0001-81', 'CRECI-SP 12345-J', 'contato@horizonte.com', '(11) 97777-1010', 'contato@horizonte.com', 'Parceira para indicações da zona sul.');
   insParceiro.run('corretor', 'Bruno Almeida', '222.333.444-05', 'CRECI-SP 98765-F', 'bruno@exemplo.com', '(11) 96666-2020', '222.333.444-05', 'Corretor autônomo.');
   insParceiro.run('fornecedor', 'Oficina Hidráulica Silva', '33.444.555/0001-81', null, 'contato@hidraulicasilva.com', '(11) 95555-3030', '33444555000181', 'Manutenção hidráulica e elétrica.');
   insParceiro.run('fornecedor', 'Condomínio Edifício Central', null, null, 'sindico@central.com', '(11) 94444-4040', null, 'Cobrança mensal de condomínio.');
@@ -709,7 +728,7 @@ export function seedDemo() {
     }
 
     insLanc.run(`${comp}-12`, comp, 'despesa', 'Material de escritório', 'Despesas do escritório', 12000, 'imobiliaria', null, null, null, 'seed');
-    insLanc.run(`${comp}-20`, comp, 'despesa', 'Outros', 'Software de gestão', 8000, 'imobiliaria', null, null, null, 'seed');
+    insLanc.run(`${comp}-20`, comp, 'despesa', 'Outras despesas', 'Software de gestão', 8000, 'imobiliaria', null, null, null, 'seed');
   }
 
   insLanc.run(addDias(-5), hojeComp, 'despesa', 'Manutenção', 'Reparo hidráulico', 35000, 'proprietarios', p1, i1, c1, 'seed');

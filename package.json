@@ -39,7 +39,7 @@
     "precheck": "node scripts/verificar-ambiente.mjs",
     "check": "node scripts/verificar-sintaxe.mjs",
     "deps:check": "node scripts/verificar-dependencias.mjs",
-    "test": "node --test tests/api.test.mjs tests/rules.test.mjs tests/seguranca.test.mjs tests/features.test.mjs tests/ui.test.mjs tests/seed.test.mjs tests/relatorios.test.mjs tests/conciliacao.test.mjs tests/analytics.test.mjs tests/assistente.test.mjs tests/validacao.test.mjs tests/auditoria.test.mjs tests/previsao.test.mjs tests/backup.test.mjs tests/cadastros.test.mjs tests/seguranca-avancada.test.mjs",
+    "test": "node --test tests/api.test.mjs tests/rules.test.mjs tests/seguranca.test.mjs tests/features.test.mjs tests/ui.test.mjs tests/seed.test.mjs tests/relatorios.test.mjs tests/conciliacao.test.mjs tests/analytics.test.mjs tests/assistente.test.mjs tests/validacao.test.mjs tests/auditoria.test.mjs tests/previsao.test.mjs tests/backup.test.mjs tests/cadastros.test.mjs tests/seguranca-avancada.test.mjs tests/diagnostico.test.mjs",
     "test:coverage": "node --test --experimental-test-coverage tests/api.test.mjs tests/rules.test.mjs tests/seguranca.test.mjs tests/features.test.mjs tests/ui.test.mjs tests/seed.test.mjs tests/relatorios.test.mjs tests/conciliacao.test.mjs tests/analytics.test.mjs tests/assistente.test.mjs tests/validacao.test.mjs tests/auditoria.test.mjs tests/previsao.test.mjs tests/backup.test.mjs tests/cadastros.test.mjs tests/seguranca-avancada.test.mjs",
     "demo": "node src/demo.js",
     "demo:preparar": "node src/demo-preparar.js",

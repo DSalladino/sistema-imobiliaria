@@ -46,6 +46,7 @@ import {
   garantirCategoria, TIPOS_PARCEIRO, TIPOS_SERVICO, FORMAS_PAGAMENTO, CAIXAS, CONTEXTOS_CATEGORIA,
 } from './cadastros.js';
 import { verificarIntegridadeAuditoria, detalharAuditoria, consultarAuditoria } from './auditoria.js';
+import { diagnosticoBase } from './diagnostico.js';
 import {
   hojeISO, competenciaAtual, getSetting, getSettingNum, setSetting, calcularRepasse, gerarRepasses,
   pagarRepasse, alertas, resumoDashboard, saldos, mesFechado, exigirMesAberto, brl,
@@ -1248,6 +1249,10 @@ export async function handleApi(req, res, url, user, ip, body) {
       const r = verificarIntegridadeAuditoria({ limite: url.searchParams.get('limite') });
       registrar(user, 'verificar_auditoria', 'auditoria', null, { ok: r.ok, total: r.total }, ip);
       return json(res, 200, r);
+    }
+    if (p === '/diagnostico' && m === 'GET') {
+      exigir(user, 'admin');
+      return json(res, 200, diagnosticoBase());
     }
     if (seg[0] === 'auditoria' && seg[1] && m === 'GET') {
       exigir(user, 'admin');

@@ -19,7 +19,7 @@ const TABELAS = [
   'usuarios', 'proprietarios', 'imoveis', 'inquilinos', 'contratos', 'excecoes',
   'lancamentos', 'cobrancas', 'cobranca_acoes', 'conciliacoes', 'repasses',
   'fechamentos', 'documentos', 'comunicacoes', 'contas', 'comissoes',
-  'reajustes', 'rescisoes', 'parceiros', 'categorias', 'auditoria',
+  'reajustes', 'rescisoes', 'parceiros', 'categorias', 'auditoria', 'auditoria_estado',
 ];
 
 export function diretorioBackups() {

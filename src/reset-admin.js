@@ -10,6 +10,7 @@
 import crypto from 'node:crypto';
 import { db } from './db.js';
 import { hashSenha } from './auth.js';
+import { inserirAuditoria } from './auditoria.js';
 import { validarSenha } from './seguranca.js';
 import { setSetting } from './regras.js';
 
@@ -43,9 +44,10 @@ try {
     totp_ativo = 0, totp_secret = NULL, totp_recovery = NULL WHERE id = ?`)
     .run(hashSenha(senha), usuario.id);
   db.prepare('DELETE FROM sessoes WHERE usuario_id = ?').run(usuario.id);
-  db.prepare(`INSERT INTO auditoria (usuario_id, usuario_nome, acao, entidade, entidade_id, detalhe)
-    VALUES (NULL, 'sistema', 'reset_admin_cli', 'usuarios', ?, ?)`)
-    .run(String(usuario.id), JSON.stringify({ email: usuario.email }));
+  inserirAuditoria({
+    usuario_nome: 'sistema', acao: 'reset_admin_cli', entidade: 'usuarios',
+    entidade_id: usuario.id, detalhe: { email: usuario.email },
+  });
   db.exec('COMMIT');
   setSetting('primeiro_acesso', '0');
 } catch (e) {

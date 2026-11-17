@@ -131,16 +131,23 @@ try {
     '/api/integracoes/status', '/api/comunicacao/status', '/api/relatorios',
     '/api/import/modelos', '/api/2fa/status', '/api/manutencao/status',
     '/api/reset/solicitacoes', '/api/usuarios', '/api/auditoria?limite=500',
+    '/api/auditoria?envelope=1&limite=500', '/api/auditoria/integridade', '/api/diagnostico',
+    '/api/cadastros/opcoes',
     '/api/fechamentos', '/api/conciliacao/resumo', '/api/documentos',
     '/api/contas', '/api/contas/resumo', '/api/contas/previsao?meses=6',
     '/api/comissoes', '/api/comissoes/resumo',
     '/api/proprietarios', '/api/imoveis', '/api/inquilinos',
     '/api/contratos', '/api/excecoes',
     '/api/parceiros', '/api/parceiros?tipo=corretor',
-    '/api/categorias?inativas=1', '/api/categorias?contexto=lancamento&inativas=0',
+    '/api/categorias?inativas=1', '/api/categorias?inativas=0', '/api/categorias?contexto=lancamento&inativas=0',
     '/api/categorias?contexto=conta_pagar', '/api/categorias?contexto=conta_receber',
   ];
   for (const caminho of fixos) await capturar(caminho);
+
+  // Detalhes de auditoria que o modal abre na demo.
+  const auditoriaDemo = respostas['/api/auditoria?envelope=1&limite=500']?.itens
+    || respostas['/api/auditoria?limite=500'] || [];
+  for (const a of auditoriaDemo.slice(0, 20)) await capturar(`/api/auditoria/${a.id}`);
 
   for (const status of ['pendente', 'conciliado', 'ignorado']) {
     await capturar(`/api/conciliacao?status=${status}`);

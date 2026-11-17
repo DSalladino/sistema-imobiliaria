@@ -20,6 +20,10 @@ const stat = (rotulo, valor, tom = '') => `<div class="kpi"><div class="kpi-labe
 const rotuloCaixa = (c) => (c === 'proprietarios' ? 'Proprietários' : c === 'imobiliaria' ? 'Imobiliária' : 'sem caixa');
 const rotuloTipoCategoria = (t) => (t === 'receita' ? 'receita' : t === 'despesa' ? 'despesa' : 'sem tipo');
 
+// A demo estática pode devolver uma lista simples ou um envelope { itens }.
+// Normalizar aqui evita que um formato antigo derrube os seletores.
+const listaApi = (v) => Array.isArray(v) ? v : Array.isArray(v?.itens) ? v.itens : [];
+
 /** Opções de categoria para os seletores dos formulários financeiros. */
 function opcoesCategoria(categorias, contexto = null) {
   return categorias
@@ -489,7 +493,7 @@ export async function viewLancamentos(root) {
             contexto: 'lancamento', tipo: tipoSel.value || null, caixa: caixaSel.value || null,
           });
           if (!nova) { categoria.value = ''; return; }
-          categorias = await api('/categorias?contexto=lancamento&inativas=0');
+          categorias = listaApi(await api('/categorias?contexto=lancamento&inativas=0')).filter(c => c.contexto === 'lancamento');
           categoria.innerHTML = [...opcoesCategoria(categorias, 'lancamento'), { value: '__nova__', label: '+ Cadastrar nova categoria…' }]
             .map(o => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');
           categoria.value = nova.nome;
@@ -584,6 +588,8 @@ export async function viewLancamentos(root) {
       [props, imoveis, contratos, categorias] = await Promise.all([
         api('/proprietarios'), api('/imoveis'), api('/contratos'), api('/categorias?contexto=lancamento&inativas=0'),
       ]);
+      props = listaApi(props); imoveis = listaApi(imoveis); contratos = listaApi(contratos);
+      categorias = listaApi(categorias).filter(c => c.contexto === 'lancamento');
       abrirForm();
     } catch (e) { toast(e.message, 'err'); }
   });
@@ -1086,23 +1092,28 @@ export async function viewAuditoria(root) {
   let dados = [];
   let total = 0;
   let filtros = { busca: '', acao: '', entidade: '', de: '', ate: '' };
-  root.innerHTML = head('Auditoria', 'Trilha encadeada por hash: alterar um registro antigo quebra a verificação.', `
-      <button class="btn" data-integridade>${icon('shield')} Verificar integridade</button>`) +
+  let ultimoDiagnostico = null;
+  root.innerHTML = head('Auditoria', 'Trilha encadeada por hash, âncora externa e diagnóstico completo da base.', `
+      <button class="btn" data-integridade>${icon('shield')} Verificar integridade</button>
+      <button class="btn primary" data-diagnostico>${icon('search')} Diagnóstico da base</button>`) +
     `<div class="filters">
-       <div class="search grow">${icon('search')}<input placeholder="Buscar usuário, ação, entidade ou detalhe" data-busca></div>
+       <div class="search grow">${icon('search')}<input placeholder="Buscar usuário, ação, entidade, detalhe ou IP" data-busca></div>
        <label class="field"><span>Ação</span><input data-acao placeholder="ex.: criar"></label>
        <label class="field"><span>Entidade</span><input data-entidade placeholder="ex.: lancamentos"></label>
        <label class="field"><span>De</span><input type="date" data-de></label>
        <label class="field"><span>Até</span><input type="date" data-ate></label>
+       <button class="btn" data-limpar type="button">Limpar filtros</button>
      </div>
      <div class="notice info" data-aviso hidden></div>
      <div class="card tight" data-lista>${loadingBox()}</div>`;
   const lista = root.querySelector('[data-lista]');
   const aviso = root.querySelector('[data-aviso]');
+  const limparAviso = () => { aviso.hidden = true; aviso.textContent = ''; };
 
   const abrirDetalhe = async (id) => {
     try {
       const a = await api(`/auditoria/${id}`);
+      const alteracoes = Array.isArray(a.alteracoes) ? a.alteracoes : [];
       openModal({
         titulo: `Auditoria #${a.id}`, subtitulo: `${a.usuario_nome || 'sistema'} · ${a.criado_em}`, wide: true,
         corpo: `<div class="grid cols-2">
@@ -1116,13 +1127,14 @@ export async function viewAuditoria(root) {
           <div class="card"><div class="card-body"><dl class="dl">
             <dt>Hash</dt><dd class="mono small" style="word-break:break-all">${esc(a.hash || '—')}</dd>
             <dt>Hash anterior</dt><dd class="mono small" style="word-break:break-all">${esc(a.hash_anterior || '—')}</dd>
+            <dt>Encadeamento</dt><dd>${a.hash ? badge('Hash presente', 'sage') : badge('Sem hash', 'blush')}</dd>
           </dl></div></div>
         </div>
-        ${a.alteracoes?.length ? `<div class="card mt-2"><div class="card-head"><h3>Alterações</h3></div><div class="card-body">${tableHtml([
+        ${alteracoes.length ? `<div class="card mt-2"><div class="card-head"><h3>Alterações campo a campo</h3></div><div class="card-body">${tableHtml([
           { label: 'Campo', render: d => esc(d.campo) },
           { label: 'Antes', render: d => `<span class="small muted">${esc(JSON.stringify(d.antes))}</span>` },
           { label: 'Depois', render: d => `<span class="small">${esc(JSON.stringify(d.depois))}</span>` },
-        ], a.alteracoes)}</div></div>` : ''}
+        ], alteracoes)}</div></div>` : ''}
         <div class="card mt-2"><div class="card-head"><h3>Detalhe bruto</h3></div><div class="card-body"><pre class="mono small" style="white-space:pre-wrap;word-break:break-word">${esc(a.detalhe || '—')}</pre></div></div>`,
         rodape: '<button class="btn" data-close>Fechar</button>',
       });
@@ -1131,14 +1143,21 @@ export async function viewAuditoria(root) {
 
   const carregar = async () => {
     lista.innerHTML = loadingBox();
+    limparAviso();
     try {
       const qs = new URLSearchParams({ envelope: '1', limite: '500' });
       for (const [k, v] of Object.entries(filtros)) if (v) qs.set(k, v);
       const r = await api(`/auditoria?${qs}`);
-      dados = r.itens;
-      total = r.total;
+      // Aceita envelope novo e também uma lista simples (demo estática antiga).
+      const itens = Array.isArray(r) ? r : Array.isArray(r?.itens) ? r.itens : [];
+      dados = itens;
+      total = Number.isFinite(Number(r?.total)) ? Number(r.total) : itens.length;
       aviso.hidden = total <= dados.length;
       if (total > dados.length) aviso.textContent = `Mostrando ${dados.length} de ${total} registros. Refine os filtros para ver os demais.`;
+      if (!dados.length) {
+        lista.innerHTML = emptyState('Nenhum registro', 'Nenhum evento de auditoria corresponde aos filtros informados.');
+        return;
+      }
       lista.innerHTML = tableHtml([
         { label: 'Quando', render: a => esc((a.criado_em || '').replace('T', ' ').slice(0, 16)) },
         { label: 'Usuário', render: a => esc(a.usuario_nome || 'sistema') },
@@ -1146,34 +1165,119 @@ export async function viewAuditoria(root) {
         { label: 'Entidade', render: a => `${esc(a.entidade)}${a.entidade_id ? ` #${esc(a.entidade_id)}` : ''}` },
         { label: 'Detalhe', render: a => `<span class="small muted">${esc(String(a.detalhe || '—').slice(0, 140))}</span>` },
         { label: 'IP', render: a => esc(a.ip || '—') },
+        { label: 'Hash', render: a => a.hash ? `<span class="mono small" title="${esc(a.hash)}">${esc(String(a.hash).slice(0, 12))}…</span>` : badge('Ausente', 'blush') },
         { label: 'Ações', acao: a => `<button class="icon-btn" data-ver="${a.id}" title="Detalhe">${icon('eye')}</button>` },
       ], dados);
       lista.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => abrirDetalhe(Number(b.dataset.ver)));
     } catch (e) { lista.innerHTML = erroBox(e); }
   };
 
-  root.querySelector('[data-integridade]').onclick = async () => {
-    try {
-      const r = await api('/auditoria/integridade');
-      openModal({
-        titulo: 'Integridade da auditoria', narrow: true,
-        corpo: `<div class="notice ${r.ok ? 'info' : ''}" style="${r.ok ? '' : 'border-color:#eccfc9;color:var(--blush-ink)'}">
-          ${r.ok ? `Cadeia íntegra: ${r.total} registro(s) verificados.` : `Divergência encontrada no registro #${r.problema?.id}: ${esc(r.problema?.motivo || '')}`}
-        </div>
-        <p class="small muted mt-2">Último hash: <span class="mono" style="word-break:break-all">${esc(r.ultimo_hash || '—')}</span></p>`,
-        rodape: '<button class="btn" data-close>Fechar</button>',
-      });
-    } catch (e) { toast(e.message, 'err'); }
+  const modalIntegridade = (r) => {
+    const problemas = Array.isArray(r.problemas) && r.problemas.length ? r.problemas : (r.problema ? [r.problema] : []);
+    openModal({
+      titulo: 'Integridade da auditoria', wide: true,
+      corpo: `<div class="notice ${r.ok ? 'info' : 'danger'}" style="${r.ok ? '' : 'border-color:#eccfc9;color:var(--blush-ink)'}">
+        ${r.ok ? `Cadeia íntegra: ${r.total} registro(s) verificados e âncora conferida.` : `Divergência encontrada${r.problema?.id ? ` no registro #${r.problema.id}` : ''}: ${esc(r.problema?.motivo || '')}`}
+      </div>
+      <div class="grid cols-2 mt-2">
+        <div class="card"><div class="card-body"><dl class="dl">
+          <dt>Registros verificados</dt><dd>${r.total}</dd>
+          <dt>Verificação parcial</dt><dd>${r.parcial ? 'Sim' : 'Não'}</dd>
+          <dt>Verificado em</dt><dd>${esc((r.verificado_em || '').replace('T', ' ').slice(0, 19))}</dd>
+        </dl></div></div>
+        <div class="card"><div class="card-body"><dl class="dl">
+          <dt>Último hash</dt><dd class="mono small" style="word-break:break-all">${esc(r.ultimo_hash || '—')}</dd>
+          <dt>Âncora (total)</dt><dd>${r.ancora?.total ?? '—'}</dd>
+          <dt>Âncora (último hash)</dt><dd class="mono small" style="word-break:break-all">${esc(r.ancora?.ultimo_hash || '—')}</dd>
+        </dl></div></div>
+      </div>
+      ${problemas.length ? `<div class="card mt-2"><div class="card-head"><h3>Problemas encontrados</h3></div><div class="card-body">${tableHtml([
+        { label: 'Registro', render: p => p.id ?? '—' },
+        { label: 'Motivo', render: p => esc(p.motivo || '') },
+        { label: 'Esperado', render: p => `<span class="mono small">${esc(String(p.esperado ?? '—').slice(0, 20))}</span>` },
+        { label: 'Encontrado', render: p => `<span class="mono small">${esc(String(p.encontrado ?? '—').slice(0, 20))}</span>` },
+      ], problemas)}</div></div>` : ''}`,
+      rodape: '<button class="btn" data-close>Fechar</button>',
+    });
   };
 
-  const ligar = () => {
-    root.querySelector('[data-busca]').addEventListener('input', (e) => { filtros.busca = e.target.value; clearTimeout(window.__audT); window.__audT = setTimeout(carregar, 350); });
-    root.querySelector('[data-acao]').addEventListener('input', (e) => { filtros.acao = e.target.value; clearTimeout(window.__audA); window.__audA = setTimeout(carregar, 350); });
-    root.querySelector('[data-entidade]').addEventListener('input', (e) => { filtros.entidade = e.target.value; clearTimeout(window.__audE); window.__audE = setTimeout(carregar, 350); });
-    root.querySelector('[data-de]').onchange = (e) => { filtros.de = e.target.value; carregar(); };
-    root.querySelector('[data-ate]').onchange = (e) => { filtros.ate = e.target.value; carregar(); };
+  root.querySelector('[data-integridade]').onclick = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const r = await api('/auditoria/integridade');
+      modalIntegridade(r);
+    } catch (e) { toast(e.message, 'err'); }
+    finally { btn.disabled = false; }
   };
-  ligar();
+
+  const abrirDiagnostico = () => {
+    const d = ultimoDiagnostico;
+    const problemas = (d.checagens || []).filter(c => c.total > 0 || c.erro);
+    const tabela = (d.checagens || []).map(c => ({
+      ...c,
+      status: c.erro ? 'Erro' : c.total === 0 ? 'OK' : c.severidade === 'critico' ? 'Crítico' : c.severidade === 'atencao' ? 'Atenção' : 'Informativo',
+      amostra: c.erro ? c.erro : (c.amostras || []).map(a => Object.entries(a).map(([k, v]) => `${k}=${String(v ?? '')}`).join(', ')).join(' | ') || '—',
+    })).sort((a, b) => {
+      const ordem = { 'Crítico': 0, 'Erro': 0, 'Atenção': 1, 'Informativo': 2, 'OK': 3 };
+      return (ordem[a.status] - ordem[b.status]) || (b.total - a.total);
+    });
+    openModal({
+      titulo: 'Diagnóstico da base', subtitulo: 'Somente leitura · duplicidades, vínculos, valores e integridade', wide: true,
+      corpo: `<div class="notice ${d.ok ? 'info' : 'danger'}" style="${d.ok ? '' : 'border-color:#eccfc9;color:var(--blush-ink)'}">
+        ${d.ok ? 'Nenhuma inconsistência crítica encontrada.' : `Foram encontradas ${d.resumo.criticas} verificação(ões) crítica(s) e ${d.resumo.atencoes} de atenção.`}
+      </div>
+      <div class="grid cols-3 mt-2">
+        <div class="kpi"><div class="kpi-label">Verificações</div><div class="kpi-value">${d.resumo.checagens}</div></div>
+        <div class="kpi"><div class="kpi-label">Críticas</div><div class="kpi-value" style="color:var(--blush-ink)">${d.resumo.criticas}</div></div>
+        <div class="kpi"><div class="kpi-label">Ocorrências</div><div class="kpi-value">${d.resumo.total_ocorrencias}</div></div>
+      </div>
+      <div class="card mt-2"><div class="card-body"><dl class="dl">
+        <dt>SQLite integrity_check</dt><dd>${d.banco.ok ? badge('OK', 'sage') : badge('Falhou', 'blush')}</dd>
+        <dt>Chaves estrangeiras</dt><dd>${d.banco.total_fk ? badge(`${d.banco.total_fk} problema(s)`, 'blush') : badge('OK', 'sage')}</dd>
+        <dt>Auditoria</dt><dd>${d.auditoria.ok ? badge(`${d.auditoria.total} registros íntegros`, 'sage') : badge(d.auditoria.problema?.motivo || 'Divergente', 'blush')}</dd>
+        <dt>Gerado em</dt><dd>${esc((d.gerado_em || '').replace('T', ' ').slice(0, 19))}</dd>
+      </dl></div></div>
+      <div class="card mt-2"><div class="card-head"><div><h3>Verificações executadas</h3><p>${problemas.length} com ocorrências ou erro</p></div></div><div class="card-body">${tableHtml([
+        { label: 'Status', render: c => badge(c.status, c.status === 'OK' ? 'sage' : c.status === 'Crítico' || c.status === 'Erro' ? 'blush' : c.status === 'Atenção' ? 'butter' : 'sky') },
+        { label: 'Verificação', render: c => `<strong>${esc(c.titulo)}</strong><span class="sub">${esc(c.descricao)}</span>` },
+        { label: 'Ocorrências', num: true, render: c => c.erro ? '—' : String(c.total) },
+        { label: 'Amostra', render: c => `<span class="small muted">${esc(c.amostra)}</span>` },
+      ], tabela)}</div></div>`,
+      rodape: '<button class="btn" data-baixar>Baixar JSON</button><button class="btn" data-close>Fechar</button>',
+      onMount: (r) => {
+        r.querySelector('[data-baixar]')?.addEventListener('click', () => baixarArquivo(
+          `diagnostico-${(d.gerado_em || '').slice(0, 10)}.json`, JSON.stringify(d, null, 2), 'application/json',
+        ));
+      },
+    });
+  };
+
+  root.querySelector('[data-diagnostico]').onclick = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      ultimoDiagnostico = await api('/diagnostico');
+      abrirDiagnostico();
+    } catch (e) { toast(e.message, 'err'); }
+    finally { btn.disabled = false; }
+  };
+
+  root.querySelector('[data-limpar]').onclick = () => {
+    filtros = { busca: '', acao: '', entidade: '', de: '', ate: '' };
+    root.querySelector('[data-busca]').value = '';
+    root.querySelector('[data-acao]').value = '';
+    root.querySelector('[data-entidade]').value = '';
+    root.querySelector('[data-de]').value = '';
+    root.querySelector('[data-ate]').value = '';
+    carregar();
+  };
+
+  root.querySelector('[data-busca]').addEventListener('input', (e) => { filtros.busca = e.target.value; clearTimeout(window.__audT); window.__audT = setTimeout(carregar, 350); });
+  root.querySelector('[data-acao]').addEventListener('input', (e) => { filtros.acao = e.target.value; clearTimeout(window.__audA); window.__audA = setTimeout(carregar, 350); });
+  root.querySelector('[data-entidade]').addEventListener('input', (e) => { filtros.entidade = e.target.value; clearTimeout(window.__audE); window.__audE = setTimeout(carregar, 350); });
+  root.querySelector('[data-de]').onchange = (e) => { filtros.de = e.target.value; carregar(); };
+  root.querySelector('[data-ate]').onchange = (e) => { filtros.ate = e.target.value; carregar(); };
   await carregar();
 }
 
@@ -1637,7 +1741,7 @@ export async function viewContas(root, params) {
         try {
           const novo = await criarParceiroRapido(tipoSel.value === 'receber' ? 'cliente' : 'fornecedor');
           if (!novo) { fornecedor.value = conta?.fornecedor || ''; return; }
-          parceiros = await api('/parceiros');
+          parceiros = listaApi(await api('/parceiros'));
           preencherParceiros(fornecedor, tipoSel.value, novo.nome);
           parceiroId.value = novo.id;
         } catch (e) { toast(e.message, 'err'); fornecedor.value = ''; }
@@ -1651,7 +1755,7 @@ export async function viewContas(root, params) {
             caixa: caixaSel.value || null,
           });
           if (!nova) { categoria.value = ''; return; }
-          categorias = await api('/categorias?inativas=0');
+          categorias = listaApi(await api('/categorias?inativas=0'));
           preencherCategorias(categoria, tipoSel.value, nova.nome);
           sugerirCaixa();
         } catch (e) { toast(e.message, 'err'); categoria.value = ''; }
@@ -1765,7 +1869,8 @@ export async function viewContas(root, params) {
       [categorias, parceiros, props, imoveis, contratos] = await Promise.all([
         api('/categorias?inativas=0'), api('/parceiros'), api('/proprietarios'), api('/imoveis'), api('/contratos'),
       ]);
-      categorias = categorias.filter(c => ['conta_pagar', 'conta_receber'].includes(c.contexto));
+      categorias = listaApi(categorias).filter(c => ['conta_pagar', 'conta_receber'].includes(c.contexto));
+      parceiros = listaApi(parceiros); props = listaApi(props); imoveis = listaApi(imoveis); contratos = listaApi(contratos);
       catalogosProntos = true;
     } catch (e) {
       toast(`Não foi possível carregar categorias e parceiros: ${e.message}`, 'err');
