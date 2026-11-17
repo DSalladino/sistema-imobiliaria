@@ -11,8 +11,9 @@ toca a base real.
 
 ```bash
 npm ci
-npm run check       # sintaxe de todos os .js/.mjs
-npm test            # API, regras, interface e seed
+npm run deps:check # versão, origem e integrity do xlsx (CDN)
+npm run check      # sintaxe de todos os .js/.mjs
+npm test           # API, regras, interface, relatórios, conciliação, analytics e seed
 npm run test:coverage
 npm audit
 ```
@@ -27,6 +28,9 @@ npm audit
 | `tests/ui.test.mjs` | Renderiza as 22 telas com dados reais em jsdom e verifica conteúdo |
 | `tests/features.test.mjs` | Pix (CRC/EMV), WhatsApp (link e API), contas e recorrência, previsão de caixa, reajuste em lote, rescisão e comissões, DRE por imóvel e geração de CSV |
 | `tests/seed.test.mjs` | Primeira execução completa a demonstração com cobranças e repasses |
+| `tests/relatorios.test.mjs` | Construção dos 8 relatórios, CSV (BOM, fórmula, `;`), XLSX relido, PDF com e sem dados, DRE por imóvel |
+| `tests/conciliacao.test.mjs` | Parser OFX, CSV com mapeamento e sugestão, deduplicação por FITID, sugestão de cobrança, confirmação e bloqueio de transação já tratada |
+| `tests/analytics.test.mjs` | Série mensal, filtro por proprietário, ocupação, composição, ranking, KPIs, período invertido e cache de configurações |
 
 ### O que cada suíte protege
 
@@ -64,6 +68,16 @@ npm audit
 - não caem no estado de erro;
 - conteúdo esperado aparece em cada tela.
 
+**Relatórios, conciliação e analytics**
+
+- os oito relatórios constroem com o período da base;
+- CSV neutraliza fórmula e não escapa `;` duas vezes em dado real;
+- XLSX é relido e preserva acentos e `;`;
+- PDF é válido com dados e com período vazio;
+- OFX e CSV são convertidos, deduplicados por `FITID` e confirmados;
+- série, ocupação e KPIs fecham entre si;
+- cache de settings é invalidado ao gravar.
+
 ## Estratégia de banco de teste
 
 Cada suíte cria um diretório temporário e define `DATA_DIR` antes de importar
@@ -77,9 +91,13 @@ Variáveis usadas nos testes:
 DATA_DIR=/tmp/...
 PORT=0
 SEED_COMPLETO=0
+SEED_DEMO=1          # obrigatório: seed não roda por omissão
 ADMIN_SENHA=admin123
 APP_SECRET=segredo-de-teste-com-mais-de-32-caracteres
 ```
+
+Os testes que usam o servidor trocam a senha inicial antes de exercitar a API,
+porque a troca é exigida no backend.
 
 ## CI
 
@@ -88,6 +106,7 @@ O workflow `.github/workflows/ci.yml` executa em `push` e `pull_request` para
 
 - matriz Node **22** e **24**;
 - `npm ci`;
+- `npm run deps:check`;
 - `npm run check`;
 - `npm test`.
 
@@ -126,7 +145,9 @@ O CI não publica artefatos nem faz deploy. A publicação é manual e está em
 - **Sem teste de upload de arquivo real**; o fluxo é coberto por código e teste
   manual.
 - **Cobertura de linhas não é meta**; o comando existe para medir tendência, não
-  para bloquear merge.
+  para bloquear merge. O número subestima `api.js` e `server.js`, que são
+  exercitados via HTTP em subprocesso e não entram no relatório do processo de
+teste.
 
 ## Regressões cobertas nesta versão
 
@@ -141,6 +162,11 @@ O CI não publica artefatos nem faz deploy. A publicação é manual e está em
 | Importação podia criar dois contratos ativos para o mesmo imóvel | `importacao.js` + teste manual |
 | Juros congelavam após baixa parcial | `rules.test.mjs` |
 | Data podia recuar um dia em fuso positivo | revisão de código + helpers locais |
+| Senha temporária operava a API sem troca | `api.test.mjs` (403 antes da troca) |
+| Cadastro com contrato ativo podia ser desativado | `api.test.mjs` (409) |
+| Atraso ficava escondido atrás do rótulo da régua | `features.test.mjs` / revisão de `statusEfetivo` |
+| Lista truncada sem aviso | `api.test.mjs` (`envelope=1` com total) |
+| Seed automático fora de produção | `seed.test.mjs` com `SEED_DEMO=1` explícito |
 
 ## Padrão para novos testes
 
