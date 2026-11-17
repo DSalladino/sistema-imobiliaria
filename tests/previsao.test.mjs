@@ -38,6 +38,10 @@ test('análise futura devolve indicadores, riscos, recomendações e projeção'
   assert.ok(a.riscos.length >= 1);
   assert.ok(a.recomendacoes.length >= 1);
   assert.ok(a.base.meses_analisados >= 10);
+  assert.ok(a.estresse);
+  assert.equal(a.estresse.projecoes.length, a.projecao.length);
+  assert.ok(a.estresse.premissas.inadimplencia_pct >= a.indicadores.inadimplencia_pct);
+  assert.equal(a.estresse.premissas.vacancia_pct, 10);
   for (const p of a.projecao) {
     assert.ok(p.receita_formatada.startsWith('R$'));
     assert.ok(p.faixa_min_centavos <= p.faixa_max_centavos);
