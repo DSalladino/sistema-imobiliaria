@@ -38,11 +38,14 @@ export function calcularEncargos(c, ref = hojeISO()) {
   return { multa, juros, dias };
 }
 
-export function statusEfetivo(c) {
+export function statusEfetivo(c, ref = hojeISO()) {
   if (c.status === 'cancelado') return 'cancelado';
   if (c.status === 'pago') return 'pago';
+  // Atraso é um fato objetivo: precisa prevalecer sobre o rótulo da régua
+  // (promessa, acordo, jurídico). Sem isso, uma cobrança vencida marcada como
+  // "promessa" deixava de aparecer como atrasada no painel e nos alertas.
+  if (c.vencimento && c.vencimento < ref && saldo(c) > 0) return 'em_atraso';
   if (c.cobranca_status) return c.cobranca_status;
-  if (c.vencimento < hojeISO() && saldo(c) > 0) return 'em_atraso';
   if (c.status === 'pago_parcial') return 'pago_parcial';
   return 'em_aberto';
 }
@@ -95,6 +98,7 @@ function enriquecer(c) {
   return {
     ...c,
     status_efetivo: statusEfetivo(c),
+    regua_status: c.cobranca_status || null,
     saldo_centavos: saldoFinal,
     multa_calculada_centavos: multa,
     juros_calculados_centavos: juros,
@@ -102,7 +106,7 @@ function enriquecer(c) {
   };
 }
 
-export function listar(filtros = {}) {
+function filtroSql(filtros = {}) {
   const where = [];
   const args = [];
   if (filtros.competencia) { where.push('c.competencia = ?'); args.push(filtros.competencia); }
@@ -123,8 +127,33 @@ export function listar(filtros = {}) {
     const b = `%${filtros.busca}%`;
     args.push(b, b, b, b);
   }
-  const sql = `${baseSelect()} ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY c.vencimento, p.nome LIMIT 1000`;
+  return { where, args };
+}
+
+const LIMITE_PADRAO = 1000;
+const LIMITE_MAXIMO = 5000;
+
+function normalizarLimite(limite) {
+  if (limite === null || limite === 'todos') return null;
+  const n = Number(limite);
+  if (!Number.isFinite(n) || n <= 0) return LIMITE_PADRAO;
+  return Math.min(Math.trunc(n), LIMITE_MAXIMO);
+}
+
+export function listar(filtros = {}) {
+  const { where, args } = filtroSql(filtros);
+  const limite = normalizarLimite(filtros.limite);
+  const offset = Math.max(Math.trunc(Number(filtros.offset)) || 0, 0);
+  const paginacao = limite == null ? '' : `LIMIT ${limite} OFFSET ${offset}`;
+  const sql = `${baseSelect()} ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY c.vencimento, p.nome ${paginacao}`;
   return db.prepare(sql).all(...args).map(enriquecer);
+}
+
+/** Total de registros para os mesmos filtros, sem carregar as linhas. */
+export function contar(filtros = {}) {
+  const { where, args } = filtroSql(filtros);
+  const sql = `SELECT COUNT(*) AS n FROM (${baseSelect()} ${where.length ? 'WHERE ' + where.join(' AND ') : ''})`;
+  return db.prepare(sql).get(...args).n;
 }
 
 export function obter(id) {
