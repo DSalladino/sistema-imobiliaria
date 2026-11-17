@@ -3,6 +3,19 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e versionamento
 semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
+## [0.8.1] — 2026-11
+
+### Adicionado
+- **`docs/SEGURANCA.md`**: modelo de ameaças, controles por camada, capítulo do Pix (P-01…P-14), checklist operacional, runbook de incidentes e riscos residuais.
+- **Conciliação usa o txid como dica**: um Pix com `txid` no memo é sugerido mesmo fora da janela de 20 dias, mas **o valor continua obrigatório** (≤5% de diferença).
+- Testes para chave Pix inválida e para o vínculo por txid (com e sem valor compatível).
+
+### Corrigido
+- **Campos EMV medidos em bytes** (`Buffer.byteLength`), não em caracteres: chave ou texto multibyte não gera mais BR Code com tamanho inválido.
+- **Chave Pix validada**: recusa caracteres não-ASCII e chave acima de 77 bytes com mensagem clara.
+- **`/api/pix/pendentes` não falha mais em lote** quando uma cobrança é paga/cancelada entre a consulta e a geração.
+- **`SECURITY.md`** atualizado para 0.8.x, com escopo de Pix e recomendações operacionais.
+
 ## [0.8.0] — 2026-11
 
 ### Corrigido

@@ -15,7 +15,7 @@
   </a>
   <img src="https://img.shields.io/badge/Node.js-22.13%2B-2E4A40?logo=node.js&logoColor=white" alt="Node.js 22.13+">
   <img src="https://img.shields.io/badge/SQLite-node%3Asqlite-5C8571?logo=sqlite&logoColor=white" alt="SQLite">
-  <img src="https://img.shields.io/badge/vers%C3%A3o-0.8.0-C9A87C" alt="Versão 0.8.0">
+  <img src="https://img.shields.io/badge/vers%C3%A3o-0.8.1-C9A87C" alt="Versão 0.8.1">
   <img src="https://img.shields.io/badge/licen%C3%A7a-MIT-2E4A40" alt="Licença MIT">
   <img src="https://img.shields.io/badge/PRs-bem--vindos-5C8571" alt="PRs bem-vindos">
 </p>
@@ -49,7 +49,7 @@ poucos usuários — e prioriza **simplicidade operacional**, **rastreabilidade*
 **baixo custo**. O resultado é um monólito Node.js + SQLite com frontend sem
 build, testes automatizados e documentação de ponta a ponta.
 
-> **Status:** versão 0.8.0, em evolução ativa. O repositório não contém dados
+> **Status:** versão 0.8.1, em evolução ativa. O repositório não contém dados
 > reais; a base de demonstração é separada da produção.
 
 ### Por que este projeto é diferente
@@ -246,7 +246,9 @@ O projeto adota, entre outras práticas:
   financeiro obrigatório.
 
 O checklist de 21 pontos, com evidências e pendências, está em
-[docs/checklist-seguranca.md](docs/checklist-seguranca.md). Para reportar uma
+[docs/checklist-seguranca.md](docs/checklist-seguranca.md). A análise de
+**segurança e vulnerabilidades**, com o capítulo do Pix (ameaças, mitigações e
+runbook), está em [docs/SEGURANCA.md](docs/SEGURANCA.md). Para reportar uma
 vulnerabilidade, siga [SECURITY.md](SECURITY.md).
 
 ## Documentação
@@ -268,6 +270,8 @@ A documentação foi organizada como um produto, não como um anexo.
 | [docs/ESTUDO-DE-CASO.md](docs/ESTUDO-DE-CASO.md) | Narrativa do problema, solução, resultados e aprendizados |
 | [docs/ESTADO-ATUAL.md](docs/ESTADO-ATUAL.md) | Fotografia técnica da versão atual e dívidas |
 | [docs/AUDITORIA.md](docs/AUDITORIA.md) | Achados da revisão técnica, correções e riscos residuais |
+| [docs/SEGURANCA.md](docs/SEGURANCA.md) | Modelo de ameaças, análise do Pix (P-01…P-14) e runbook |
+| [docs/checklist-seguranca.md](docs/checklist-seguranca.md) | Auditoria de 21 pontos com evidências e pendências |
 | [docs/roadmap.md](docs/roadmap.md) | Prioridades em fases |
 | [deploy/README.md](deploy/README.md) | VPS, domínio, HTTPS, systemd, backup e go-live |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Ambiente, padrões, testes e fluxo de PR |
@@ -291,7 +295,7 @@ npm test
 - `tests/ui.test.mjs` — renderiza as 22 telas com dados reais em jsdom.
 - `tests/seed.test.mjs` — valida a base de demonstração da primeira execução.
 - `tests/relatorios.test.mjs` — CSV/XLSX/PDF, fórmulas, acentos, período vazio e DRE.
-- `tests/conciliacao.test.mjs` — OFX, CSV, sugestão, duplicidade e confirmação.
+- `tests/conciliacao.test.mjs` — OFX, CSV, sugestão, duplicidade, txid e confirmação.
 - `tests/analytics.test.mjs` — série, ocupação, composição, KPIs e cache de settings.
 
 O CI roda em Node 22 e 24. A estratégia e as lacunas estão em

@@ -89,9 +89,9 @@ ativos ao mesmo tempo, e o código do contrato é único na base.
 - Estorno de baixa e cancelamento com motivo.
 - Régua: responsável, próxima ação, data e histórico de contatos.
 - Aging: 0–30, 31–60, 61–90, 90+.
-- **Pix por cobrança:** gera BR Code estático (payload EMV com CRC16), QR Code e copia e cola, com txid determinístico para conciliar. Exige a chave Pix em **Configurações → Integrações**.
+- **Pix por cobrança:** gera BR Code estático (payload EMV com CRC16), QR Code e copia e cola, com txid determinístico usado como dica na conciliação. A chave precisa ser ASCII (CPF/CNPJ, e-mail, telefone ou EVP) e o valor é o saldo atual da cobrança. Exige a chave em **Configurações → Integrações**. Não há confirmação automática de pagamento: a baixa vem do extrato + conciliação humana.
 
-**Regras:** mês fechado não gera cobrança; cobrança paga não é apagada; correção por estorno. O status exibido prioriza o **atraso** sobre o rótulo da régua (promessa, acordo, jurídico); a régua continua visível no detalhe da cobrança.
+**Regras:** mês fechado não gera cobrança; cobrança paga não é apagada; correção por estorno. O status exibido prioriza o **atraso** sobre o rótulo da régua (promessa, acordo, jurídico); a régua continua visível no detalhe da cobrança. O Pix é estático, sem PSP: o `txid` é só uma dica na conciliação e o valor do BR Code é o saldo no momento da geração. A análise de segurança do Pix está em [SEGURANCA.md](SEGURANCA.md).
 Vencimento em fim de semana pode ser prorrogado (configurável). Contrato que começa no meio do mês pode
 ser proporcional (configurável). Pagamento parcial continua contando como inadimplência enquanto houver
 saldo — nos alertas e no relatório de inadimplência, o sistema compara **valores**, não a quantidade
