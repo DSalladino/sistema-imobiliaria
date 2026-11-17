@@ -129,6 +129,7 @@ Passo a passo em [docs/DEPLOY-DEMO.md](docs/DEPLOY-DEMO.md).
 | Módulo | O que resolve |
 |---|---|
 | **Painel** | KPIs do mês, comparativos, composição de receitas, ocupação, inadimplência, alertas e atividade recente |
+| **Análises futuras** | Tendência, projeção com faixa de erro, riscos, recomendações, simulador de cenário e teste de estresse automático com runway |
 | **Carteira** | Proprietários, imóveis, inquilinos, contratos, garantias, reajustes e exceções de taxa |
 | **Cobranças** | Geração mensal em lote, baixa total/parcial, multa e juros, estorno, cancelamento, aging e régua, **Pix copia e cola com QR por cobrança** |
 | **Conciliação** | Importação de OFX/CSV/Excel, sugestão de vínculo e confirmação humana |

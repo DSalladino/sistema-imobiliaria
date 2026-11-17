@@ -13,6 +13,7 @@ semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 - **Recorrências adicionais**: bimestral, trimestral e semestral, com cálculo de próximo vencimento e projeção de caixa.
 - **Backup automático com hash SHA-256**: snapshot ao iniciar quando o último tem mais de 24 h (configurável), arquivo `.sha256` por snapshot e status “conferido/divergente” na tela de manutenção.
 - **Pix do proprietário e do corretor** visíveis no extrato de repasse e no detalhe da comissão.
+- **Análises futuras com teste de estresse**: cenário automático de inadimplência +10 p.p., vacância extra de 10% e despesa +10%, com saldo final e runway (meses até o caixa acumulado ficar negativo); o simulador também informa o primeiro mês negativo.
 - Testes `cadastros` e cobertura de API/UI para as novas telas (126 testes).
 
 ### Corrigido

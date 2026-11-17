@@ -415,10 +415,12 @@ informação. A confirmação de qualquer ação continua sendo humana.
 - A tendência e a projeção usam regressão linear, com R², inclinação mensal e faixa de erro.
 - O simulador permite informar inadimplência, vacância extra, reajuste médio e pressão de despesa,
   devolvendo receita, despesa, resultado e saldo acumulado mês a mês.
+- Um **teste de estresse automático** aplica inadimplência +10 p.p., vacância extra de 10% e despesa
+  +10%, mostrando saldo final e em quantos meses o caixa acumulado ficaria negativo (runway).
 - Riscos e recomendações são derivados dos indicadores; o assistente também responde “qual a previsão?”
   e “quais são os riscos da carteira?”.
 
 **Regras:** nenhum dado sai do servidor; a projeção é estatística simples e não substitui decisão humana.
-O histórico e as premissas ficam visíveis para que o número possa ser explicado.
+O histórico, as premissas e o teste de estresse ficam visíveis para que o número possa ser explicado.
 
 **Onde:** menu **Visão geral → Análises futuras** e assistente.
