@@ -479,9 +479,11 @@ if (qtdUsuarios === 0) {
 }
 
 const qtdProps = db.prepare('SELECT COUNT(*) AS n FROM proprietarios').get().n;
-// Em produção a base começa vazia. A demonstração só é carregada em
-// desenvolvimento ou quando SEED_DEMO=1 é definido explicitamente.
-const podeSemearDemo = process.env.SEED_DEMO === '1' || process.env.NODE_ENV !== 'production';
+// A base começa vazia sempre: dados de demonstração exigem opt-in explícito.
+// Antes o seed acontecia quando NODE_ENV != 'production', o que injetava dados
+// fictícios em qualquer deploy que esquecesse de definir as variáveis de
+// ambiente. Para demonstrar use `npm run demo*` ou SEED_DEMO=1.
+const podeSemearDemo = process.env.SEED_DEMO === '1';
 if (qtdProps === 0 && podeSemearDemo) seedDemo();
 
 export function seedDemo() {

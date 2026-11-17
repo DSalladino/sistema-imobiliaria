@@ -5,7 +5,7 @@
 > registrar o que foi encontrado, o que foi corrigido e o que permanece como
 > risco conhecido.
 
-**Versão revisada:** 0.6.0 · **Data:** novembro de 2026
+**Versão revisada:** 0.6.0 (corpo) e 0.7/0.8 (adendo) · **Data:** novembro de 2026
 
 ## Método
 
@@ -225,6 +225,138 @@ comandos e caminhos conferidos com o código.
 `limite=abc` podia gerar erro 500 e valores negativos não eram normalizados.
 
 **Correção:** limite convertido para inteiro e restrito a 1–1.000.
+
+## Adendo — revisão 0.7/0.8 (novembro de 2026)
+
+Esta seção cobre os módulos entregues depois da revisão 0.6 e as correções de
+endurecimento da 0.8.0. Mesmo método: leitura de código, execução da suíte,
+`npm audit` e exercício manual da API.
+
+### Escopo acrescentado
+
+Pix (BR Code/CRC16), WhatsApp Cloud API, contas a pagar/receber com recorrência,
+previsão de caixa, comissões, reajuste em lote, rescisão, DRE por imóvel,
+paginação de listas, cache de configurações, fontes locais e ciclo de vida do
+processo.
+
+### Achados e correções da 0.8.0
+
+#### B-01 — Senha temporária dava acesso total à API
+
+**Severidade:** média · **Status:** corrigido
+
+`deve_trocar_senha` era imposto apenas pelo `app.js`. Com a senha temporária
+(criada pelo admin ou por reset) era possível chamar qualquer rota protegida por
+`curl` — inclusive exportar relatórios — sem trocar a senha. Reproduzido: login
+com senha inicial e `POST /api/proprietarios` retornava `201`.
+
+**Correção:** o roteador responde `403` em rotas protegidas enquanto a flag
+estiver ativa; só sessão, troca de senha e 2FA seguem liberados.
+
+**Teste:** `tests/api.test.mjs` (dashboard e escrita bloqueados antes da troca).
+
+#### B-02 — Seed de demonstração automático fora de produção
+
+**Severidade:** média · **Status:** corrigido
+
+O seed rodava quando `NODE_ENV !== 'production'`. Um deploy sem a variável no
+processo recebia 12 meses de dados fictícios. Agora o seed exige `SEED_DEMO=1`
+em qualquer ambiente; `npm run demo*` continua funcionando e os testes declaram
+a variável explicitamente.
+
+**Teste:** `tests/seed.test.mjs` com `SEED_DEMO=1`.
+
+#### B-03 — Atraso escondido pelo rótulo da régua
+
+**Severidade:** baixa · **Status:** corrigido
+
+`statusEfetivo` retornava `promessa`/`acordo` antes de avaliar vencimento, então
+uma cobrança vencida podia aparecer sem o selo de atraso enquanto o aging a
+contava como vencida. O atraso agora tem precedência e a régua vai em campo
+próprio (`regua_status`), exibido no detalhe.
+
+#### B-04 — Cadastro com contrato ativo podia ser desativado
+
+**Severidade:** baixa · **Status:** corrigido
+
+Desativar proprietário, imóvel ou inquilino com contrato ativo escondia o
+cadastro das listas mantendo a cobrança. A API agora responde `409` com a
+contagem de contratos ativos.
+
+**Teste:** `tests/api.test.mjs`.
+
+#### B-05 — Listas truncadas sem aviso
+
+**Severidade:** baixa · **Status:** corrigido
+
+Cobranças (1.000) e lançamentos (500) cortavam a resposta em silêncio. A API
+aceita `limite`, `offset` e `envelope=1` (com `total`), a interface mostra aviso
+de truncamento e as exportações CSV percorrem a competência inteira.
+
+**Teste:** `tests/api.test.mjs` (envelope e deslocamento).
+
+#### B-06 — N+1 de configurações em laço de cobranças
+
+**Severidade:** baixa · **Status:** corrigido
+
+Cada cobrança preparava e executava duas consultas a `settings` para multa e
+juros. Em 3.600 cobranças isso somava milhares de consultas por painel. As
+configurações passaram a ser cacheadas em memória, com invalidação em
+`setSetting` e função explícita de recarga.
+
+**Teste:** `tests/analytics.test.mjs` (cache e invalidação).
+
+#### B-07 — Fontes carregadas do Google
+
+**Severidade:** baixa · **Status:** corrigido
+
+O `index.html` buscava DM Sans e Fraunces em `fonts.googleapis.com`, o que
+contradiz o discurso de dados sob controle, quebra o uso offline e expõe o IP do
+usuário a terceiros. Os arquivos `woff2` (latin/latin-ext) agora são servidos por
+`/fonts`, com CSP restrita a `'self'`.
+
+#### B-08 — Dependência de CDN sem verificação
+
+**Severidade:** baixa · **Status:** mitigado
+
+`xlsx` vem de `cdn.sheetjs.com`, fora do `npm audit` e ignorado pelo Dependabot.
+`npm run deps:check` (executado na CI) confere versão, URL e `integrity` do
+lockfile antes de instalar/testar. Continua sem monitoramento automático de CVE.
+
+#### B-09 — Health raso e encerramento abrupto
+
+**Severidade:** baixa · **Status:** corrigido
+
+`/api/health` só executava `SELECT 1`. Agora valida o banco e a escrita em
+`data/uploads`, retornando `503` quando algo está errado. O processo trata
+`SIGTERM`/`SIGINT`, para de aceitar conexões, fecha o SQLite e força saída após
+10 s.
+
+#### B-10 — Módulos da 0.7 sem teste direto
+
+**Severidade:** média · **Status:** corrigido
+
+Relatórios, conciliação e analytics eram exercitados apenas indiretamente. Foram
+adicionados `tests/relatorios.test.mjs`, `tests/conciliacao.test.mjs` e
+`tests/analytics.test.mjs` (CSV/XLSX/PDF, fórmula, acentos, período vazio, OFX,
+CSV, deduplicação, sugestão, KPIs e cache).
+
+### Pix: o txid determinístico é um problema?
+
+O `txid` é `IMOB<id><competência>`, portanto previsível. Ele **não** é tratado
+como prova de pagamento em nenhum ponto: a conciliação usa valor/data para
+sugerir um vínculo e exige confirmação humana; não há webhook de PSP nem baixa
+automática. O risco residual é de sugestão errada (operacional), não de fraude
+lógica. Se no futuro houver baixa automática por PSP, o txid deve vir do banco
+ou incluir um sufixo aleatório e a confirmação deve validar o valor pago.
+
+### Riscos residuais acrescentados
+
+| ID | Risco | Impacto | Mitigação / próxima ação |
+|---|---|---|---|
+| R-13 | `xlsx` de CDN sem CVE automatizado | Dependência vulnerável passar despercebida | Guarda de versão/integrity; revisão manual a cada atualização |
+| R-14 | Interface sem controles de página | Usuário precisa refinar filtros | Aviso de truncamento e API paginada; adicionar navegação |
+| R-15 | Mídia de demonstração no histórico | Clone pesado | Documentado em `OPERACAO.md`; mover para LFS/release quando necessário |
 
 ## Riscos conhecidos que permanecem
 

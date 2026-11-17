@@ -8,9 +8,26 @@ export const hojeISO = () => {
 
 export const competenciaAtual = () => hojeISO().slice(0, 7);
 
+// Configurações mudam pouco e são lidas em laço (multa/juros por cobrança,
+// nomes em relatórios). Um cache em memória evita preparar e executar a mesma
+// consulta milhares de vezes por requisição. `setSetting` mantém o cache
+// coerente; processos externos que editem a tabela exigem reinício.
+let cacheSettings = null;
+
+function carregarSettings() {
+  if (!cacheSettings) {
+    cacheSettings = new Map(db.prepare('SELECT chave, valor FROM settings').all().map(r => [r.chave, r.valor]));
+  }
+  return cacheSettings;
+}
+
+export function invalidarCacheSettings() {
+  cacheSettings = null;
+}
+
 export function getSetting(chave, padrao = '') {
-  const row = db.prepare('SELECT valor FROM settings WHERE chave = ?').get(chave);
-  return row ? row.valor : padrao;
+  const valor = carregarSettings().get(chave);
+  return valor === undefined ? padrao : valor;
 }
 
 export function getSettingNum(chave, padrao = 0) {
@@ -20,7 +37,9 @@ export function getSettingNum(chave, padrao = 0) {
 }
 
 export function setSetting(chave, valor) {
-  db.prepare('UPDATE settings SET valor = ? WHERE chave = ?').run(String(valor ?? ''), chave);
+  const texto = String(valor ?? '');
+  db.prepare('UPDATE settings SET valor = ? WHERE chave = ?').run(texto, chave);
+  carregarSettings().set(chave, texto);
 }
 
 export function brl(centavos) {

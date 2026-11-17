@@ -14,3 +14,5 @@ Caddyfile text eol=lf
 *.db binary
 *.png binary
 *.jpg binary
+*.woff2 binary
+*.webm binary

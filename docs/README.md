@@ -4,7 +4,7 @@ Esta pasta reúne a documentação do **Sistema de Gestão Imobiliária**. O obj
 é permitir que uma pessoa entenda o produto, rode o projeto, avalie as decisões
 técnicas, opere em produção e evolua o código sem depender de conhecimento tácito.
 
-> **Versão documentada:** 0.6.0 · **Última revisão:** novembro de 2026
+> **Versão documentada:** 0.8.0 · **Última revisão:** novembro de 2026
 
 ## Comece por aqui
 

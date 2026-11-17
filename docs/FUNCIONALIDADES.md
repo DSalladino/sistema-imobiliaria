@@ -53,8 +53,7 @@ vencimento do contrato e a ausência de receita de aluguel na competência.
 **Como funciona:** CRUD com busca, campos editáveis, links de documentos, conta bancária/Pix e
 observações. Proprietários e imóveis podem ter taxa própria.
 
-**Regras:** desativação é lógica (o histórico permanece). CPF/CNPJ é mascarado para o perfil consulta.
-Toda alteração vai para a auditoria.
+**Regras:** desativação é lógica (o histórico permanece) e **não é permitida enquanto houver contrato ativo** vinculado ao cadastro (retorna conflito e pede o encerramento). CPF/CNPJ é mascarado para o perfil consulta. Toda alteração vai para a auditoria.
 
 **Onde:** menus **Proprietários**, **Imóveis** e **Inquilinos**.
 
@@ -92,7 +91,7 @@ ativos ao mesmo tempo, e o código do contrato é único na base.
 - Aging: 0–30, 31–60, 61–90, 90+.
 - **Pix por cobrança:** gera BR Code estático (payload EMV com CRC16), QR Code e copia e cola, com txid determinístico para conciliar. Exige a chave Pix em **Configurações → Integrações**.
 
-**Regras:** mês fechado não gera cobrança; cobrança paga não é apagada; correção por estorno.
+**Regras:** mês fechado não gera cobrança; cobrança paga não é apagada; correção por estorno. O status exibido prioriza o **atraso** sobre o rótulo da régua (promessa, acordo, jurídico); a régua continua visível no detalhe da cobrança.
 Vencimento em fim de semana pode ser prorrogado (configurável). Contrato que começa no meio do mês pode
 ser proporcional (configurável). Pagamento parcial continua contando como inadimplência enquanto houver
 saldo — nos alertas e no relatório de inadimplência, o sistema compara **valores**, não a quantidade

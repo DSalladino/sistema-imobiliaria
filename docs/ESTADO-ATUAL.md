@@ -3,7 +3,7 @@
 Documento de referência técnica: o que está implementado, como executar, onde
 fica cada módulo e quais pendências permanecem.
 
-> **Versão:** 0.6.0 · **Última revisão:** novembro de 2026
+> **Versão:** 0.8.0 · **Última revisão:** novembro de 2026
 
 ## Stack e execução
 
@@ -14,9 +14,11 @@ fica cada módulo e quais pendências permanecem.
   `jsdom` em desenvolvimento.
 - Rodar: `npm install && npm start` (porta 3000).
 - Para não conflitar com instâncias antigas: `PORT=3007 npm start`.
-- Testes: `npm test` (API, regras, interface jsdom e seed).
-- Sintaxe: `npm run check`.
-- Dados de exemplo: `npm run demo` (12 meses, cobranças e repasses).
+- Testes: `npm test` (API, regras, interface jsdom, relatórios, conciliação,
+  analytics e seed).
+- Sintaxe: `npm run check`; dependência de CDN: `npm run deps:check`.
+- Dados de exemplo: exigem **opt-in** (`SEED_DEMO=1`, `npm run demo` ou
+  `npm run demo:preparar`). Sem isso a base sobe vazia em qualquer ambiente.
 - Demonstração com credenciais conhecidas: `npm run demo:preparar` e
   `npm run demo:servir` (ver [DEMONSTRACAO.md](DEMONSTRACAO.md)).
 
@@ -46,10 +48,12 @@ src/
   auth.js        hash de senha e token
   permissoes.js  papéis e auditoria
 public/
-  index.html, app.js, charts.js, core.js, views.js, views-fin.js, styles.css
+  index.html, app.js, charts.js, core.js, views.js, views-fin.js, styles.css,
+  fonts/ (DM Sans e Fraunces servidas localmente)
 tests/
   api.test.mjs, rules.test.mjs, seguranca.test.mjs, features.test.mjs,
-  ui.test.mjs, seed.test.mjs
+  ui.test.mjs, seed.test.mjs, relatorios.test.mjs, conciliacao.test.mjs,
+  analytics.test.mjs
 docs/
   README, PRODUTO, FUNCIONALIDADES, ARQUITETURA, MODELO-DE-DADOS, API,
   QUALIDADE, OPERACAO, DECISOES, ESTUDO-DE-CASO, ESTADO-ATUAL,
@@ -81,7 +85,12 @@ Painel analítico, alertas, cobranças + régua + aging, conciliação OFX/CSV,
 proprietários, imóveis, inquilinos, contratos, lançamentos, repasses,
 importação de planilhas, documentos com versões/preview, comunicação manual
 (WhatsApp/e-mail), relatórios CSV/XLSX/PDF, configurações, usuários, auditoria,
-privacidade/LGPD, 2FA, backup `.zip` + verificação de integridade.
+privacidade/LGPD, 2FA, backup `.zip` + verificação de integridade. Desde a 0.7:
+Pix por cobrança, WhatsApp Cloud API, contas a pagar/receber com recorrência e
+previsão de caixa, comissões, reajuste em lote, rescisão e DRE por imóvel. A
+0.8.0 acrescentou troca de senha exigida no servidor, seed opt-in, paginação com
+aviso de truncamento, cache de configurações, fontes locais, health check real e
+desligamento gracioso.
 
 ## Rotas principais
 
@@ -96,15 +105,25 @@ Relatórios: `/api/reports/:tipo.:formato`, `/api/export/*`, `/api/relatorios`.
 Importação: `/api/import/*`.
 Documentos/comunicação/LGPD/backup: `/api/documentos*`, `/api/comunicacao/*`,
 `/api/lgpd/*`, `/api/backup*`.
-Operação: `/api/health`, `/api/manutencao/*`, `/api/auditoria`.
+Operação: `/api/health` (checa banco e escrita de uploads), `/api/manutencao/*`,
+`/api/auditoria`.
+Integrações (0.7+): `/api/integracoes/status`, `/api/cobrancas/:id/pix`,
+`/api/pix/pendentes`, `/api/cobrancas/:id/whatsapp`, `/api/contas*`,
+`/api/comissoes*`, `/api/contratos/reajuste/*`, `/api/contratos/:id/rescindir`,
+`/api/relatorios/dre-imovel`.
+
+Listas longas aceitam `limite`, `offset` e `envelope=1`: nesse modo a resposta
+vira `{ itens, total, limite, offset }` para a interface avisar quando há dados
+truncados. Sem o envelope, o formato continua sendo um array.
 
 O contrato completo está em [API.md](API.md).
 
 ## Qualidade
 
-- 48 testes automatizados distribuídos em 7 arquivos.
-- CI em Node 22 e 24 (`npm ci`, `npm run check`, `npm test`).
-- Testes de UI renderizam as 20 telas em jsdom com dados reais.
+- 69 testes automatizados distribuídos em 10 arquivos.
+- CI em Node 22 e 24 (`npm ci`, `npm run deps:check`, `npm run check`,
+  `npm test`).
+- Testes de UI renderizam as 22 telas em jsdom com dados reais.
 - Cobertura de linhas disponível com `npm run test:coverage` (não é meta).
 - Lacunas: sem lint, sem tipos, sem E2E de navegador real e sem teste de carga.
   Ver [QUALIDADE.md](QUALIDADE.md).
@@ -112,7 +131,8 @@ O contrato completo está em [API.md](API.md).
 ## Dívidas técnicas e riscos conhecidos
 
 1. **Single-tenant:** não há `empresa_id`; todas as consultas assumem uma empresa.
-2. **Listas sem paginação:** limites fixos de 500 a 1.000 registros.
+2. **Listas longas:** a API pagina por `limite`/`offset` e informa o total, mas a
+   interface ainda não tem controles de página (mostra aviso de truncamento).
 3. **Sem concorrência otimista:** edições simultâneas podem sobrescrever.
 4. **PDF/e-mail síncronos:** podem segurar uma requisição por alguns segundos.
 5. **Sem antivírus/criptografia em repouso** nos uploads.
@@ -123,6 +143,10 @@ O contrato completo está em [API.md](API.md).
 9. **Importação limitada a 5.000 linhas e 60 colunas**, sem processamento em
    streaming.
 10. **Sem observabilidade estruturada:** logs em texto e monitor HTTP externo.
+11. **Dependência de CDN:** `xlsx` vem de `cdn.sheetjs.com`; há guarda de versão e
+   integrity (`npm run deps:check`), mas não auditoria automática de CVE.
+12. **Mídia da demonstração no Git:** ~7,7 MB em `docs/assets`; mover para LFS
+   ou releases se o clone começar a pesar.
 
 ## Pendências operacionais
 
@@ -134,11 +158,10 @@ O contrato completo está em [API.md](API.md).
 
 ## Próximos passos técnicos
 
-1. Reajuste assistido e rescisão de contrato.
-2. Contas a pagar/receber e previsão de caixa.
-3. Paginação e busca full-text.
-4. Lint/formatador e verificação de tipos.
-5. Teste E2E de navegador e acessibilidade automatizada.
-6. Logs estruturados, métricas e alertas.
+1. Controles de paginação e busca full-text na interface.
+2. Lint/formatador e verificação de tipos.
+3. Teste E2E de navegador e acessibilidade automatizada.
+4. Logs estruturados, métricas e alertas.
+5. Criptografia/antivírus nos uploads e retenção automática da auditoria.
 
 O [roadmap](roadmap.md) organiza por fase e impacto.
