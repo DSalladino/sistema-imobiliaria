@@ -51,7 +51,7 @@ body:
     id: versao
     attributes:
       label: Versão ou commit
-      placeholder: "0.6.0 ou hash do commit"
+      placeholder: "0.8.0 ou hash do commit"
 
   - type: input
     id: ambiente

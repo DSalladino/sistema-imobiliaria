@@ -4,7 +4,7 @@ Prioridades de evolução do produto. A ordem combina **impacto operacional**,
 **risco** e **esforço**. Itens concluídos saem daqui e entram no
 [CHANGELOG](../CHANGELOG.md).
 
-> **Versão atual:** 0.7.0 · **Última revisão:** novembro de 2026
+> **Versão atual:** 0.8.0 · **Última revisão:** novembro de 2026
 
 ## Onde estamos
 
@@ -44,6 +44,11 @@ Foco: fechar ciclos do contrato e reduzir trabalho manual recorrente.
 | **DRE por proprietário** | Agregação por carteira além do DRE por imóvel | Baixo | planejado (por imóvel **feito**) |
 
 ## Fase 2 — Transparência (0.8)
+
+> A 0.8.0 entregou **endurecimento** (troca de senha exigida no servidor, seed
+> opt-in, paginação com aviso, fontes locais, health check real, desligamento
+> gracioso e guarda de dependência de CDN). Os itens de portal abaixo seguem
+> planejados para os próximos ciclos.
 
 Foco: reduzir atendimento e dar autonomia a proprietários e inquilinos.
 

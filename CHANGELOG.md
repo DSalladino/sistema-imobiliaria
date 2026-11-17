@@ -3,6 +3,30 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e versionamento
 semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
+## [0.8.0] — 2026-11
+
+### Corrigido
+- **Troca de senha exigida no servidor**: usuário com senha temporária recebe `403` em rotas protegidas até trocar a senha (antes a regra existia só na interface).
+- **Seed de demonstração opt-in**: dados fictícios só entram com `SEED_DEMO=1`; não há mais seed automático fora de produção.
+- **Atraso não fica mais escondido pela régua**: `em_atraso` tem precedência e a régua é exposta em `regua_status`.
+- **Desativar cadastro com contrato ativo** agora retorna `409` em vez de esconder o imóvel/proprietário.
+- **Health check real**: `/api/health` valida banco e escrita em `data/uploads` e responde `503` quando algo falha.
+- **Versões da documentação** alinhadas à versão do pacote.
+
+### Adicionado
+- `limite`, `offset` e `envelope=1` em cobranças e lançamentos, com aviso de truncamento na interface; exportações CSV sem limite.
+- Cache de configurações em processo, invalidado por `setSetting`/`invalidarCacheSettings`.
+- Fontes DM Sans e Fraunces servidas localmente em `public/fonts` (OFL), com CSP restrita a `'self'`.
+- `npm run deps:check` e execução na CI para versão, origem e `integrity` do `xlsx` de CDN.
+- Desligamento gracioso em `SIGTERM`/`SIGINT`, com fechamento do SQLite.
+- Aviso no log quando `X-Forwarded-For` chega sem `TRUST_PROXY=1`.
+- Testes `relatorios.test.mjs`, `conciliacao.test.mjs` e `analytics.test.mjs` (69 testes no total).
+
+### Alterado
+- Base começa vazia em qualquer ambiente sem `SEED_DEMO=1`.
+- Schemas de health e de paginação documentados em `docs/API.md`.
+- `docs/AUDITORIA.md` ganhou adendo da revisão 0.7/0.8 (B-01 a B-10, R-13 a R-15).
+
 ## [0.7.0] — 2026-11
 
 ### Adicionado

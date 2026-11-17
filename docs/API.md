@@ -25,9 +25,9 @@ devem ser registradas no [CHANGELOG](../CHANGELOG.md).
 | `201` | Criado |
 | `400` | Dados inválidos ou regra de negócio violada |
 | `401` | Não autenticado / credenciais inválidas |
-| `403` | Sem permissão ou origem cruzada bloqueada |
+| `403` | Sem permissão, origem cruzada bloqueada ou troca de senha pendente |
 | `404` | Recurso ou rota não encontrada |
-| `409` | Conflito (mês fechado, cobrança já paga, duplicidade) |
+| `409` | Conflito (mês fechado, cobrança já paga, duplicidade, cadastro com contrato ativo) |
 | `413` | Corpo grande demais |
 | `415` | `Content-Type` diferente de JSON em escrita |
 | `429` | Rate limit; consulte `Retry-After` |
@@ -58,9 +58,14 @@ O cookie `SameSite=Lax` complementa a proteção. Não há token CSRF separado.
 
 ## Autenticação e sessão
 
+Usuário com senha temporária (`deve_trocar_senha = 1`, criado pelo admin ou por
+reset) recebe **403** em qualquer rota protegida até chamar
+`POST /api/me/senha`. As únicas rotas liberadas nesse estado são as de sessão e
+2FA. A regra vale no servidor, não apenas na interface.
+
 | Método | Rota | Acesso | Descrição |
 |---|---|---|---|
-| `GET` | `/api/health` | público | Status, versão e uptime (verifica o banco) |
+| `GET` | `/api/health` | público | `{ ok, versao, uptime_s, em, banco, uploads }`; `503` se o banco não responder ou `data/uploads` não for gravável |
 | `POST` | `/api/login` | público | E-mail + senha; devolve usuário ou desafio 2FA |
 | `POST` | `/api/login/2fa` | público | Código TOTP ou de recuperação |
 | `POST` | `/api/logout` | autenticado | Encerra a sessão atual |
@@ -171,11 +176,24 @@ Validações relevantes:
 | `PUT` | `/api/settings` | Atualiza configurações (admin) |
 | `GET` | `/api/auditoria?limite=200` | Auditoria (admin, máximo 1.000) |
 
+## Listas e paginação
+
+Cobranças e lançamentos aceitam `limite` (1–5.000 ou `todos`), `offset` e
+`envelope=1`. Sem `envelope`, a resposta continua sendo um array — compatível com
+as versões anteriores. Com `envelope=1`:
+
+```json
+{ "itens": [], "total": 1234, "limite": 500, "offset": 0 }
+```
+
+A interface usa o envelope para avisar quando a lista está truncada. Exportações
+CSV ignoram o limite e percorrem a competência inteira.
+
 ## Lançamentos
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/api/lancamentos?competencia=&caixa=&tipo=` | Lista até 500 lançamentos |
+| `GET` | `/api/lancamentos?competencia=&caixa=&tipo=&limite=&offset=&envelope=` | Lista lançamentos (500 por padrão) |
 | `POST` | `/api/lancamentos` | Cria receita/despesa |
 | `POST` | `/api/lancamentos/:id/estornar` | Estorna com motivo |
 
@@ -191,7 +209,7 @@ Regras de integridade:
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/api/cobrancas?competencia=&status=&contrato_id=&busca=` | Lista enriquecida com saldo e aging |
+| `GET` | `/api/cobrancas?competencia=&status=&contrato_id=&busca=&limite=&offset=&envelope=` | Lista enriquecida com saldo e aging (1.000 por padrão) |
 | `GET` | `/api/cobrancas/resumo?competencia=` | Totais, aging, vencidas e próximas ações |
 | `GET` | `/api/cobrancas/gerar/preview?competencia=` | Prévia da geração mensal |
 | `POST` | `/api/cobrancas/gerar` | Gera cobranças (idempotente) |
