@@ -219,10 +219,20 @@ Regras de integridade:
 | `POST` | `/api/cobrancas/:id/cancelar` | Cancela sem pagamento |
 | `POST` | `/api/cobrancas/:id/acao` | Registra contato, promessa, acordo etc. |
 | `POST` | `/api/cobrancas/:id/status` | Altera o status da régua |
-| `GET` | `/api/cobrancas/:id/pix` | Gera o BR Code Pix da cobrança (payload, QR e txid) |
-| `POST` | `/api/cobrancas/:id/whatsapp` | Envia cobrança pelo WhatsApp (API oficial ou link `wa.me`) |
-| `GET` | `/api/pix/pendentes?competencia=` | Lista os Pix pendentes da competência |
-| `GET` | `/api/integracoes/status` | Situação do Pix e do WhatsApp |
+| `GET` | `/api/cobrancas/:id/pix` | Gera o BR Code Pix da cobrança (payload, QR e txid). Retorna `409` para cobrança paga, cancelada ou chave inválida/ausente |
+| `POST` | `/api/cobrancas/:id/whatsapp` | Envia cobrança pelo WhatsApp (API oficial ou link `wa.me`); aceita o payload Pix na mensagem |
+| `GET` | `/api/pix/pendentes?competencia=` | Lista os Pix pendentes da competência (ignora cobrança resolvida no meio do lote) |
+| `GET` | `/api/integracoes/status` | Situação do Pix e do WhatsApp (inclui a chave cadastrada para usuários autenticados) |
+
+### Pix e conciliação
+
+O Pix é **estático** (BR Code EMV com CRC16), sem PSP e sem webhook. O `txid`
+é `IMOB<id><AAAAMM>` e serve como dica: a conciliação sugere a cobrança quando o
+valor confere (≤5%) e a data está a até 20 dias do vencimento **ou** quando o
+`txid` aparece no memo do extrato — nesse caso o valor continua obrigatório. A
+baixa só acontece após `POST /api/conciliacao/:id/confirmar` ou
+`POST /api/cobrancas/:id/pagar`, ambas auditadas. Detalhes de ameaça, checklist e
+runbook em [SEGURANCA.md](SEGURANCA.md).
 
 Exemplo de baixa:
 

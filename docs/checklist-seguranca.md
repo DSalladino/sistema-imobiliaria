@@ -31,7 +31,22 @@ Legenda: **OK** · **Corrigido** · **Parcial** · **Pendente** · **Risco aceit
 | 20 | HTTPS, proxy e 2FA | **Parcial** | **2FA TOTP implementado** (QR Code, códigos de recuperação, reset pelo admin, segredo criptografado com `APP_SECRET`/chave local). O HSTS é automático sob HTTPS. A parte de infraestrutura (Caddy/HTTPS e `TRUST_PROXY=1`) está documentada em `deploy/README.md`, mas depende de cada instalação. |
 | 21 | Backup testado, LGPD e auditoria final | **Parcial** | Backup, verificação de integridade e restauração documentada; exportação e anonimização de dados do titular implementadas. Falta **executar o teste de restauração periodicamente**, configurar retenção automática de logs e concluir a revisão jurídica de LGPD. Esta tabela é a auditoria final deste ciclo. |
 
+## Segurança do Pix
+
+O Pix não tem PSP nem webhook: a baixa depende de extrato + conciliação humana.
+O `txid` é apenas uma dica e nunca substitui a conferência de valor. QR/chave
+adulterados e comprovante falso são riscos de engenharia social tratados por
+processo. Checklist operacional e runbook completos em
+[SEGURANCA.md](SEGURANCA.md#52-o-que-vai-no-payload).
+
 ## O que foi alterado nesta rodada
+
+**0.8.1**
+
+- Documento [SEGURANCA.md](SEGURANCA.md) com modelo de ameaças, Pix (P-01…P-14), checklist e runbook.
+- Chave Pix validada (ASCII, até 77 bytes) e campos EMV medidos em bytes.
+- `txid` passou a ser usado como dica na conciliação, sempre exigindo valor compatível.
+- `/api/pix/pendentes` tolera cobrança resolvida no meio do lote.
 
 **0.8.0**
 

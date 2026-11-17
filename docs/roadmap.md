@@ -4,7 +4,7 @@ Prioridades de evolução do produto. A ordem combina **impacto operacional**,
 **risco** e **esforço**. Itens concluídos saem daqui e entram no
 [CHANGELOG](../CHANGELOG.md).
 
-> **Versão atual:** 0.8.0 · **Última revisão:** novembro de 2026
+> **Versão atual:** 0.8.1 · **Última revisão:** novembro de 2026
 
 ## Onde estamos
 
