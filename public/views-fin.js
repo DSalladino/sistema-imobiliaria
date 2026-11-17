@@ -17,6 +17,34 @@ function head(titulo, texto, acoes = '') {
 }
 const stat = (rotulo, valor, tom = '') => `<div class="kpi"><div class="kpi-label">${esc(rotulo)}</div><div class="kpi-value" ${tom ? `style="color:var(--${tom})"` : ''}>${valor}</div></div>`;
 
+const rotuloCaixa = (c) => (c === 'proprietarios' ? 'Proprietários' : c === 'imobiliaria' ? 'Imobiliária' : 'sem caixa');
+const rotuloTipoCategoria = (t) => (t === 'receita' ? 'receita' : t === 'despesa' ? 'despesa' : 'sem tipo');
+
+/** Opções de categoria para os seletores dos formulários financeiros. */
+function opcoesCategoria(categorias, contexto = null) {
+  return categorias
+    .filter(c => !contexto || c.contexto === contexto)
+    .map(c => ({ value: c.nome, label: `${c.nome} · ${rotuloTipoCategoria(c.tipo)} · ${rotuloCaixa(c.caixa)}` }));
+}
+
+/** Cria uma categoria dentro do formulário sem exigir sair da tela. */
+async function criarCategoriaRapida({ contexto, tipo = null, caixa = null }) {
+  const nome = (prompt('Nome da nova categoria:') || '').trim();
+  if (!nome) return null;
+  const nova = await api('/categorias', { method: 'POST', body: { contexto, nome, tipo, caixa } });
+  toast(`Categoria “${nova.nome}” criada.`);
+  return nova;
+}
+
+/** Cria um fornecedor/cliente básico a partir da tela de contas. */
+async function criarParceiroRapido(tipo) {
+  const nome = (prompt(tipo === 'cliente' ? 'Nome do novo cliente:' : 'Nome do novo fornecedor/prestador:') || '').trim();
+  if (!nome) return null;
+  const novo = await api('/parceiros', { method: 'POST', body: { tipo, nome, ativo: 1 } });
+  toast(`Cadastro “${novo.nome}” incluído.`);
+  return novo;
+}
+
 /* ============================================================
    COBRANÇAS
    ============================================================ */
@@ -435,7 +463,7 @@ export async function viewLancamentos(root) {
     { name: 'competencia', label: 'Competência', type: 'month', required: true },
     { name: 'tipo', label: 'Tipo', type: 'select', required: true, options: [['receita', 'Receita'], ['despesa', 'Despesa']] },
     { name: 'caixa', label: 'Caixa', type: 'select', required: true, options: [['imobiliaria', 'Imobiliária'], ['proprietarios', 'Proprietários']], hint: 'Aluguel e repasse usam Proprietários; taxa de administração usa Imobiliária.' },
-    { name: 'categoria', label: 'Categoria', type: 'datalist', required: true, options: categorias.map(c => ({ value: c.nome, label: `${c.nome} · ${c.tipo === 'receita' ? 'receita' : 'despesa'} · ${c.caixa === 'proprietarios' ? 'Proprietários' : c.caixa === 'imobiliaria' ? 'Imobiliária' : 'sem caixa'}` })), hint: 'Selecione uma categoria existente ou digite uma nova. Gerenciar em Cadastros › Categorias financeiras.' },
+    { name: 'categoria', label: 'Categoria', type: 'select', required: true, options: [...opcoesCategoria(categorias, 'lancamento'), { value: '__nova__', label: '+ Cadastrar nova categoria…' }], hint: 'A lista mostra o tipo e o caixa sugerido de cada categoria. É possível criar uma nova sem sair do formulário.' },
     { name: 'valor_centavos', label: 'Valor (R$)', type: 'money', required: true },
     { name: 'descricao', label: 'Descrição', type: 'textarea', span: 2 },
     { name: 'proprietario_id', label: 'Proprietário', type: 'select', options: props.map(p => ({ value: p.id, label: p.nome })) },
@@ -448,14 +476,33 @@ export async function viewLancamentos(root) {
     onMount: (r) => {
       const categoria = r.querySelector('[name=categoria]');
       const caixaSel = r.querySelector('[name=caixa]');
+      const tipoSel = r.querySelector('[name=tipo]');
       const sugerirCaixa = () => {
         const c = categorias.find(x => x.nome.toLowerCase() === String(categoria.value || '').trim().toLowerCase());
         if (c?.caixa) caixaSel.value = c.caixa;
+        if (c?.tipo) tipoSel.value = c.tipo;
       };
-      categoria.addEventListener('change', sugerirCaixa);
+      categoria.addEventListener('change', async () => {
+        if (categoria.value !== '__nova__') { sugerirCaixa(); return; }
+        try {
+          const nova = await criarCategoriaRapida({
+            contexto: 'lancamento', tipo: tipoSel.value || null, caixa: caixaSel.value || null,
+          });
+          if (!nova) { categoria.value = ''; return; }
+          categorias = await api('/categorias?contexto=lancamento&inativas=0');
+          categoria.innerHTML = [...opcoesCategoria(categorias, 'lancamento'), { value: '__nova__', label: '+ Cadastrar nova categoria…' }]
+            .map(o => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');
+          categoria.value = nova.nome;
+          sugerirCaixa();
+        } catch (e) { toast(e.message, 'err'); categoria.value = ''; }
+      });
       categoria.addEventListener('blur', sugerirCaixa);
     },
-    onSubmit: async (d) => { await api('/lancamentos', { method: 'POST', body: d }); toast('Lançamento criado.'); carregar(); },
+    onSubmit: async (d) => {
+      if (d.categoria === '__nova__') throw new Error('Cadastre ou selecione uma categoria antes de salvar.');
+      await api('/lancamentos', { method: 'POST', body: d });
+      toast('Lançamento criado.'); carregar();
+    },
   });
 
   const abrirDetalhe = async (id) => {
@@ -1491,7 +1538,7 @@ export async function viewContas(root, params) {
   let busca = '';
   let lista = [];
   let resumo = null;
-  let categorias = [], parceiros = [];
+  let categorias = [], parceiros = [], props = [], imoveis = [], contratos = [];
 
   root.innerHTML = head('Contas a pagar e a receber', 'Compromissos, recorrências e previsão de caixa.', `
       ${podeFinanceiro() ? `<button class="btn primary" data-nova>${icon('plus')} Nova conta</button>` : ''}`) +
@@ -1513,16 +1560,48 @@ export async function viewContas(root, params) {
   const container = root.querySelector('[data-lista]');
   const previsao = root.querySelector('[data-previsao]');
 
+  const categoriasDoTipo = (t) => categorias.filter(c => c.contexto === (t === 'receber' ? 'conta_receber' : 'conta_pagar'));
+  const parceirosDoTipo = (t) => parceiros.filter(p => p.ativo && (t === 'receber'
+    ? ['cliente', 'ambos'].includes(p.tipo)
+    : ['fornecedor', 'manutencao', 'prestador', 'ambos'].includes(p.tipo)));
+  const preencherCategorias = (sel, tipoConta, selecionada = '') => {
+    const opcoes = opcoesCategoria(categoriasDoTipo(tipoConta));
+    if (selecionada && !opcoes.some(o => o.value === selecionada)) {
+      opcoes.unshift({ value: selecionada, label: `${selecionada} · categoria atual` });
+    }
+    opcoes.push({ value: '__nova__', label: '+ Cadastrar nova categoria…' });
+    sel.innerHTML = `<option value="">Selecione…</option>` + opcoes
+      .map(o => `<option value="${esc(o.value)}" ${o.value === selecionada ? 'selected' : ''}>${esc(o.label)}</option>`).join('');
+    if (selecionada) sel.value = selecionada;
+  };
+  const preencherParceiros = (sel, tipoConta, selecionado = '') => {
+    const opcoes = parceirosDoTipo(tipoConta).map(p => ({
+      value: p.nome,
+      label: `${p.nome} · ${p.tipo === 'cliente' ? 'cliente' : p.tipo === 'manutencao' ? 'manutenção' : p.tipo === 'prestador' ? 'prestador' : 'fornecedor'}${p.pix ? ' · Pix ' + p.pix : ''}`,
+    }));
+    if (selecionado && !opcoes.some(o => o.value === selecionado)) {
+      opcoes.unshift({ value: selecionado, label: `${selecionado} · cadastro atual` });
+    }
+    sel.innerHTML = `<option value="">Selecione…</option>` + opcoes
+      .map(o => `<option value="${esc(o.value)}" ${o.value === selecionado ? 'selected' : ''}>${esc(o.label)}</option>`).join('')
+      + `<option value="__novo__">+ Cadastrar novo fornecedor/cliente…</option>`;
+    if (selecionado) sel.value = selecionado;
+  };
+
   const campos = () => [
     { name: 'tipo', label: 'Tipo', type: 'select', required: true, options: [['pagar', 'A pagar'], ['receber', 'A receber']] },
     { name: 'descricao', label: 'Descrição', required: true, placeholder: 'Condomínio, IPTU, comissão…' },
-    { name: 'categoria', label: 'Categoria', type: 'datalist', options: categorias.map(c => ({ value: c.nome, label: `${c.nome} · ${c.contexto === 'conta_pagar' ? 'a pagar' : 'a receber'} · ${c.caixa === 'proprietarios' ? 'Proprietários' : c.caixa === 'imobiliaria' ? 'Imobiliária' : 'sem caixa'}` })), hint: 'Selecione ou digite uma nova. Gerenciar em Cadastros › Categorias financeiras.' },
-    { name: 'fornecedor', label: 'Fornecedor / cliente', type: 'datalist', options: parceiros.filter(p => p.ativo && (p.tipo === 'fornecedor' || p.tipo === 'cliente' || p.tipo === 'ambos')).map(p => ({ value: p.nome, label: `${p.nome} · ${p.tipo === 'cliente' ? 'cliente' : 'fornecedor'}${p.pix ? ' · Pix ' + p.pix : ''}` })), hint: 'Cadastre fornecedores e clientes em Cadastros › Corretores e parceiros. Também pode digitar um nome novo.' },
+    { name: 'categoria', label: 'Categoria', type: 'select', required: true, options: opcoesCategoria(categoriasDoTipo('pagar')), hint: 'A lista muda conforme o tipo (a pagar ou a receber). É possível cadastrar uma nova categoria no próprio formulário.' },
+    { name: 'fornecedor', label: 'Fornecedor / cliente', type: 'select', options: parceirosDoTipo('pagar').map(p => ({ value: p.nome, label: `${p.nome}${p.pix ? ' · Pix ' + p.pix : ''}` })), hint: 'Filtra fornecedores, empresas de manutenção e prestadores para contas a pagar; clientes para contas a receber.' },
+    { name: 'parceiro_id', label: 'Vínculo do parceiro', type: 'hidden' },
     { name: 'valor_centavos', label: 'Valor (R$)', type: 'money', required: true },
     { name: 'vencimento', label: 'Vencimento', type: 'date', required: true },
     { name: 'recorrencia', label: 'Recorrência', type: 'select', options: [['unica', 'Única'], ['semanal', 'Semanal'], ['mensal', 'Mensal'], ['bimestral', 'Bimestral'], ['trimestral', 'Trimestral'], ['semestral', 'Semestral'], ['anual', 'Anual']], hint: 'A próxima parcela é criada automaticamente na baixa.' },
     { name: 'recorrencia_fim', label: 'Repetir até', type: 'date' },
     { name: 'caixa', label: 'Caixa', type: 'select', options: [['imobiliaria', 'Imobiliária'], ['proprietarios', 'Proprietários']] },
+    { name: 'proprietario_id', label: 'Proprietário (opcional)', type: 'select', options: props.map(p => ({ value: p.id, label: p.nome })) },
+    { name: 'imovel_id', label: 'Imóvel (opcional)', type: 'select', options: imoveis.map(i => ({ value: i.id, label: `${i.endereco}${i.numero ? ', ' + i.numero : ''}` })) },
+    { name: 'contrato_id', label: 'Contrato (opcional)', type: 'select', span: 2, options: contratos.map(c => ({ value: c.id, label: `${c.codigo || '#' + c.id} — ${c.endereco} (${c.inquilino_nome})` })) },
     { name: 'observacoes', label: 'Observações', type: 'textarea', span: 2 },
   ];
 
@@ -1531,16 +1610,56 @@ export async function viewContas(root, params) {
     fields: campos(),
     valores: conta || { tipo: 'pagar', vencimento: hojeISO(), recorrencia: 'unica', caixa: 'imobiliaria' },
     onMount: (r) => {
+      const tipoSel = r.querySelector('[name=tipo]');
       const categoria = r.querySelector('[name=categoria]');
+      const fornecedor = r.querySelector('[name=fornecedor]');
+      const parceiroId = r.querySelector('[name=parceiro_id]');
       const caixaSel = r.querySelector('[name=caixa]');
       const sugerirCaixa = () => {
         const c = categorias.find(x => x.nome.toLowerCase() === String(categoria.value || '').trim().toLowerCase());
         if (c?.caixa) caixaSel.value = c.caixa;
       };
-      categoria.addEventListener('change', sugerirCaixa);
+      const sincronizarParceiro = () => {
+        const p = parceiros.find(x => x.nome.toLowerCase() === String(fornecedor.value || '').trim().toLowerCase());
+        parceiroId.value = p?.id || '';
+      };
+      const trocarTipo = () => {
+        preencherCategorias(categoria, tipoSel.value);
+        preencherParceiros(fornecedor, tipoSel.value);
+        parceiroId.value = '';
+      };
+      tipoSel.addEventListener('change', trocarTipo);
+      preencherCategorias(categoria, tipoSel.value, conta?.categoria || '');
+      preencherParceiros(fornecedor, tipoSel.value, conta?.fornecedor || '');
+      parceiroId.value = conta?.parceiro_id || '';
+      fornecedor.addEventListener('change', async () => {
+        if (fornecedor.value !== '__novo__') { sincronizarParceiro(); return; }
+        try {
+          const novo = await criarParceiroRapido(tipoSel.value === 'receber' ? 'cliente' : 'fornecedor');
+          if (!novo) { fornecedor.value = conta?.fornecedor || ''; return; }
+          parceiros = await api('/parceiros');
+          preencherParceiros(fornecedor, tipoSel.value, novo.nome);
+          parceiroId.value = novo.id;
+        } catch (e) { toast(e.message, 'err'); fornecedor.value = ''; }
+      });
+      categoria.addEventListener('change', async () => {
+        if (categoria.value !== '__nova__') { sugerirCaixa(); return; }
+        try {
+          const nova = await criarCategoriaRapida({
+            contexto: tipoSel.value === 'receber' ? 'conta_receber' : 'conta_pagar',
+            tipo: tipoSel.value === 'receber' ? 'receita' : 'despesa',
+            caixa: caixaSel.value || null,
+          });
+          if (!nova) { categoria.value = ''; return; }
+          categorias = await api('/categorias?inativas=0');
+          preencherCategorias(categoria, tipoSel.value, nova.nome);
+          sugerirCaixa();
+        } catch (e) { toast(e.message, 'err'); categoria.value = ''; }
+      });
       categoria.addEventListener('blur', sugerirCaixa);
     },
     onSubmit: async (d) => {
+      if (d.categoria === '__nova__' || d.fornecedor === '__novo__') throw new Error('Selecione ou cadastre a categoria e o fornecedor/cliente.');
       if (conta) await api(`/contas/${conta.id}`, { method: 'PUT', body: d });
       else await api('/contas', { method: 'POST', body: d });
       toast(conta ? 'Conta atualizada.' : 'Conta criada.');
@@ -1579,7 +1698,10 @@ export async function viewContas(root, params) {
         ${podeFinanceiro() && c.status === 'aberta' ? `<button class="icon-btn" data-cancelar="${c.id}" title="Cancelar">${icon('x')}</button>` : ''}` },
     ], lista);
     container.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => abrirBaixa(lista.find(x => x.id === Number(b.dataset.baixar))));
-    container.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => abrirForm(lista.find(x => x.id === Number(b.dataset.editar))));
+    container.querySelectorAll('[data-editar]').forEach(b => b.onclick = async () => {
+      if (!catalogosProntos) await carregarCatalogos();
+      abrirForm(lista.find(x => x.id === Number(b.dataset.editar)));
+    });
     container.querySelectorAll('[data-cancelar]').forEach(b => b.onclick = async () => {
       const c = lista.find(x => x.id === Number(b.dataset.cancelar));
       if (!await confirmar({ titulo: 'Cancelar conta', mensagem: `Cancelar “${c.descricao}”?`, textoBotao: 'Cancelar conta', perigo: true })) return;
@@ -1637,20 +1759,29 @@ export async function viewContas(root, params) {
     } catch (e) { container.innerHTML = erroBox(e); }
   };
 
+  let catalogosProntos = false;
+  const carregarCatalogos = async () => {
+    try {
+      [categorias, parceiros, props, imoveis, contratos] = await Promise.all([
+        api('/categorias?inativas=0'), api('/parceiros'), api('/proprietarios'), api('/imoveis'), api('/contratos'),
+      ]);
+      categorias = categorias.filter(c => ['conta_pagar', 'conta_receber'].includes(c.contexto));
+      catalogosProntos = true;
+    } catch (e) {
+      toast(`Não foi possível carregar categorias e parceiros: ${e.message}`, 'err');
+    }
+  };
+
   root.querySelector('[data-tipo]').onchange = (e) => { tipo = e.target.value; carregar(); };
   root.querySelector('[data-status]').onchange = (e) => { status = e.target.value; carregar(); };
   root.querySelector('[data-busca]').addEventListener('input', (e) => {
     busca = e.target.value; clearTimeout(window.__contasT); window.__contasT = setTimeout(carregar, 350);
   });
-  root.querySelector('[data-nova]')?.addEventListener('click', () => abrirForm());
-  try {
-    [categorias, parceiros] = await Promise.all([
-      api('/categorias?contexto=conta_pagar'),
-      api('/parceiros'),
-    ]);
-    const receber = await api('/categorias?contexto=conta_receber');
-    categorias = [...categorias, ...receber];
-  } catch { /* formulário continua aceitando texto livre */ }
+  root.querySelector('[data-nova]')?.addEventListener('click', async () => {
+    if (!catalogosProntos) await carregarCatalogos();
+    abrirForm();
+  });
+  await carregarCatalogos();
   await carregar();
   await renderPrevisao();
 }

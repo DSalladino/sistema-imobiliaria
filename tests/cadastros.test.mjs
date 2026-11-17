@@ -54,6 +54,36 @@ test('parceiros: cadastro, filtro por tipo, vínculo e duplicidade', () => {
   assert.throws(() => cad.resolverParceiro({ id: corretor.id, tipo: 'fornecedor' }), /não está cadastrado como fornecedor/);
 });
 
+test('parceiros: empresa de manutenção e prestador com dados de pagamento', () => {
+  const manutencao = cad.criarParceiro({
+    tipo: 'manutencao', nome: 'Manutenção Rápida Ltda', nome_fantasia: 'Rápida Serviços',
+    tipo_servico: 'hidraulica', especialidades: 'Hidráulica, elétrica e pequenos reparos',
+    cpf_cnpj: '11.444.777/0001-61', telefone: '(11) 95555-0001', whatsapp: '(11) 95555-0001',
+    email: 'contato@rapida.com', banco: 'Itaú', agencia: '1234', conta: '99887-1',
+    tipo_conta: 'corrente', pix: 'contato@rapida.com', forma_pagamento: 'transferencia', prazo_pagamento_dias: 30,
+  });
+  assert.equal(manutencao.tipo, 'manutencao');
+  assert.equal(manutencao.tipo_servico, 'hidraulica');
+  assert.equal(manutencao.forma_pagamento, 'transferencia');
+  assert.equal(manutencao.prazo_pagamento_dias, 30);
+  assert.equal(manutencao.banco, 'Itaú');
+
+  const prestador = cad.criarParceiro({ tipo: 'prestador', nome: 'Zeladoria Central', tipo_servico: 'limpeza' });
+  assert.equal(prestador.tipo, 'prestador');
+
+  // Fornecedor é o grupo usado nas contas a pagar: inclui manutenção e prestador.
+  const fornecedores = cad.listarParceiros({ tipo: 'fornecedor' });
+  assert.ok(fornecedores.some(p => p.id === manutencao.id));
+  assert.ok(fornecedores.some(p => p.id === prestador.id));
+
+  // Atualização não perde os dados de pagamento e valida o documento duplicado.
+  const atualizado = cad.atualizarParceiro(manutencao.id, { prazo_pagamento_dias: 45, observacoes: 'Atende zona sul.' });
+  assert.equal(atualizado.prazo_pagamento_dias, 45);
+  assert.equal(atualizado.pix, 'contato@rapida.com');
+  assert.throws(() => cad.criarParceiro({ tipo: 'fornecedor', nome: 'Outro', cpf_cnpj: '11.444.777/0001-61' }), (e) => e.status === 409);
+  assert.throws(() => cad.criarParceiro({ tipo: 'prestador', nome: 'Forma inválida', forma_pagamento: 'inexistente' }), /Forma de pagamento/);
+});
+
 test('categorias: sementes, contexto, reativação e uso automático', () => {
   const lanc = cad.listarCategorias({ contexto: 'lancamento' });
   assert.ok(lanc.some(c => c.nome === 'Aluguel' && c.caixa === 'proprietarios'));

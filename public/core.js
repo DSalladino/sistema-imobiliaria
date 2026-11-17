@@ -327,21 +327,35 @@ export function confirmarTexto({ titulo, mensagem, palavra, textoBotao = 'Confir
 }
 
 /* ---------------- formulários ---------------- */
+/* Normaliza opções de formulário aceitando strings, pares [valor, rótulo]
+ * e objetos { value, label }. O formato de par é usado em vários formulários
+ * e antes era tratado como objeto, gerando <option> sem valor nem texto. */
+export function normalizarOpcoes(options) {
+  return (typeof options === 'function' ? options() : options || [])
+    .map((o) => {
+      if (Array.isArray(o)) return { value: o[0], label: o[1] ?? o[0] };
+      if (o && typeof o === 'object') {
+        const value = o.value ?? o.valor ?? o.id ?? '';
+        return { value, label: o.label ?? o.rotulo ?? o.nome ?? value };
+      }
+      return { value: o, label: o };
+    })
+    .filter(o => o.value !== '' && o.value !== null && o.value !== undefined);
+}
+
 function fieldInput(f, valores) {
   const val = valores?.[f.name];
   const req = f.required ? 'required' : '';
   const id = `f-${f.name}`;
   if (f.type === 'select') {
-    const opts = (typeof f.options === 'function' ? f.options() : f.options || [])
-      .map(o => typeof o === 'object' ? o : { value: o, label: o });
+    const opts = normalizarOpcoes(f.options);
     return `<select id="${id}" name="${esc(f.name)}" ${req}>
       ${f.placeholder !== false ? `<option value="">${esc(f.placeholder || 'Selecione…')}</option>` : ''}
       ${opts.map(o => `<option value="${esc(o.value)}" ${String(val ?? '') === String(o.value) ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}
     </select>`;
   }
   if (f.type === 'datalist') {
-    const opts = (typeof f.options === 'function' ? f.options() : f.options || [])
-      .map(o => typeof o === 'object' ? o : { value: o, label: o });
+    const opts = normalizarOpcoes(f.options);
     const listId = `dl-${f.name}`;
     return `<input id="${id}" name="${esc(f.name)}" list="${listId}" value="${val == null ? '' : esc(val)}" placeholder="${esc(f.placeholder || 'Selecione ou digite…')}" ${f.maxlength ? `maxlength="${f.maxlength}"` : ''} ${req}>
       <datalist id="${listId}">${opts.map(o => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</datalist>`;
@@ -367,6 +381,7 @@ function fieldInput(f, valores) {
 
 export function fieldsHtml(fields, valores = {}) {
   return `<div class="grid-2">${fields.map((f) => {
+    if (f.type === 'hidden') return fieldInput(f, valores);
     if (f.type === 'checkbox') {
       return `<div class="span-2">${fieldInput(f, valores)}</div>`;
     }

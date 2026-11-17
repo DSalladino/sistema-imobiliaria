@@ -100,6 +100,18 @@ test('analytics entrega KPIs, comparativo e séries consistentes', () => {
   assert.ok(Array.isArray(dados.top_contratos));
   assert.ok(Array.isArray(dados.atividades));
   assert.ok(dados.cobrancas && typeof dados.cobrancas.abertas === 'number');
+  assert.ok(dados.contas && typeof dados.contas.a_pagar === 'number', 'resumo de contas no painel');
+  assert.ok(Array.isArray(dados.previsao_caixa?.meses) && dados.previsao_caixa.meses.length >= 3, 'previsão de caixa no painel');
+  assert.ok(Array.isArray(dados.carteira_proprietarios), 'carteira por proprietário');
+  assert.ok(Array.isArray(dados.proximos_vencimentos), 'próximos vencimentos');
+  assert.ok(Array.isArray(dados.contratos_vencendo), 'contratos a vencer');
+  assert.equal(typeof dados.kpis.media_receita, 'number');
+  assert.equal(typeof dados.kpis.margem_pct, 'number');
+  assert.equal(typeof dados.kpis.concentracao_tres_pct, 'number');
+  assert.ok(dados.comissoes && typeof dados.comissoes.quantidade === 'number');
+  const somaCarteira = dados.carteira_proprietarios.reduce((s, p) => s + p.aluguel_centavos, 0);
+  assert.ok(somaCarteira > 0);
+  assert.ok(dados.kpis.concentracao_tres_pct >= 0 && dados.kpis.concentracao_tres_pct <= 100);
   assert.match(dados.gerado_em, /^\d{4}-\d{2}-\d{2}$/);
 });
 

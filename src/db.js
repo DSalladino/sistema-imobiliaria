@@ -349,12 +349,23 @@ CREATE TABLE IF NOT EXISTS parceiros (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tipo TEXT NOT NULL DEFAULT 'fornecedor',
   nome TEXT NOT NULL,
+  nome_fantasia TEXT,
   cpf_cnpj TEXT,
   creci TEXT,
   email TEXT,
   telefone TEXT,
+  whatsapp TEXT,
+  tipo_servico TEXT,
+  especialidades TEXT,
   pix TEXT,
   endereco TEXT,
+  site TEXT,
+  banco TEXT,
+  agencia TEXT,
+  conta TEXT,
+  tipo_conta TEXT DEFAULT 'corrente',
+  forma_pagamento TEXT,
+  prazo_pagamento_dias INTEGER,
   observacoes TEXT,
   ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL DEFAULT (datetime('now','localtime'))
@@ -440,10 +451,34 @@ garantirColuna('contratos', 'corretor_id', 'INTEGER REFERENCES parceiros(id)');
 garantirColuna('contratos', 'comissao_pct', 'REAL');
 garantirColuna('comissoes', 'corretor_id', 'INTEGER REFERENCES parceiros(id)');
 garantirColuna('contas', 'parceiro_id', 'INTEGER REFERENCES parceiros(id)');
+// Dados comerciais e de pagamento dos parceiros (fornecedores, empresas de
+// manutenção e prestadores de serviço). Ficam em colunas próprias para que a
+// seleção em contas e lançamentos traga telefone, Pix e condição de pagamento.
+garantirColuna('parceiros', 'nome_fantasia', 'TEXT');
+garantirColuna('parceiros', 'tipo_servico', 'TEXT');
+garantirColuna('parceiros', 'especialidades', 'TEXT');
+garantirColuna('parceiros', 'whatsapp', 'TEXT');
+garantirColuna('parceiros', 'site', 'TEXT');
+garantirColuna('parceiros', 'banco', 'TEXT');
+garantirColuna('parceiros', 'agencia', 'TEXT');
+garantirColuna('parceiros', 'conta', 'TEXT');
+garantirColuna('parceiros', 'tipo_conta', "TEXT DEFAULT 'corrente'");
+garantirColuna('parceiros', 'forma_pagamento', 'TEXT');
+garantirColuna('parceiros', 'prazo_pagamento_dias', 'INTEGER');
 garantirColuna('auditoria', 'hash_anterior', 'TEXT');
 garantirColuna('auditoria', 'hash', 'TEXT');
 garantirColuna('sessoes', 'ultimo_uso', 'TEXT');
 db.prepare("UPDATE sessoes SET ultimo_uso = criado_em WHERE ultimo_uso IS NULL").run();
+
+// Índices criados depois das migrações para não falharem em bancos antigos que
+// ainda não tinham as colunas novas. São operações idempotentes e não alteram
+// dados existentes.
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_parceiros_servico ON parceiros(tipo_servico, ativo);
+  CREATE INDEX IF NOT EXISTS idx_contas_parceiro ON contas(parceiro_id);
+  CREATE INDEX IF NOT EXISTS idx_cobrancas_venc ON cobrancas(vencimento, status);
+  CREATE INDEX IF NOT EXISTS idx_lanc_categoria ON lancamentos(categoria, competencia);
+`);
 
 // Cadeia de auditoria: bancos criados antes desta versão recebem a cadeia
 // retroativa uma única vez. A partir daí cada novo registro é encadeado ao
@@ -551,6 +586,8 @@ export const CATEGORIAS_PADRAO = [
   ['lancamento', 'Marketing', 'despesa', 'imobiliaria', 80],
   ['lancamento', 'Material de escritório', 'despesa', 'imobiliaria', 85],
   ['lancamento', 'Serviços', 'despesa', 'imobiliaria', 86],
+  ['lancamento', 'Serviços de terceiros', 'despesa', 'imobiliaria', 87],
+  ['lancamento', 'Manutenção de imóvel', 'despesa', 'proprietarios', 21],
   ['lancamento', 'Outras despesas', 'despesa', 'imobiliaria', 90],
   ['conta_pagar', 'Ocupação', 'despesa', 'imobiliaria', 10],
   ['conta_pagar', 'Condomínio', 'despesa', 'proprietarios', 20],
@@ -561,6 +598,8 @@ export const CATEGORIAS_PADRAO = [
   ['conta_pagar', 'Comissão de corretagem', 'despesa', 'imobiliaria', 70],
   ['conta_pagar', 'Marketing', 'despesa', 'imobiliaria', 80],
   ['conta_pagar', 'Serviços', 'despesa', 'imobiliaria', 85],
+  ['conta_pagar', 'Manutenção de imóvel', 'despesa', 'proprietarios', 42],
+  ['conta_pagar', 'Serviços de terceiros', 'despesa', 'imobiliaria', 86],
   ['conta_pagar', 'Outros', 'despesa', 'imobiliaria', 90],
   ['conta_receber', 'Aluguel', 'receita', 'proprietarios', 10],
   ['conta_receber', 'Taxa de administração', 'receita', 'imobiliaria', 20],
