@@ -136,6 +136,9 @@ try {
     '/api/comissoes', '/api/comissoes/resumo',
     '/api/proprietarios', '/api/imoveis', '/api/inquilinos',
     '/api/contratos', '/api/excecoes',
+    '/api/parceiros', '/api/parceiros?tipo=corretor',
+    '/api/categorias?inativas=1', '/api/categorias?contexto=lancamento&inativas=0',
+    '/api/categorias?contexto=conta_pagar', '/api/categorias?contexto=conta_receber',
   ];
   for (const caminho of fixos) await capturar(caminho);
 

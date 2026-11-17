@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { hojeISO, competenciaAtual, getSettingNum } from './regras.js';
+import { resolverParceiro } from './cadastros.js';
 
 /**
  * Comissões de corretagem: previstas por contrato/corretor e pagas como despesa
@@ -14,8 +15,10 @@ export const STATUS_COMISSAO = {
 };
 
 const baseSelect = `SELECT cm.*, ct.codigo AS contrato_codigo, ct.aluguel_centavos,
-    i.endereco, i.numero, i.complemento, p.nome AS proprietario_nome, q.nome AS inquilino_nome
+    i.endereco, i.numero, i.complemento, p.nome AS proprietario_nome, q.nome AS inquilino_nome,
+    pc.nome AS corretor_cadastro, pc.creci AS corretor_creci, pc.pix AS corretor_pix
   FROM comissoes cm
+  LEFT JOIN parceiros pc ON pc.id = cm.corretor_id
   JOIN contratos ct ON ct.id = cm.contrato_id
   JOIN imoveis i ON i.id = ct.imovel_id
   JOIN proprietarios p ON p.id = i.proprietario_id
@@ -55,11 +58,12 @@ export function resumo(competencia = competenciaAtual()) {
   };
 }
 
-export function criar({ contrato_id, corretor, pct, competencia, base_centavos, observacoes } = {}, user) {
+export function criar({ contrato_id, corretor, corretor_id, pct, competencia, base_centavos, observacoes } = {}, user) {
   const contrato = db.prepare('SELECT * FROM contratos WHERE id = ?').get(Number(contrato_id));
   if (!contrato) throw Object.assign(new Error('Contrato não encontrado.'), { status: 404 });
-  const nomeCorretor = String(corretor || contrato.corretor || '').trim();
-  if (!nomeCorretor) throw Object.assign(new Error('Informe o corretor.'), { status: 400 });
+  const parceiro = resolverParceiro({ id: corretor_id, nome: corretor, tipo: 'corretor' });
+  const nomeCorretor = String(parceiro?.nome || corretor || contrato.corretor || '').trim();
+  if (!nomeCorretor) throw Object.assign(new Error('Informe o corretor. Cadastre-o em Cadastros › Parceiros.'), { status: 400 });
   const percentual = pct == null || pct === ''
     ? (contrato.comissao_pct != null ? Number(contrato.comissao_pct) : getSettingNum('comissao_padrao_pct', 0))
     : Number(String(pct).replace(',', '.'));
@@ -76,9 +80,9 @@ export function criar({ contrato_id, corretor, pct, competencia, base_centavos, 
   if (existente) {
     throw Object.assign(new Error(`Já existe comissão de ${nomeCorretor} para este contrato em ${comp}.`), { status: 409 });
   }
-  const r = db.prepare(`INSERT INTO comissoes (contrato_id, corretor, base_centavos, pct, valor_centavos, competencia,
-      status, prevista_em, observacoes, criado_por) VALUES (?,?,?,?,?,?,'prevista',?,?,?)`)
-    .run(contrato.id, nomeCorretor, base, percentual, valor, comp, hojeISO(), observacoes || null, user?.nome || null);
+  const r = db.prepare(`INSERT INTO comissoes (contrato_id, corretor, corretor_id, base_centavos, pct, valor_centavos, competencia,
+      status, prevista_em, observacoes, criado_por) VALUES (?,?,?,?,?,?,?,'prevista',?,?,?)`)
+    .run(contrato.id, nomeCorretor, parceiro?.id || null, base, percentual, valor, comp, hojeISO(), observacoes || null, user?.nome || null);
   return obter(Number(r.lastInsertRowid));
 }
 
@@ -133,21 +137,22 @@ export function cancelar(id, motivo, user) {
 }
 
 /** Gera, em lote, as comissões previstas da competência para contratos ativos. */
-export function gerarLote({ competencia = competenciaAtual(), pct = null, corretor = null } = {}, user) {
+export function gerarLote({ competencia = competenciaAtual(), pct = null, corretor = null, corretor_id = null } = {}, user) {
   const comp = /^\d{4}-\d{2}$/.test(String(competencia)) ? String(competencia) : competenciaAtual();
   const contratos = db.prepare(`SELECT c.*, i.proprietario_id FROM contratos c JOIN imoveis i ON i.id = c.imovel_id
     WHERE c.status = 'ativo' ORDER BY c.id`).all();
+  const parceiroLote = resolverParceiro({ id: corretor_id, nome: corretor, tipo: 'corretor' });
   const criadas = [];
   const ignoradas = [];
   for (const c of contratos) {
-    const nome = String(corretor || c.corretor || '').trim();
+    const nome = String(parceiroLote?.nome || corretor || c.corretor || '').trim();
     if (!nome) { ignoradas.push({ contrato_id: c.id, motivo: 'sem corretor' }); continue; }
     const percentual = pct == null || pct === ''
       ? (c.comissao_pct != null ? Number(c.comissao_pct) : getSettingNum('comissao_padrao_pct', 0))
       : Number(String(pct).replace(',', '.'));
     if (!Number.isFinite(percentual) || percentual <= 0) { ignoradas.push({ contrato_id: c.id, motivo: 'percentual zerado' }); continue; }
     try {
-      criadas.push(criar({ contrato_id: c.id, corretor: nome, pct: percentual, competencia: comp }, user));
+      criadas.push(criar({ contrato_id: c.id, corretor: nome, corretor_id: parceiroLote?.id || c.corretor_id, pct: percentual, competencia: comp }, user));
     } catch (e) {
       ignoradas.push({ contrato_id: c.id, motivo: e.message });
     }

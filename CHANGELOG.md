@@ -3,6 +3,23 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e versionamento
 semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
+## [0.11.0] — 2026-11
+
+### Adicionado
+- **Cadastro de parceiros** (`src/cadastros.js`, telas Corretores e parceiros, `/api/parceiros`): corretores com CRECI, fornecedores, clientes e contatos “ambos”, com Pix, documento, e-mail, telefone e situação. O corretor deixa de ser texto livre: comissões e contratos podem vincular o cadastro e puxam o Pix para pagamento.
+- **Categorias financeiras gerenciáveis** (`categorias`, `/api/categorias`): listas iniciais por contexto (lançamento, conta a pagar e conta a receber), com tipo, caixa sugerido e ordem. Categorias digitadas em um lançamento ou conta são registradas automaticamente para as próximas seleções.
+- **Formulários com seleção e digitação assistida**: lançamentos, contas, contratos e comissões passam a usar `datalist`, mantendo compatibilidade com valores antigos e nomes ainda não cadastrados.
+- **Fornecedor/cliente vinculado em contas**: a conta guarda `parceiro_id` quando o nome corresponde a um cadastro, sem perder o texto histórico.
+- **Recorrências adicionais**: bimestral, trimestral e semestral, com cálculo de próximo vencimento e projeção de caixa.
+- **Backup automático com hash SHA-256**: snapshot ao iniciar quando o último tem mais de 24 h (configurável), arquivo `.sha256` por snapshot e status “conferido/divergente” na tela de manutenção.
+- **Pix do proprietário e do corretor** visíveis no extrato de repasse e no detalhe da comissão.
+- Testes `cadastros` e cobertura de API/UI para as novas telas (126 testes).
+
+### Corrigido
+- **“Zerar dados” não deixava resíduos**: a limpeza agora inclui contas, comissões, reajustes, rescisões e parceiros, na ordem correta das chaves estrangeiras.
+- **Contagem de backup** passa a considerar parceiros e categorias.
+- **Edição de contrato** recalculava as colunas antes da validação; o vínculo de corretor agora é persistido também em atualizações.
+
 ## [0.10.0] — 2026-11
 
 ### Adicionado

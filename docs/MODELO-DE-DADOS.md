@@ -96,12 +96,19 @@ Isso garante idempotência da geração mensal.
 
 Restrição importante: `UNIQUE (competencia, proprietario_id)` em `repasses`.
 
+### Cadastros de apoio
+
+| Tabela | Papel | Campos relevantes |
+|---|---|---|
+| `parceiros` | Corretores, fornecedores e clientes | `tipo` (`corretor`/`fornecedor`/`cliente`/`ambos`), `nome`, `cpf_cnpj`, `creci`, `email`, `telefone`, `pix`, `endereco`, `observacoes`, `ativo` |
+| `categorias` | Dicionário financeiro | `contexto` (`lancamento`/`conta_pagar`/`conta_receber`), `nome`, `tipo` (`receita`/`despesa`), `caixa`, `ordem`, `ativo`; `UNIQUE (contexto, nome)` |
+
 ### Contas, comissões e eventos de contrato
 
 | Tabela | Papel | Campos relevantes |
 |---|---|---|
-| `contas` | Contas a pagar/receber | `tipo` (`pagar`/`receber`), `descricao`, `categoria`, `fornecedor`, `valor_centavos`, `vencimento`, `competencia`, `recorrencia`, `recorrencia_fim`, `recorrencia_origem_id`, `caixa`, vínculos, `status`, `pago_em`, `lancamento_id` |
-| `comissoes` | Corretagem | `contrato_id`, `corretor`, `base_centavos`, `pct`, `valor_centavos`, `competencia`, `status`, `pago_em`, `lancamento_id` |
+| `contas` | Contas a pagar/receber | `tipo` (`pagar`/`receber`), `descricao`, `categoria`, `fornecedor`, `parceiro_id`, `valor_centavos`, `vencimento`, `competencia`, `recorrencia`, `recorrencia_fim`, `recorrencia_origem_id`, `caixa`, vínculos, `status`, `pago_em`, `lancamento_id` |
+| `comissoes` | Corretagem | `contrato_id`, `corretor`, `corretor_id`, `base_centavos`, `pct`, `valor_centavos`, `competencia`, `status`, `pago_em`, `lancamento_id` |
 | `reajustes` | Histórico de reajuste | `contrato_id`, `competencia`, `indice`, `percentual`, `aluguel_anterior_centavos`, `aluguel_novo_centavos`, `aplicado_em`, `aplicado_por` |
 | `rescisoes` | Encerramento antecipado | `contrato_id` (único), `data`, `motivo`, `multa_centavos`, `caucao_devolucao_centavos`, `cobrancas_canceladas` |
 

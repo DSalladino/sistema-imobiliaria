@@ -57,6 +57,24 @@ observações. Proprietários e imóveis podem ter taxa própria.
 
 **Onde:** menus **Proprietários**, **Imóveis** e **Inquilinos**.
 
+### Parceiros e categorias de apoio
+
+**Problema:** corretor, fornecedor e cliente eram texto livre; o mesmo nome aparecia com grafias
+diferentes e não havia onde guardar CRECI ou Pix de quem recebe comissão.
+
+**Como funciona:** a tela **Corretores e parceiros** cadastra pessoa física ou jurídica como
+corretor, fornecedor, cliente ou ambos, com CPF/CNPJ, CRECI, contato, endereço, Pix e observações.
+Comissões, contratos e contas a pagar/receber passam a oferecer esses nomes na seleção, sem impedir
+um nome novo. A tela **Categorias financeiras** mantém as opções de lançamentos, contas a pagar e
+contas a receber, com tipo (receita/despesa) e caixa sugerido; uma categoria digitada pela primeira
+vez entra automaticamente no dicionário.
+
+**Regras:** nomes de parceiros ativos não se repetem; desativar preserva o histórico; o CPF/CNPJ de
+parceiro segue a mesma máscara do perfil consulta; o vínculo por `corretor_id`/`parceiro_id` é
+mantido quando o nome corresponde ao cadastro.
+
+**Onde:** menu **Corretores e parceiros** e **Categorias financeiras**; backend em `src/cadastros.js`.
+
 ---
 
 ## 4. Contratos e motor de regras
@@ -214,7 +232,9 @@ de fórmula.
 não havia previsão de caixa confiável.
 
 **Como funciona:** cada conta tem tipo (**pagar** ou **receber**), categoria, fornecedor, valor,
-vencimento, caixa de destino e **recorrência** (única, mensal, semanal ou anual, com data de término).
+vencimento, caixa de destino e **recorrência** (única, semanal, mensal, bimestral, trimestral,
+semestral ou anual, com data de término). O fornecedor/cliente pode vir do cadastro de parceiros,
+inclusive com Pix.
 A baixa gera o lançamento financeiro correspondente e, quando a conta é recorrente, cria automaticamente
 a próxima parcela. A tela mostra a **previsão de caixa** dos próximos 6 meses, somando contas em aberto
 e a projeção das recorrências, com saldo mensal e acumulado.
@@ -232,7 +252,9 @@ o dia do vencimento e corta no fim do mês (31/01 → 28/02).
 **Problema:** a comissão do corretor era combinada por WhatsApp e paga sem vínculo com o contrato.
 
 **Como funciona:** a comissão é criada por contrato e corretor, com percentual (do contrato, da regra
-padrão ou informado) sobre o aluguel. Percorre os estados **prevista → liberada → paga** (ou cancelada).
+padrão ou informado) sobre o aluguel. O corretor é escolhido no cadastro de parceiros (com CRECI e
+Pix), mas um nome novo ainda pode ser digitado. Percorre os estados **prevista → liberada → paga**
+(ou cancelada).
 A geração em lote cria as comissões da competência para todos os contratos ativos com corretor.
 O pagamento lança uma despesa no caixa da imobiliária, na categoria *Comissão de corretagem*.
 

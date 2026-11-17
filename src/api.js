@@ -40,6 +40,11 @@ import { drePorImovel } from './dre.js';
 import { responder as responderAssistente, contextoRapido } from './assistente.js';
 import { analiseFutura, projetarCenario } from './previsao.js';
 import { validarDocumentoObrigatorio, somenteDigitos, documentoValido } from './validacao.js';
+import {
+  listarParceiros, obterParceiro, criarParceiro, atualizarParceiro, desativarParceiro,
+  listarCategorias, criarCategoria, atualizarCategoria, desativarCategoria,
+  garantirCategoria,
+} from './cadastros.js';
 import { verificarIntegridadeAuditoria, detalharAuditoria, consultarAuditoria } from './auditoria.js';
 import {
   hojeISO, competenciaAtual, getSetting, getSettingNum, setSetting, calcularRepasse, gerarRepasses,
@@ -324,9 +329,9 @@ const ENTIDADES = {
   },
   contratos: {
     tabela: 'contratos',
-    campos: ['codigo', 'imovel_id', 'inquilino_id', 'inicio', 'fim', 'aluguel_centavos', 'dia_vencimento', 'indice_reajuste', 'ultimo_reajuste', 'garantia_tipo', 'garantia_valor_centavos', 'garantia_fim', 'taxa_admin_pct', 'justificativa_taxa', 'documento_url', 'status', 'observacoes'],
+    campos: ['codigo', 'imovel_id', 'inquilino_id', 'inicio', 'fim', 'aluguel_centavos', 'dia_vencimento', 'indice_reajuste', 'ultimo_reajuste', 'garantia_tipo', 'garantia_valor_centavos', 'garantia_fim', 'taxa_admin_pct', 'justificativa_taxa', 'documento_url', 'corretor', 'corretor_id', 'comissao_pct', 'status', 'observacoes'],
     obrigatorios: ['imovel_id', 'inquilino_id', 'inicio'],
-    numericos: ['imovel_id', 'inquilino_id', 'aluguel_centavos', 'dia_vencimento', 'garantia_valor_centavos', 'taxa_admin_pct'],
+    numericos: ['imovel_id', 'inquilino_id', 'aluguel_centavos', 'dia_vencimento', 'garantia_valor_centavos', 'taxa_admin_pct', 'corretor_id', 'comissao_pct'],
     ordem: 'id DESC',
   },
   excecoes: {
@@ -422,6 +427,22 @@ function validarDados(entidade, dados, idAtual = null) {
       throw erroValidacao('Valor de garantia inválido.');
     }
     if (tem('status') && !STATUS_CONTRATO.includes(dados.status)) throw erroValidacao('Status do contrato inválido.');
+    if (tem('corretor_id') && dados.corretor_id != null) {
+      const p = db.prepare('SELECT nome, tipo FROM parceiros WHERE id = ?').get(dados.corretor_id);
+      if (!p) throw erroValidacao('Corretor não encontrado.');
+      if (p.tipo !== 'corretor' && p.tipo !== 'ambos') throw erroValidacao('O parceiro selecionado não é corretor.');
+      if (!dados.corretor) dados.corretor = p.nome;
+    } else if (tem('corretor')) {
+      // Mantém o vínculo coerente quando o corretor é digitado no formulário:
+      // encontra o cadastro pelo nome ou limpa o id se for um nome livre.
+      const p = dados.corretor
+        ? db.prepare("SELECT id, nome FROM parceiros WHERE ativo = 1 AND tipo IN ('corretor','ambos') AND lower(nome) = lower(?) ORDER BY id").get(dados.corretor)
+        : null;
+      dados.corretor_id = p?.id || null;
+    }
+    if (tem('comissao_pct') && dados.comissao_pct != null && (dados.comissao_pct < 0 || dados.comissao_pct > 100)) {
+      throw erroValidacao('A comissão deve ficar entre 0 e 100.');
+    }
     if (tem('codigo') && dados.codigo) {
       const outro = db.prepare('SELECT id FROM contratos WHERE lower(codigo) = lower(?) AND id <> ?').get(dados.codigo, idAtual ?? -1);
       if (outro) throw erroValidacao('Já existe um contrato com este código.');
@@ -491,11 +512,11 @@ function criar(entidade, body, user, ip) {
 function atualizar(entidade, id, body, user, ip) {
   const ent = ENTIDADES[entidade];
   const dados = normalizar(ent, body);
-  const cols = Object.keys(dados);
-  if (!cols.length) throw Object.assign(new Error('Nada para atualizar.'), { status: 400 });
+  if (!Object.keys(dados).length) throw Object.assign(new Error('Nada para atualizar.'), { status: 400 });
   const antes = db.prepare(`SELECT * FROM ${ent.tabela} WHERE id = ?`).get(id);
   if (!antes) throw Object.assign(new Error('Registro não encontrado.'), { status: 404 });
   validarDados(entidade, dados, id);
+  const cols = Object.keys(dados);
   db.prepare(`UPDATE ${ent.tabela} SET ${cols.map(c => `${c} = ?`).join(', ')} WHERE id = ?`)
     .run(...cols.map(c => dados[c]), id);
   registrar(user, 'alterar', entidade, id, { antes, depois: dados }, ip);
@@ -620,6 +641,7 @@ function criarLancamento(body, user, ip) {
     .run(dados.data, dados.competencia, dados.tipo, dados.categoria, dados.descricao, dados.valor_centavos,
       dados.caixa, dados.proprietario_id, dados.imovel_id, dados.contrato_id, user.nome);
   const id = Number(r.lastInsertRowid);
+  garantirCategoria('lancamento', dados.categoria, dados.tipo, dados.caixa);
   registrar(user, 'criar', 'lancamentos', id, dados, ip);
   return db.prepare('SELECT * FROM lancamentos WHERE id = ?').get(id);
 }
@@ -1434,7 +1456,8 @@ export async function handleApi(req, res, url, user, ip, body) {
     if (p === '/comissoes/gerar-lote' && m === 'POST') {
       exigir(user, 'financeiro');
       const r = gerarComissoesLote({
-        competencia: texto(body.competencia), percentual: num(body.percentual, null), corretor: texto(body.corretor),
+        competencia: texto(body.competencia), percentual: num(body.percentual, null),
+        corretor: texto(body.corretor), corretor_id: int(body.corretor_id, null),
       }, user);
       registrar(user, 'gerar_lote', 'comissoes', r.competencia, { criadas: r.criadas }, ip);
       return json(res, 200, r);
@@ -1449,7 +1472,7 @@ export async function handleApi(req, res, url, user, ip, body) {
     }
     if (p === '/comissoes' && m === 'POST') {
       exigir(user, 'financeiro');
-      const r = criarComissao(body, user);
+      const r = criarComissao({ ...body, corretor_id: int(body.corretor_id, null) }, user);
       registrar(user, 'criar', 'comissoes', r.id, { corretor: r.corretor, valor_centavos: r.valor_centavos }, ip);
       return json(res, 201, r);
     }
@@ -1962,6 +1985,71 @@ export async function handleApi(req, res, url, user, ip, body) {
       );
       archive.finalize();
       return;
+    }
+
+    /* ---------- Parceiros e categorias ---------- */
+    if (p === '/parceiros' && m === 'GET') {
+      exigir(user, 'ler');
+      const itens = listarParceiros({
+        tipo: url.searchParams.get('tipo') || undefined,
+        busca: url.searchParams.get('busca') || undefined,
+      });
+      if (user.papel === 'admin' || String(getSetting('mascarar_cpf_consulta', '1')) === '0') return json(res, 200, itens);
+      return json(res, 200, itens.map(p => ({ ...p, cpf_cnpj: mascararCpf(p.cpf_cnpj) })));
+    }
+    if (p === '/parceiros' && m === 'POST') {
+      exigir(user, 'escrever');
+      const r = criarParceiro(body);
+      registrar(user, 'criar', 'parceiros', r.id, { nome: r.nome, tipo: r.tipo }, ip);
+      return json(res, 201, r);
+    }
+    if (seg[0] === 'parceiros' && seg[1] && !seg[2] && m === 'GET') {
+      exigir(user, 'ler');
+      const r = obterParceiro(Number(seg[1]));
+      if (!r) return erro(res, 404, 'Parceiro não encontrado.');
+      if (user.papel !== 'admin' && String(getSetting('mascarar_cpf_consulta', '1')) !== '0') {
+        r.cpf_cnpj = mascararCpf(r.cpf_cnpj);
+      }
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'parceiros' && seg[1] && !seg[2] && m === 'PUT') {
+      exigir(user, 'escrever');
+      const r = atualizarParceiro(Number(seg[1]), body);
+      registrar(user, 'alterar', 'parceiros', r.id, { nome: r.nome, tipo: r.tipo }, ip);
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'parceiros' && seg[1] && !seg[2] && m === 'DELETE') {
+      exigir(user, 'escrever');
+      const r = desativarParceiro(Number(seg[1]));
+      registrar(user, 'desativar', 'parceiros', Number(seg[1]), null, ip);
+      return json(res, 200, r);
+    }
+
+    if (p === '/categorias' && m === 'GET') {
+      exigir(user, 'ler');
+      return json(res, 200, listarCategorias({
+        contexto: url.searchParams.get('contexto') || undefined,
+        tipo: url.searchParams.get('tipo') || undefined,
+        incluirInativas: url.searchParams.get('inativas') === '1',
+      }));
+    }
+    if (p === '/categorias' && m === 'POST') {
+      exigir(user, 'escrever');
+      const r = criarCategoria(body);
+      registrar(user, 'criar', 'categorias', r.id, { contexto: r.contexto, nome: r.nome }, ip);
+      return json(res, 201, r);
+    }
+    if (seg[0] === 'categorias' && seg[1] && !seg[2] && m === 'PUT') {
+      exigir(user, 'escrever');
+      const r = atualizarCategoria(Number(seg[1]), body);
+      registrar(user, 'alterar', 'categorias', r.id, { contexto: r.contexto, nome: r.nome }, ip);
+      return json(res, 200, r);
+    }
+    if (seg[0] === 'categorias' && seg[1] && !seg[2] && m === 'DELETE') {
+      exigir(user, 'escrever');
+      const r = desativarCategoria(Number(seg[1]));
+      registrar(user, 'desativar', 'categorias', Number(seg[1]), null, ip);
+      return json(res, 200, r);
     }
 
     if (ENTIDADES[seg[0]]) {

@@ -7,15 +7,18 @@ import { addMesesComp } from './analytics.js';
 import { gerar as gerarCobrancas, pagar as pagarCobranca, listar as listarCobrancas } from './cobrancas.js';
 import { UPLOADS } from './documentos.js';
 
+// Ordem importa: filhos antes dos pais, por causa das chaves estrangeiras.
+// A lista precisa cobrir TODAS as tabelas operacionais; caso contrário, “zerar
+// dados” deixaria contas, comissões, reajustes e rescisões órfãos no banco.
 const TABELAS = [
-  'cobranca_acoes', 'conciliacoes', 'cobrancas', 'lancamentos', 'repasses',
-  'excecoes', 'contratos', 'imoveis', 'inquilinos', 'proprietarios',
-  'fechamentos', 'documentos', 'comunicacoes', 'password_resets',
+  'cobranca_acoes', 'conciliacoes', 'cobrancas', 'comissoes', 'reajustes', 'rescisoes',
+  'contas', 'lancamentos', 'repasses', 'excecoes', 'contratos', 'imoveis', 'inquilinos',
+  'proprietarios', 'fechamentos', 'documentos', 'comunicacoes', 'password_resets', 'parceiros',
 ];
 
 export function statusManutencao() {
   const contagens = {};
-  for (const t of [...TABELAS, 'usuarios', 'auditoria']) {
+  for (const t of [...TABELAS, 'categorias', 'usuarios', 'auditoria']) {
     try { contagens[t] = db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n; } catch { contagens[t] = null; }
   }
   let arquivos = 0;

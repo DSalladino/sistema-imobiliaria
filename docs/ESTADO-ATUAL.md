@@ -3,7 +3,7 @@
 Documento de referência técnica: o que está implementado, como executar, onde
 fica cada módulo e quais pendências permanecem.
 
-> **Versão:** 0.10.0 · **Última revisão:** novembro de 2026
+> **Versão:** 0.11.0 · **Última revisão:** novembro de 2026
 
 ## Stack e execução
 
@@ -107,7 +107,7 @@ o assistente interno, o novo login, a verificação de ambiente, a proteção co
 tela em branco e os artefatos de demo online (Docker, Render e Fly.io). A 0.10.0
 acrescentou análises futuras com cenários, auditoria encadeada por hash, validação
 de CPF/CNPJ, ensaio real de restauração, retenção LGPD, quatro novos relatórios,
-detalhes financeiros, sessão com inatividade e melhorias de mobile.
+detalhes financeiros, sessão com inatividade e melhorias de mobile. A 0.11.0 trouxe cadastro de corretores/fornecedores/clientes com Pix, categorias financeiras gerenciáveis, recorrências adicionais, vínculo de parceiro nas contas, backup automático com hash SHA-256 e correção da limpeza de dados.
 
 ## Rotas principais
 

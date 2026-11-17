@@ -80,6 +80,8 @@ test('todas as telas renderizam com dados reais', async (t) => {
     ['inquilinos', views.viewInquilinos, 'Contatos para cobrança'],
     ['contratos', views.viewContratos, 'Vigência, aluguel'],
     ['excecoes', views.viewExcecoes, 'Descontos e acréscimos'],
+    ['parceiros', views.viewParceiros, 'Quem recebe comissões'],
+    ['categorias', views.viewCategorias, 'Opções que aparecem'],
     ['cobrancas', fin.viewCobrancas, 'Geração mensal'],
     ['conciliacao', fin.viewConciliacao, 'Importe OFX'],
     ['lancamentos', fin.viewLancamentos, 'Dois caixas'],
