@@ -922,3 +922,31 @@ body.ia-open { overflow: hidden; }
   .auth-float-c { display: none; }
   .auth-list { gap: 8px; margin-top: 0; }
 }
+
+/* Demo estática (GitHub Pages) */
+.demo-static-banner {
+  position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 80;
+  display: flex; align-items: center; gap: 10px; max-width: min(640px, calc(100vw - 28px));
+  padding: 10px 12px 10px 14px; border-radius: 12px;
+  background: rgba(44, 54, 52, .96); color: #eaf2ed; box-shadow: 0 16px 44px -18px rgba(0, 0, 0, .6);
+  font-size: .76rem; line-height: 1.4;
+}
+.demo-static-banner strong {
+  flex: none; color: var(--butter); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+}
+.demo-static-banner span { color: #c9d6cf; }
+.demo-static-banner button {
+  flex: none; border: 0; background: transparent; color: #9fb4aa; font-size: 1.1rem;
+  width: 24px; height: 24px; border-radius: 6px;
+}
+.demo-static-banner button:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.demo-aviso {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 120;
+  padding: 10px 16px; border-radius: 10px; background: var(--butter-soft);
+  border: 1px solid #e2cf98; color: var(--butter-ink); font-size: .82rem;
+  box-shadow: var(--shadow); max-width: min(520px, calc(100vw - 32px)); text-align: center;
+}
+@media (max-width: 680px) {
+  .demo-static-banner { left: 8px; right: 8px; bottom: 8px; transform: none; max-width: none; font-size: .72rem; }
+  .demo-static-banner span { display: none; }
+}

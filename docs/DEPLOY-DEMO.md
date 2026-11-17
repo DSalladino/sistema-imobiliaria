@@ -130,3 +130,49 @@ curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
 - [ ] A demo está com `DEMO_MODE=1` e `X-Robots-Tag: noindex`.
 - [ ] O reset automático está ligado (ou a senha foi trocada).
 - [ ] Nenhum dado real foi copiado para `DEMO_DATA_DIR`.
+
+## 4. GitHub Pages — demo estática (somente leitura)
+
+Esta é a opção sem conta externa, usada pelo link público
+**https://dsalladino.github.io/sistema-imobiliaria/**.
+
+Como o sistema real é Node + SQLite, o Pages não executa o backend. O workflow
+`.github/workflows/pages.yml` faz o seguinte:
+
+1. sobe uma instância isolada de demonstração;
+2. captura respostas reais das telas (painel, cobranças, repasses, relatórios,
+   contas, assistente etc.);
+3. gera `public/demo-data.json` (~380 KB) com dados fictícios sanitizados;
+4. publica `public/` no GitHub Pages.
+
+No navegador, `public/demo-estatico.js` intercepta `/api/*` e responde com esse
+retrato. Login, navegação, filtros, modais e o assistente funcionam. Escritas
+(cadastros, baixas, conciliação, configurações) retornam uma mensagem explicando
+que a demo é somente leitura. Exportações e downloads também ficam desabilitados.
+
+### Limitações (propositais)
+
+- Não grava nada: recarregar a página volta ao retrato original.
+- A base é um retrato do dia do deploy; o workflow roda semanalmente para manter
+  competências, vencimentos e indicadores atuais.
+- Para testar escrita de verdade, use Render/Fly/Docker ou rode localmente.
+
+### Testar a demo estática localmente
+
+```bash
+npm ci
+npm run demo:estatico
+npx serve public
+# abra http://localhost:3000/?demo=1
+```
+
+O parâmetro `?demo=1` só ativa o modo estático em `localhost`/`127.0.0.1`. Em
+produção, a mesma página continua usando a API real.
+
+### Segurança
+
+- Apenas dados fictícios da base demo entram no JSON.
+- Senhas, hashes, tokens e segredos são removidos na geração.
+- O workflow não recebe credenciais de produção; usa `ADMIN_SENHA`/`DEMO_SENHA`
+  locais ao runner.
+- O link do Pages é público e indexável; não coloque dados reais nele.
