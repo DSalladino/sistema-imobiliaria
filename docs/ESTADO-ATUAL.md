@@ -21,6 +21,9 @@ fica cada módulo e quais pendências permanecem.
   `npm run demo:preparar`). Sem isso a base sobe vazia em qualquer ambiente.
 - Demonstração com credenciais conhecidas: `npm run demo:preparar` e
   `npm run demo:servir` (ver [DEMONSTRACAO.md](DEMONSTRACAO.md)).
+- Demo estática pública, somente leitura:
+  **https://dsalladino.github.io/sistema-imobiliaria/** (`npm run demo:estatico`
+  gera o retrato usado pelo GitHub Pages).
 
 ## Onde está cada coisa
 
@@ -49,8 +52,8 @@ src/
   auth.js        hash de senha e token
   permissoes.js  papéis e auditoria
 public/
-  index.html, app.js, ia.js, boot-guard.js, charts.js, core.js, views.js,
-  views-fin.js, styles.css,
+  index.html, app.js, ia.js, demo-estatico.js, boot-guard.js, charts.js,
+  core.js, views.js, views-fin.js, styles.css,
   fonts/ (DM Sans e Fraunces servidas localmente)
 tests/
   api.test.mjs, rules.test.mjs, seguranca.test.mjs, features.test.mjs,
