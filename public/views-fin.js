@@ -1878,6 +1878,7 @@ export async function viewAnalises(root) {
         ${stat('Inadimplência', `${i.inadimplencia_pct.toFixed(1)}%`, i.inadimplencia_pct >= 10 ? 'blush-ink' : '')}
         ${stat('Ocupação', `${i.ocupacao_pct.toFixed(0)}%`)}
         ${stat('Meses de caixa', i.meses_de_caixa == null ? '—' : String(i.meses_de_caixa))}
+        ${stat('Caixa negativo em', i.meses_ate_caixa_negativo == null ? 'não ocorre' : `${i.meses_ate_caixa_negativo} mês(es)`)}
       </div>
       <div class="grid cols-2 mt-2">
         <div class="card"><div class="card-body">
@@ -1895,6 +1896,16 @@ export async function viewAnalises(root) {
           ${dados.riscos.map(r => `<div class="doc"><div class="doc-ico">${icon('shield')}</div><div class="doc-meta"><strong>${riscoBadge(r.nivel)} ${esc(r.titulo)}</strong><small>${esc(r.descricao)}</small><small class="muted">Ação: ${esc(r.acao)}</small></div></div>`).join('')}
         </div></div>
       </div>
+      <div class="card mt-2"><div class="card-head"><div><h2>Teste de estresse</h2><p>${esc(dados.estresse?.descricao || '')}</p></div></div>
+        <div class="card-body">
+          <div class="kpis">
+            ${stat('Receita no estresse', brl(dados.estresse.totais.receita_centavos))}
+            ${stat('Despesa no estresse', brl(dados.estresse.totais.despesa_centavos), 'blush-ink')}
+            ${stat('Saldo final no estresse', brl(dados.estresse.totais.saldo_final_centavos), dados.estresse.totais.saldo_final_centavos < 0 ? 'blush-ink' : 'sage-ink')}
+            ${stat('Runway no estresse', dados.estresse.meses_ate_caixa_negativo == null ? 'não ocorre' : `${dados.estresse.meses_ate_caixa_negativo} mês(es)`)}
+          </div>
+          <p class="small muted mt-2">Premissas: inadimplência ${esc(dados.estresse.premissas.inadimplencia_pct)}%, vacância ${esc(dados.estresse.premissas.vacancia_pct)}% e despesa +${esc(dados.estresse.premissas.aumento_despesa_pct)}%. Este cenário é calculado automaticamente, além do simulador abaixo.</p>
+        </div></div>
       <div class="card mt-2"><div class="card-head"><div><h2>Histórico e projeção</h2><p>Receita da imobiliária por competência — barras claras são projeção.</p></div></div>
         <div class="card-body">
           ${barChart({
@@ -1938,6 +1949,7 @@ export async function viewAnalises(root) {
           ${stat('Despesa projetada', brl(p.totais.despesa_centavos), 'blush-ink')}
           ${stat('Resultado projetado', brl(p.totais.resultado_centavos), p.totais.resultado_centavos < 0 ? 'blush-ink' : 'sage-ink')}
           ${stat('Saldo final', brl(p.totais.saldo_final_centavos))}
+          ${stat('Caixa negativo em', p.projecoes.find(m => m.saldo_acumulado_centavos < 0) ? `${p.projecoes.findIndex(m => m.saldo_acumulado_centavos < 0) + 1} mês(es)` : 'não ocorre')}
         </div>
         ${tableHtml([
           { label: 'Competência', render: m => esc(m.rotulo) },

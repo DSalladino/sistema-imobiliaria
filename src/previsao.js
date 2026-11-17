@@ -250,6 +250,31 @@ export function analiseFutura({ meses = 12, horizonte = 3 } = {}) {
   }
 
   const cenario = projetarCenario({ meses: Math.min(Math.max(horizonte, 1), 12) });
+  // Teste de estresse fixo, além do simulador livre: inadimplência observada
+  // +10 p.p., 10% de vacância extra e 10% de pressão de custos. Serve como
+  // alerta cedo de runway, sem depender de o usuário montar o cenário.
+  const estresse = projetarCenario({
+    meses: Math.min(Math.max(horizonte, 1), 12),
+    inadimplencia_pct: Math.min(inadimplenciaPct + 10, 100),
+    vacancia_pct: 10,
+    reajuste_pct: 0,
+    aumento_despesa_pct: 10,
+  });
+  const primeiroCaixaNegativo = (projecoes) => {
+    const i = projecoes.findIndex(p => p.saldo_acumulado_centavos < 0);
+    return i < 0 ? null : i + 1;
+  };
+  const runwayBase = primeiroCaixaNegativo(cenario.projecoes);
+  const runwayEstresse = primeiroCaixaNegativo(estresse.projecoes);
+  if (runwayEstresse === 1) {
+    riscos.push(risco('alto', 'Caixa negativo no teste de estresse',
+      'Com inadimplência e custos 10% piores, o caixa acumulado fica negativo já no primeiro mês projetado.',
+      'Cortar despesas não essenciais, reforçar cobrança e negociar prazos antes do próximo mês.'));
+  } else if (runwayEstresse != null) {
+    riscos.push(risco('atencao', 'Runway curto no teste de estresse',
+      `Com choque de inadimplência, vacância e custos, o caixa acumulado fica negativo em ${runwayEstresse} mês(es).`,
+      'Antecipar recebíveis e montar reserva para absorver o choque.'));
+  }
   const projecao = cenario.projecoes.map((p, i) => {
     const x = serie.length - 1 + i + 1;
     const base = Math.max(regReceita.a + regReceita.b * x, 0);
@@ -269,6 +294,7 @@ export function analiseFutura({ meses = 12, horizonte = 3 } = {}) {
   if (margem < 20 && receitaMedia > 0) recomendacoes.push(`Margem média de ${margem.toFixed(1)}%: revisar despesas da imobiliária.`);
   if (mesesCaixa != null && mesesCaixa < 3) recomendacoes.push('Reforçar a reserva de caixa antes de ampliar a operação.');
   if (vencendo90 > 0) recomendacoes.push(`Planejar a renovação de ${vencendo90} contrato(s) que vencem em 90 dias.`);
+  if (runwayEstresse != null) recomendacoes.push(`Teste de estresse: o caixa acumulado fica negativo em ${runwayEstresse} mês(es). Reforce a reserva ou reduza despesa fixa.`);
   if (!recomendacoes.length) recomendacoes.push('Manter a rotina de conciliação, baixa e repasse para preservar a previsibilidade.');
 
   return {
@@ -286,6 +312,7 @@ export function analiseFutura({ meses = 12, horizonte = 3 } = {}) {
       meses_de_caixa: mesesCaixa == null ? null : Number(mesesCaixa.toFixed(1)),
       contratos_ativos: contratosAtivos,
       vencendo_90_dias: vencendo90,
+      meses_ate_caixa_negativo: runwayBase,
       concentracao_maior_proprietario_pct: Number(concentracaoPct.toFixed(1)),
       maior_proprietario: top?.nome || null,
       variacao_trimestral_pct: Number(variacaoRecente.toFixed(1)),
@@ -315,6 +342,15 @@ export function analiseFutura({ meses = 12, horizonte = 3 } = {}) {
       totais: cenario.totais,
       projecoes: cenario.projecoes,
       confianca: cenario.confianca,
+    },
+    estresse: {
+      descricao: 'Inadimplência observada +10 p.p., vacância extra de 10% e despesas 10% maiores.',
+      premissas: estresse.premissas,
+      saldo_inicial_formatado: estresse.saldo_inicial_formatado,
+      totais: estresse.totais,
+      meses_ate_caixa_negativo: runwayEstresse,
+      projecoes: estresse.projecoes,
+      confianca: estresse.confianca,
     },
     riscos,
     recomendacoes,
