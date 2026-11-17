@@ -4,7 +4,7 @@ Prioridades de evolução do produto. A ordem combina **impacto operacional**,
 **risco** e **esforço**. Itens concluídos saem daqui e entram no
 [CHANGELOG](../CHANGELOG.md).
 
-> **Versão atual:** 0.6.0 · **Última revisão:** novembro de 2026
+> **Versão atual:** 0.7.0 · **Última revisão:** novembro de 2026
 
 ## Onde estamos
 
@@ -22,23 +22,26 @@ Já está pronto e em uso:
 O trabalho manual que ainda sobra:
 
 1. comunicar reajustes e rescisões com documentos gerados;
-2. controlar contas a pagar e prever caixa;
+2. gerar boleto registrado e baixar por webhook do PSP;
 3. acompanhar manutenção e orçamentos;
 4. atender proprietários e inquilinos sem acesso ao sistema;
 5. operar com permissões mais finas e possibilidade de filiais.
 
-## Fase 1 — Consolidação (0.7)
+## Fase 1 — Consolidação (0.7) — concluída
 
 Foco: fechar ciclos do contrato e reduzir trabalho manual recorrente.
 
 | Item | Por que | Esforço | Status |
 |---|---|---|---|
-| **Reajuste assistido em lote** | Calcular pelo índice, gerar termo e atualizar contrato com trilha | Médio | planejado |
-| **Rescisão de contrato** | Multa, saldo, vistoria, devolução de caução e encerramento correto | Alto | planejado |
-| **Contas a pagar/receber** | Vencimentos, recorrência e previsão de caixa de 12 meses | Médio | planejado |
+| **Reajuste assistido em lote** | Calcular pelo índice, gerar termo e atualizar contrato com trilha | Médio | **feito** |
+| **Rescisão de contrato** | Multa, saldo, vistoria, devolução de caução e encerramento correto | Alto | **feito** |
+| **Contas a pagar/receber** | Vencimentos, recorrência e previsão de caixa de 12 meses | Médio | **feito** (previsão de 6–24 meses) |
+| **Comissões** | Corretagem por contrato, liberação e pagamento com lançamento | Médio | **feito** |
+| **Pix automático** | BR Code estático com QR, copia e cola e txid para conciliação | Baixo | **feito** |
+| **WhatsApp pela API oficial** | Envio server-side com fallback para link `wa.me` | Médio | **feito** |
 | **Modelos de documento** | Recibo, extrato, termo de reajuste e aviso de rescisão em PDF | Médio | planejado |
-| **Notificações automáticas** | Vencimento, atraso e reajuste por e-mail; WhatsApp via API oficial | Médio | planejado |
-| **DRE por proprietário/imóvel** | Resultado e rateio de despesas por carteira | Médio | planejado |
+| **Notificações automáticas** | Vencimento e atraso por e-mail/WhatsApp em régua agendada | Médio | planejado |
+| **DRE por proprietário** | Agregação por carteira além do DRE por imóvel | Baixo | planejado (por imóvel **feito**) |
 
 ## Fase 2 — Transparência (0.8)
 
@@ -61,7 +64,7 @@ Foco: atender mais operações e integrar o ecossistema.
 |---|---|---|---|
 | **Multiempresa/filiais** | Separar caixas, usuários e relatórios por unidade | Alto | planejado |
 | **Permissões granulares** | Restringir por módulo, proprietário ou carteira | Médio | planejado |
-| **Comissões e metas** | Comissão por contrato e painel de metas | Médio | planejado |
+| **Comissões e metas** | Comissão por contrato e painel de metas | Médio | comissões **feito**; metas planejado |
 | **Assinatura digital** | Clicksign/D4Sign/DocuSign | Médio | planejado |
 | **Integração contábil** | Exportação no layout do contador e plano de contas | Médio | planejado |
 | **API pública e webhooks** | Integrar site, portais imobiliários e CRM | Médio | planejado |
@@ -82,8 +85,8 @@ Foco: atender mais operações e integrar o ecossistema.
 
 | Ideia | Motivo |
 |---|---|
-| **Boleto/Pix próprio** | Exige banco/adquirente, conciliação e responsabilidade financeira. Melhor integrar um provedor especializado quando houver volume. |
-| **WhatsApp 100% automático antes da régua** | Automatizar um processo mal definido acelera o erro. Primeiro o fluxo, depois a API paga. |
+| **Boleto/Pix próprio** | Boleto registrado exige banco/adquirente e responsabilidade financeira. O Pix estático (BR Code) já é gerado; para boleto e baixa automática, integrar um PSP especializado. |
+| **WhatsApp 100% automático antes da régua** | Automatizar um processo mal definido acelera o erro. Primeiro o fluxo, depois a automação em lote. |
 | **App nativo** | O sistema já é responsivo; um PWA resolve o uso em campo com menos custo. |
 | **Microserviços** | Com este volume, um processo Node + SQLite é mais simples, barato e fácil de fazer backup. |
 | **Multi-tenant antes de ter clientes** | Complexidade e risco de vazamento entre empresas sem demanda real. |

@@ -15,7 +15,7 @@
   </a>
   <img src="https://img.shields.io/badge/Node.js-22.13%2B-2E4A40?logo=node.js&logoColor=white" alt="Node.js 22.13+">
   <img src="https://img.shields.io/badge/SQLite-node%3Asqlite-5C8571?logo=sqlite&logoColor=white" alt="SQLite">
-  <img src="https://img.shields.io/badge/vers%C3%A3o-0.6.0-C9A87C" alt="Versão 0.6.0">
+  <img src="https://img.shields.io/badge/vers%C3%A3o-0.7.0-C9A87C" alt="Versão 0.7.0">
   <img src="https://img.shields.io/badge/licen%C3%A7a-MIT-2E4A40" alt="Licença MIT">
   <img src="https://img.shields.io/badge/PRs-bem--vindos-5C8571" alt="PRs bem-vindos">
 </p>
@@ -49,7 +49,7 @@ poucos usuários — e prioriza **simplicidade operacional**, **rastreabilidade*
 **baixo custo**. O resultado é um monólito Node.js + SQLite com frontend sem
 build, testes automatizados e documentação de ponta a ponta.
 
-> **Status:** versão 0.6.0, em evolução ativa. O repositório não contém dados
+> **Status:** versão 0.7.0, em evolução ativa. O repositório não contém dados
 > reais; a base de demonstração é separada da produção.
 
 ### Por que este projeto é diferente
@@ -104,13 +104,15 @@ instruções para gerar **capturas de tela** e o **vídeo de 90 s** estão em
 |---|---|
 | **Painel** | KPIs do mês, comparativos, composição de receitas, ocupação, inadimplência, alertas e atividade recente |
 | **Carteira** | Proprietários, imóveis, inquilinos, contratos, garantias, reajustes e exceções de taxa |
-| **Cobranças** | Geração mensal em lote, baixa total/parcial, multa e juros, estorno, cancelamento, aging e régua |
+| **Cobranças** | Geração mensal em lote, baixa total/parcial, multa e juros, estorno, cancelamento, aging e régua, **Pix copia e cola com QR por cobrança** |
 | **Conciliação** | Importação de OFX/CSV/Excel, sugestão de vínculo e confirmação humana |
+| **Contas** | Contas a pagar e a receber com recorrência, baixa que gera lançamento e previsão de caixa de 6–24 meses |
 | **Financeiro** | Dois caixas, lançamentos por competência, estornos, repasses com extrato e fechamento mensal |
+| **Comissões** | Corretagem prevista/liberada/paga por contrato, geração em lote e lançamento de despesa |
 | **Documentos** | Upload vinculado a cadastros, versões, validade, pré-visualização e download autenticado |
-| **Relatórios** | Sete relatórios em CSV, XLSX e PDF, com cabeçalho, indicadores e paginação |
+| **Relatórios** | Oito relatórios em CSV, XLSX e PDF — incluindo **DRE por imóvel** — com cabeçalho, indicadores e paginação |
 | **Importação** | Modelos de planilha, prévia linha a linha e atualização de registros existentes |
-| **Comunicação** | WhatsApp (`wa.me`) e e-mail SMTP com modelos, histórico e assinatura |
+| **Comunicação** | WhatsApp por link `wa.me` ou API oficial (Cloud API), e e-mail SMTP com modelos, histórico e assinatura |
 | **Administração** | Usuários, papéis, auditoria, 2FA, LGPD, backup, manutenção e configurações |
 
 Detalhes de cada fluxo, regras e telas em [docs/FUNCIONALIDADES.md](docs/FUNCIONALIDADES.md).
@@ -278,6 +280,10 @@ npm test
   relatórios, backup, fechamento e proteção do último admin.
 - `tests/rules.test.mjs` — precedência de taxas, snapshot, senha, CSV, repasse e
   importação.
+- `tests/seguranca.test.mjs` — TOTP (vetores do RFC 6238), base32, cifragem
+  AES-GCM, códigos de recuperação, política de senha e hash de sessão.
+- `tests/features.test.mjs` — Pix, WhatsApp, contas e recorrência, previsão de
+  caixa, reajuste em lote, rescisão, comissões e DRE por imóvel.
 - `tests/ui.test.mjs` — renderiza as 20 telas com dados reais em jsdom.
 - `tests/seed.test.mjs` — valida a base de demonstração da primeira execução.
 
@@ -332,6 +338,9 @@ arquivos). Vercel e hospedagem compartilhada não servem. O guia completo está 
 | `ADMIN_SENHA` | Senha inicial do admin na primeira execução (opcional) |
 | `PUBLIC_URL` | URL pública usada nos links de e-mail |
 | `SMTP_*` | Configuração de envio de e-mail |
+| `WHATSAPP_TOKEN` | Token da API oficial do WhatsApp (Cloud API) |
+| `WHATSAPP_PHONE_ID` | ID do número na Cloud API |
+| `WHATSAPP_API_VERSION` | Versão da Graph API (padrão `v21.0`) |
 | `SEED_DEMO=1` | Carrega demonstração em produção (use com cuidado) |
 
 ## Estrutura
@@ -349,22 +358,22 @@ data/           banco e uploads (gerado; não versionar)
 
 ## Roadmap
 
-**Fase 1 — consolidação:** reajuste assistido em lote, rescisão de contrato,
-contas a pagar/receber, modelos de documento e notificações automáticas.
+**Fase 1 — consolidação (concluída na 0.7.0):** reajuste em lote, rescisão, contas
+a pagar/receber com previsão de caixa, comissões e DRE por imóvel. Restam modelos
+de documento e notificações automáticas.
 
 **Fase 2 — transparência:** portal do proprietário, portal do inquilino, central
 de manutenção, histórico do imóvel e dashboard por bairro/tipo.
 
-**Fase 3 — escala:** multiempresa, permissões granulares, comissões, assinatura
+**Fase 3 — escala:** multiempresa, permissões granulares, assinatura
 digital, integração contábil, API pública e observabilidade.
 
 Detalhes, esforço e ordem em [docs/roadmap.md](docs/roadmap.md).
 
 ## O que ainda não está incluído
 
-- Boleto/Pix automáticos e API oficial do WhatsApp (há atalho `wa.me`).
-- Contas a pagar/receber com recorrência e previsão de caixa.
-- Reajuste em lote, rescisão, DRE por imóvel e comissões.
+- Boleto bancário registrado e baixa automática por webhook de PSP (o Pix já é
+  gerado como BR Code estático, com QR e copia e cola por cobrança).
 - Central de manutenção, portal do proprietário/inquilino e OCR.
 - Antivírus no upload, criptografia em repouso e backup offsite nativo.
 - Permissões granulares por módulo/proprietário e multiempresa.

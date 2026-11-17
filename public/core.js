@@ -173,6 +173,8 @@ const ICONES = {
   print: '<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
   key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m11 12 8-8M16 3l3 3M19 6l2 2"/>',
   filter: '<path d="M22 3H2l8 9.5V19l4 2v-8.5L22 3Z"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h6"/>',
+  cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
   arrowLeft: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
   arrowRight: '<path d="M5 12h14M12 5l7 7-7 7"/>',
 };

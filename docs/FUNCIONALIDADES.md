@@ -90,6 +90,7 @@ ativos ao mesmo tempo, e o código do contrato é único na base.
 - Estorno de baixa e cancelamento com motivo.
 - Régua: responsável, próxima ação, data e histórico de contatos.
 - Aging: 0–30, 31–60, 61–90, 90+.
+- **Pix por cobrança:** gera BR Code estático (payload EMV com CRC16), QR Code e copia e cola, com txid determinístico para conciliar. Exige a chave Pix em **Configurações → Integrações**.
 
 **Regras:** mês fechado não gera cobrança; cobrança paga não é apagada; correção por estorno.
 Vencimento em fim de semana pode ser prorrogado (configurável). Contrato que começa no meio do mês pode
@@ -165,8 +166,9 @@ confirmar. Para remover todas as versões, remova uma a uma.
 
 **Como funciona:** botão **Mensagem** em proprietários, inquilinos e contratos. Escolhe destinatário,
 modelo (cobrança, lembrete, reajuste) e edita o texto.
-- **WhatsApp:** abre o WhatsApp Web/Desktop com a mensagem pronta (`wa.me`). Sem API oficial, o envio
-  sai pelo número conectado na máquina.
+- **WhatsApp:** dois modos. **Link** abre o WhatsApp Web/Desktop com a mensagem pronta (`wa.me`).
+  **API oficial** (Cloud API) envia direto pelo servidor com `WHATSAPP_TOKEN` e `WHATSAPP_PHONE_ID`;
+  o modo é escolhido em **Configurações → Integrações** e cai para link se faltar credencial.
 - **E-mail:** enviado pelo SMTP da imobiliária, com assunto, assinatura e histórico.
 
 **Regras:** é preciso ter telefone/e-mail cadastrado. SMTP é configurado por variáveis de ambiente.
@@ -202,6 +204,75 @@ também exportações CSV rápidas de lançamentos, cobranças, repasses e contr
 de fórmula.
 
 **Onde:** menu **Relatórios**.
+
+---
+
+## 19. Contas a pagar e a receber
+
+**Problema:** condomínio, IPTU, software, comissões e recebíveis avulsos viviam fora do sistema, então
+não havia previsão de caixa confiável.
+
+**Como funciona:** cada conta tem tipo (**pagar** ou **receber**), categoria, fornecedor, valor,
+vencimento, caixa de destino e **recorrência** (única, mensal, semanal ou anual, com data de término).
+A baixa gera o lançamento financeiro correspondente e, quando a conta é recorrente, cria automaticamente
+a próxima parcela. A tela mostra a **previsão de caixa** dos próximos 6 meses, somando contas em aberto
+e a projeção das recorrências, com saldo mensal e acumulado.
+
+**Regras:** só conta em aberto pode ser editada, baixada ou cancelada; a baixa não pode ser maior que o
+valor da conta; não se cria conta duplicada (mesma descrição, vencimento e valor); recorrência preserva
+o dia do vencimento e corta no fim do mês (31/01 → 28/02).
+
+**Onde:** menu **Contas**; backend em `src/contas.js`.
+
+---
+
+## 20. Comissões de corretagem
+
+**Problema:** a comissão do corretor era combinada por WhatsApp e paga sem vínculo com o contrato.
+
+**Como funciona:** a comissão é criada por contrato e corretor, com percentual (do contrato, da regra
+padrão ou informado) sobre o aluguel. Percorre os estados **prevista → liberada → paga** (ou cancelada).
+A geração em lote cria as comissões da competência para todos os contratos ativos com corretor.
+O pagamento lança uma despesa no caixa da imobiliária, na categoria *Comissão de corretagem*.
+
+**Regras:** não existe comissão duplicada para o mesmo contrato, competência e corretor; comissão paga
+não é cancelada (estorne o lançamento); percentual entre 0 e 100.
+
+**Onde:** menu **Comissões**; backend em `src/comissoes.js`.
+
+---
+
+## 21. Reajuste em lote e rescisão
+
+**Problema:** reajustar contrato a contrato e encerrar contrato sem perder cobranças em aberto.
+
+**Como funciona:**
+- **Reajuste em lote:** a prévia lista os contratos com aniversário vencido, o aluguel atual e o novo.
+  A aplicação grava o histórico na tabela reajustes, atualiza o último reajuste e o aluguel, e corrige as
+  cobranças **em aberto** com vencimento a partir da data. Cobranças pagas mantêm o valor histórico.
+- **Rescisão:** encerra o contrato na data informada, cancela as cobranças futuras ainda em aberto,
+  marca o imóvel como vago quando não há outro contrato ativo, registra motivo e multa e, se houver
+  caução, gera a **devolução** como conta a pagar (descontando a multa).
+
+**Regras:** reajuste só em contrato ativo; percentual maior que −100%; rescisão exige motivo e data
+posterior ao início; contrato já encerrado não é rescindido duas vezes.
+
+**Onde:** menu **Contratos** → botões **Reajuste em lote** e **Rescisão**; backend em `src/contratos-acoes.js`.
+
+---
+
+## 22. DRE por imóvel
+
+**Problema:** saber se um imóvel dá lucro exige cruzar aluguel, taxa, despesas e comissão.
+
+**Como funciona:** para o período escolhido, calcula por imóvel os aluguéis recebidos, a taxa de
+administração (pela precedência de regras), as despesas do proprietário, as comissões e dois resultados:
+o do **proprietário** (aluguel − taxa − despesas) e o da **imobiliária** (taxa − comissões), com margem.
+
+**Regras:** só entram lançamentos ativos; comissões canceladas são ignoradas; a taxa segue a mesma
+precedência do repasse (contrato > imóvel > proprietário > geral).
+
+**Onde:** **Relatórios → DRE por imóvel** (CSV, XLSX e PDF); backend em `src/dre.js`.
 
 ---
 

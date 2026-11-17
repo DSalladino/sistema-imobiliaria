@@ -526,7 +526,7 @@ export async function viewInquilinos(root) {
    ============================================================ */
 export async function viewContratos(root) {
   let dados = [], imoveis = [], inquilinos = [], filtro = 'todos', busca = '';
-  root.innerHTML = head('Contratos', 'Vigência, aluguel, reajuste, garantia e exceção de taxa.', podeEscrever() ? `<button class="btn primary" data-novo>${icon('plus')} Novo contrato</button>` : '')
+  root.innerHTML = head('Contratos', 'Vigência, aluguel, reajuste, garantia e exceção de taxa.', `${podeEscrever() ? `<button class="btn" data-reajuste>${icon('chart')} Reajuste em lote</button>` : ''}${podeEscrever() ? `<button class="btn primary" data-novo>${icon('plus')} Novo contrato</button>` : ''}`)
     + `<div class="filters">
         <div class="search grow">${icon('search')}<input placeholder="Buscar por código, imóvel, inquilino ou proprietário" data-busca></div>
         <div class="segmented" data-filtro><button class="active" data-f="todos">Todos</button><button data-f="ativo">Ativos</button><button data-f="encerrado">Encerrados</button></div>
@@ -565,6 +565,74 @@ export async function viewContratos(root) {
     },
   });
 
+  const abrirReajusteLote = () => {
+    const camposReajuste = [
+      { name: 'data', label: 'Data do reajuste', type: 'date', required: true },
+      { name: 'percentual', label: 'Percentual aplicado (%)', type: 'percent', required: true },
+      { name: 'indice', label: 'Índice de referência', type: 'select', options: ['IGP-M', 'IPCA', 'INCC', 'IGP-DI', 'Fixo'] },
+    ];
+    openModal({
+      titulo: 'Reajuste em lote', subtitulo: 'Contratos com aniversário vencido — confira a prévia antes de aplicar.',
+      wide: true,
+      corpo: `<form data-form>${fieldsHtml(camposReajuste, { data: hojeISO(), percentual: 5, indice: setting('indice_reajuste_padrao', 'IGP-M') })}</form>
+        <div class="divider"></div>
+        <div data-preview>${loadingBox('Calculando prévia…')}</div>`,
+      rodape: `<button class="btn" data-close>Cancelar</button><button class="btn primary" data-ok disabled>Aplicar reajuste</button>`,
+      onMount(r, close) {
+        const form = r.querySelector('[data-form]');
+        const box = r.querySelector('[data-preview]');
+        const ok = r.querySelector('[data-ok]');
+        const atualizar = async () => {
+          try {
+            const dados = collectForm(form, camposReajuste.map(f => ({ ...f, required: false })));
+            const qs = new URLSearchParams({ data: dados.data || hojeISO(), percentual: dados.percentual ?? 0, indice: dados.indice || '' });
+            const previa = await api(`/contratos/reajuste/preview?${qs}`);
+            box.innerHTML = previa.linhas.length ? tableHtml([
+              { label: '', render: l => `<input type="checkbox" data-id value="${l.contrato_id}" checked aria-label="Incluir">` },
+              { label: 'Contrato', render: l => `<strong>${esc(l.codigo)}</strong><span class="sub">${esc(l.imovel)}</span>` },
+              { label: 'Aniversário', render: l => dataBR(l.aniversario) },
+              { label: 'Aluguel atual', num: true, render: l => brl(l.aluguel_atual_centavos) },
+              { label: 'Novo aluguel', num: true, render: l => `<strong>${brl(l.aluguel_novo_centavos)}</strong><span class="sub">+${brl(l.diferenca_centavos)}</span>` },
+            ], previa.linhas) + `<p class="small muted mt-2">${previa.resumo.contratos} contrato(s): ${previa.resumo.total_atual} → ${previa.resumo.total_novo} (${previa.resumo.diferenca}).</p>`
+              : `<div class="notice">Nenhum contrato com aniversário vencido nessa data. Ajuste a data ou o percentual.</div>`;
+            ok.disabled = !previa.linhas.length;
+          } catch (e) { box.innerHTML = erroBox(e); ok.disabled = true; }
+        };
+        form.addEventListener('change', atualizar);
+        form.addEventListener('input', () => { clearTimeout(window.__reajT); window.__reajT = setTimeout(atualizar, 400); });
+        ok.onclick = async () => {
+          const ids = [...r.querySelectorAll('[data-id]:checked')].map(el => Number(el.value));
+          if (!ids.length) return toast('Selecione ao menos um contrato.', 'err');
+          try {
+            const d = collectForm(form, camposReajuste);
+            const res = await api('/contratos/reajustar-lote', { method: 'POST', body: { ...d, contrato_ids: ids } });
+            toast(`${res.aplicados.length} contrato(s) reajustado(s). Cobranças em aberto atualizadas.`);
+            close(); carregar();
+          } catch (e) { toast(e.message, 'err'); }
+        };
+        atualizar();
+      },
+    });
+  };
+
+  const abrirRescisao = (c) => formModal({
+    titulo: 'Rescisão de contrato', subtitulo: `${c.codigo || '#' + c.id} — ${c.endereco}`,
+    fields: [
+      { name: 'data', label: 'Data da rescisão', type: 'date', required: true },
+      { name: 'motivo', label: 'Motivo', required: true, placeholder: 'Devolução do imóvel, acordo…' },
+      { name: 'multa_centavos', label: 'Multa rescisória (R$)', type: 'money' },
+      { name: 'devolver_caucao', label: 'Devolver caução descontando a multa', type: 'checkbox', checkLabel: 'Gerar conta a pagar da devolução da caução' },
+      { name: 'observacoes', label: 'Observações', type: 'textarea', span: 2 },
+    ],
+    valores: { data: hojeISO(), devolver_caucao: c.garantia_tipo === 'caucao' ? 1 : 0 },
+    textoBotao: 'Confirmar rescisão',
+    onSubmit: async (d) => {
+      const res = await api(`/contratos/${c.id}/rescindir`, { method: 'POST', body: d });
+      toast(`Contrato encerrado. ${res.cobrancas_canceladas.length} cobrança(s) futura(s) cancelada(s)${res.caucao_devolucao_centavos ? ' e devolução de caução gerada' : ''}.`);
+      carregar();
+    },
+  });
+
   const render = () => {
     const termo = busca.toLowerCase();
     const filtrados = dados.filter(c => (filtro === 'todos' || c.status === filtro)
@@ -581,9 +649,11 @@ export async function viewContratos(root) {
         <button class="icon-btn" data-msg="${c.id}" title="Mensagem">${icon('whatsapp')}</button>
         <a class="icon-btn" href="#/cobrancas?contrato=${c.id}" title="Cobranças">${icon('receipt')}</a>
         ${podeEscrever() ? `<button class="icon-btn" data-edit="${c.id}" title="Editar">${icon('edit')}</button>` : ''}
+        ${podeEscrever() && c.status === 'ativo' ? `<button class="icon-btn" data-rescindir="${c.id}" title="Rescindir">${icon('alert')}</button>` : ''}
         ${podeEscrever() && c.status === 'ativo' ? `<button class="icon-btn" data-del="${c.id}" title="Encerrar">${icon('x')}</button>` : ''}` },
     ], filtrados);
     lista.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => abrirForm(dados.find(x => x.id === Number(b.dataset.edit))));
+    lista.querySelectorAll('[data-rescindir]').forEach(b => b.onclick = () => abrirRescisao(dados.find(x => x.id === Number(b.dataset.rescindir))));
     lista.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
       const c = dados.find(x => x.id === Number(b.dataset.del));
       if (!await confirmar({ titulo: 'Encerrar contrato', mensagem: `Encerrar ${c.codigo || '#' + c.id}? O histórico é mantido e o contrato sai das novas cobranças.`, textoBotao: 'Encerrar', perigo: true })) return;
@@ -617,6 +687,7 @@ export async function viewContratos(root) {
     render();
   });
   const novo = root.querySelector('[data-novo]'); if (novo) novo.onclick = () => abrirForm();
+  root.querySelector('[data-reajuste]')?.addEventListener('click', abrirReajusteLote);
   await carregar();
 }
 
