@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>A imobiliária inteira em um só lugar: contratos, cobranças, Pix, conciliação,<br>
-  repasses, comissões, DRE, auditoria e análise de futuro — no navegador, do PC ao celular.</strong>
+  repasses, comissões, DRE, auditoria e análises futuras — no navegador, do PC ao celular.</strong>
 </p>
 
 <p align="center">
@@ -96,14 +96,14 @@ instruções para gerar **capturas de tela** e o **vídeo de 90 s** estão em
 [todas as capturas](docs/assets/telas/) ·
 [roteiro de avaliação](docs/DEMONSTRACAO.md#roteiro-de-avaliação-10-minutos)
 
-## O que este projeto faz diferente
+## O que este projeto faz de diferente
 
 - **Explica o repasse.** Cada competência guarda um *snapshot* com a taxa, a
   origem da regra e o cálculo por contrato — o repasse sempre se explica.
 - **Separa o dinheiro.** Dois caixas: imobiliária e proprietários. O aluguel não
   se confunde com a receita da taxa.
 - **Nada desaparece.** Lançamentos e baixas são corrigidos por estorno; cadastros
-  são desativados; contratos são encerrados. Nunca é editar por cima.
+  são desativados; contratos são encerrados. Nada é editado por cima do histórico.
 - **Mede o que deveria entrar.** Cobranças por contrato e competência, com aging,
   régua de cobrança, pagamento parcial e **Pix copia e cola com QR por cobrança**.
 - **Prova a própria integridade.** Cada registro da trilha de auditoria encadeia
@@ -113,9 +113,9 @@ instruções para gerar **capturas de tela** e o **vídeo de 90 s** estão em
 - **Decide com horizonte.** Análises futuras projetam receita, resultado e caixa
   com faixa de erro, riscos, simulador de cenário e **teste de estresse
   automático com runway** — tudo no banco local.
-- **Assistente que conhece os números.** Perguntas em português (ou `Ctrl K`)
-  sobre inadimplência, caixa, repasses, contratos e ocupação são respondidas pelo
-  próprio banco, sem enviar dados a serviços externos.
+- **Assistente que conhece os números.** Perguntas em português — `Ctrl K` abre o
+  assistente — sobre inadimplência, caixa, repasses, contratos e ocupação são
+  respondidas pelo próprio banco, sem enviar dados a serviços externos.
 - **Segurança de verdade.** Sessão server-side com expiração por inatividade, CSRF, CSP,
   rate limit, 2FA TOTP, upload privado, validação de CPF/CNPJ, LGPD e backup com
   ensaio real de restauração.
@@ -274,7 +274,7 @@ O projeto adota, entre outras práticas:
 - **Rate limit:** login, 2FA, API, importação, comunicação e recuperação.
 - **XSS:** escape na renderização e CSP sem script inline.
 - **Sem terceiros no navegador:** fontes servidas pelo próprio sistema, sem
-  CDN externo, o que preserva o modo offline e não envia IP do usuário ao Google.
+  CDN externo, o que preserva o modo offline e não envia o IP do usuário ao Google.
 - **SQL:** consultas parametrizadas e referências validadas.
 - **Upload:** limite de tamanho, extensões permitidas, nome aleatório, storage
   fora de `public/` e download autenticado.
@@ -419,7 +419,7 @@ Sem `SEED_DEMO=1` a base começa sempre vazia, inclusive fora de produção.
 | `A porta 3000 já está em uso` | Outra instância rodando | `PORT=3010 npm start` |
 | `EACCES`/`EPERM` na pasta de dados | Permissão de escrita | Use `DATA_DIR` apontando para uma pasta gravável |
 | Abre só em `localhost`, não no celular | `HOST=127.0.0.1` | Use o padrão `0.0.0.0` e o IP mostrado no terminal |
-| Login demo pede troca de senha | Banco criado fora de `npm run demo:servir` | Rode `npm run demo:preparar` antes |
+| Login da demo pede troca de senha | Banco criado fora de `npm run demo:servir` | Rode `npm run demo:preparar` antes |
 
 ## Estrutura
 

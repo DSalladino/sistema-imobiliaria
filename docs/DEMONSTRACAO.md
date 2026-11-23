@@ -119,9 +119,9 @@ node scripts/capturar-telas.mjs     # grava as 10 telas
 O script usa `APP_URL` (padrão `http://127.0.0.1:3009`) e `DEMO_SENHA`. Ele
 captura login, painel, contratos, cobranças, repasses, conciliação, relatórios,
 alertas e duas telas no celular. As telas de análises, auditoria, parceiros,
-categorias, assistente aberto e diagnóstico são capturadas do mesmo modo,
-acrescendo `analises`, `auditoria`, `parceiros`, `categorias`, `manutencao`
-e o clique do assistente ao array `telas` do script.
+categorias e diagnóstico são capturadas do mesmo modo — basta navegar até a rota
+correspondente antes do screenshot; para a tela do assistente, abra o painel
+com o botão do assistente antes de capturar.
 
 > As imagens são produzidas localmente. Nenhuma captura é enviada para fora da
 > máquina.
