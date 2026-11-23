@@ -94,10 +94,14 @@ da própria demonstração, para não envelhecerem:
 | ![Repasses](assets/telas/05-repasses.png) | ![Conciliação](assets/telas/06-conciliacao.png) |
 | **Relatórios** | **Alertas** |
 | ![Relatórios](assets/telas/07-relatorios.png) | ![Alertas](assets/telas/08-alertas.png) |
+| **Análises futuras** | **Auditoria** |
+| ![Análises futuras com projeção e teste de estresse](assets/telas/12-analises.png) | ![Trilha de auditoria encadeada](assets/telas/13-auditoria.png) |
+| **Fornecedores e parceiros** | **Categorias financeiras** |
+| ![Cadastros de corretores, fornecedores e clientes](assets/telas/14-parceiros.png) | ![Categorias financeiras extensíveis](assets/telas/15-categorias.png) |
 | **Painel no celular** | **Cobranças no celular** |
 | ![Painel no celular](assets/telas/09-painel-celular.png) | ![Cobranças no celular](assets/telas/10-cobrancas-celular.png) |
-| **Assistente de gestão** | |
-| ![Assistente respondendo sobre inadimplência](assets/telas/11-assistente.png) | |
+| **Assistente de gestão** | **Diagnóstico da base** |
+| ![Assistente respondendo sobre inadimplência](assets/telas/11-assistente.png) | ![Diagnóstico da base](assets/telas/16-diagnostico.png) |
 
 A demo do GitHub Pages é somente leitura. Para testar cadastros, baixas e
 conciliação de ponta a ponta, rode a instância local com `npm run demo:servir`
@@ -114,7 +118,10 @@ node scripts/capturar-telas.mjs     # grava as 10 telas
 
 O script usa `APP_URL` (padrão `http://127.0.0.1:3009`) e `DEMO_SENHA`. Ele
 captura login, painel, contratos, cobranças, repasses, conciliação, relatórios,
-alertas e duas telas no celular.
+alertas e duas telas no celular. As telas de análises, auditoria, parceiros,
+categorias, assistente aberto e diagnóstico são capturadas do mesmo modo,
+acrescendo `analises`, `auditoria`, `parceiros`, `categorias`, `manutencao`
+e o clique do assistente ao array `telas` do script.
 
 > As imagens são produzidas localmente. Nenhuma captura é enviada para fora da
 > máquina.

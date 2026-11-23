@@ -5,8 +5,8 @@
 <h1 align="center">Sistema de Gestão Imobiliária</h1>
 
 <p align="center">
-  <strong>Cadastros, cobranças, conciliação bancária, repasses, documentos e relatórios<br>
-  em uma operação única, auditável e feita para rodar no navegador do celular.</strong>
+  <strong>A imobiliária inteira em um só lugar: contratos, cobranças, Pix, conciliação,<br>
+  repasses, comissões, DRE, auditoria e análise de futuro — no navegador, do PC ao celular.</strong>
 </p>
 
 <p align="center">
@@ -15,14 +15,14 @@
   </a>
   <img src="https://img.shields.io/badge/Node.js-22.13%2B-2E4A40?logo=node.js&logoColor=white" alt="Node.js 22.13+">
   <img src="https://img.shields.io/badge/SQLite-node%3Asqlite-5C8571?logo=sqlite&logoColor=white" alt="SQLite">
+  <img src="https://img.shields.io/badge/testes-131%20em%2017%20su%C3%ADtes-5C8571" alt="131 testes">
   <img src="https://img.shields.io/badge/vers%C3%A3o-0.11.0-C9A87C" alt="Versão 0.11.0">
   <img src="https://img.shields.io/badge/licen%C3%A7a-MIT-2E4A40" alt="Licença MIT">
-  <img src="https://img.shields.io/badge/PRs-bem--vindos-5C8571" alt="PRs bem-vindos">
 </p>
 
 <p align="center">
   <a href="#demonstração">Demonstração</a> ·
-  <a href="#começando">Começar</a> ·
+  <a href="#por-que-este-projeto-existe">O problema</a> ·
   <a href="#uma-volta-pelo-produto">Produto</a> ·
   <a href="#arquitetura">Arquitetura</a> ·
   <a href="#documentação">Documentação</a> ·
@@ -31,56 +31,30 @@
 
 ---
 
-## Sobre o projeto
+## Por que este projeto existe
 
 Uma imobiliária familiar administra imóveis de terceiros, recebe aluguéis,
 desconta a taxa de administração e repassa o saldo aos proprietários. Quando esse
-processo vive em planilhas e mensagens, o mesmo aluguel aparece com valores ou
-datas diferentes, o repasse não se explica e ninguém sabe quem alterou o quê.
+processo vive em planilhas e mensagens:
 
-Este projeto transforma esse ciclo em um fluxo único:
+- o mesmo aluguel aparece com valores ou datas **diferentes**;
+- o repasse **não se explica** — ninguém sabe qual taxa foi aplicada nem por quê;
+- o dinheiro da imobiliária **se mistura** com o dos proprietários;
+- ninguém sabe **quem alterou o quê**, quando ou por quê.
+
+Este projeto transforma esse ciclo em um fluxo único, auditável de ponta a ponta:
 
 ```text
 cadastro → contrato → cobrança → recebimento → conciliação → repasse → fechamento
 ```
 
-O sistema foi desenhado para uma operação pequena — uma imobiliária, uma base,
-poucos usuários — e prioriza **simplicidade operacional**, **rastreabilidade** e
+Foi desenhado para uma operação pequena — uma imobiliária, uma base, poucos
+usuários — priorizando **simplicidade operacional**, **rastreabilidade** e
 **baixo custo**. O resultado é um monólito Node.js + SQLite com frontend sem
-build, testes automatizados e documentação de ponta a ponta.
+build, 131 testes automatizados e documentação de ponta a ponta.
 
 > **Status:** versão 0.11.0, em evolução ativa. O repositório não contém dados
 > reais; a base de demonstração é separada da produção.
-
-### Por que este projeto é diferente
-
-- **Explica o repasse.** Cada competência guarda um *snapshot* com a taxa, a
-  origem da regra e o cálculo por contrato.
-- **Separa o dinheiro.** Dois caixas: imobiliária e proprietários. O aluguel não
-  se confunde com a receita da taxa.
-- **Nada desaparece.** Lançamentos e baixas são corrigidos por estorno; cadastros
-  são desativados; contratos são encerrados. A auditoria registra o antes/depois.
-- **Mede o que deveria entrar.** Cobranças por contrato e competência, com aging,
-  régua e pagamento parcial.
-- **Funciona no celular.** Layout responsivo, cartões em vez de tabelas largas e
-  gráficos SVG sem biblioteca externa.
-- **Assistente que conhece os números.** Perguntas em português sobre
-  inadimplência, caixa, repasses, contratos e ocupação são respondidas pelo
-  próprio banco, sem enviar dados a serviços externos.
-- **Segurança de verdade.** Sessão server-side com expiração por inatividade, CSRF, CSP,
-  rate limit, 2FA TOTP, upload privado, validação de CPF/CNPJ, LGPD e backup com
-  ensaio real de restauração.
-- **Auditoria que prova.** Cada registro da trilha encadeia o hash do anterior;
-  editar o banco diretamente quebra a verificação.
-- **Decisão com horizonte.** Análises futuras projetam receita, resultado e caixa
-  com faixa de erro, riscos e simulador de cenário — tudo no banco local.
-- **Dados de apoio que não se repetem.** Corretores, fornecedores e clientes têm
-  cadastro próprio com Pix e CRECI; categorias financeiras são selecionáveis e
-  extensíveis. O formulário deixa de depender de texto livre e o histórico não
-  nasce com três grafias do mesmo nome.
-- **Backup que se prova.** Snapshots automáticos com hash SHA-256 ao lado do
-  arquivo, retenção configurável e ensaio de restauração que compara todas as
-  tabelas — não apenas “o arquivo foi criado”.
 
 ## Demonstração
 
@@ -110,28 +84,59 @@ padrão publicada. O roteiro de avaliação, o conteúdo da base de exemplo e as
 instruções para gerar **capturas de tela** e o **vídeo de 90 s** estão em
 [docs/DEMONSTRACAO.md](docs/DEMONSTRACAO.md).
 
-Para divulgar uma demo pública, o repositório traz `render.yaml`, `fly.toml`,
-`Dockerfile` e `docker-compose.yml` prontos, com reset automático e `noindex`.
-Passo a passo em [docs/DEPLOY-DEMO.md](docs/DEPLOY-DEMO.md).
-
 | Painel | Cobranças |
 |---|---|
-| ![Painel analítico](docs/assets/telas/02-painel.png) | ![Cobranças com aging e baixa](docs/assets/telas/04-cobrancas.png) |
-| **Repasses com snapshot da taxa** | **No celular** |
-| ![Repasses](docs/assets/telas/05-repasses.png) | ![Painel no celular](docs/assets/telas/09-painel-celular.png) |
+| ![Painel analítico com KPIs, fluxo de caixa projetado e comparativos](docs/assets/telas/02-painel.png) | ![Cobranças com aging, baixa e Pix](docs/assets/telas/04-cobrancas.png) |
+| **Análises futuras** | **Trilha de auditoria encadeada** |
+| ![Análises futuras com projeção, riscos e teste de estresse](docs/assets/telas/12-analises.png) | ![Trilha de auditoria com verificação de integridade](docs/assets/telas/13-auditoria.png) |
+| **Assistente que conhece os números** | **No celular** |
+| ![Assistente respondendo sobre inadimplência e caixa](docs/assets/telas/11-assistente.png) | ![Painel no celular](docs/assets/telas/09-painel-celular.png) |
 
 [▶ Vídeo de 90 s](docs/assets/demonstracao.webm) ·
 [todas as capturas](docs/assets/telas/) ·
 [roteiro de avaliação](docs/DEMONSTRACAO.md#roteiro-de-avaliação-10-minutos)
 
+## O que este projeto faz diferente
+
+- **Explica o repasse.** Cada competência guarda um *snapshot* com a taxa, a
+  origem da regra e o cálculo por contrato — o repasse sempre se explica.
+- **Separa o dinheiro.** Dois caixas: imobiliária e proprietários. O aluguel não
+  se confunde com a receita da taxa.
+- **Nada desaparece.** Lançamentos e baixas são corrigidos por estorno; cadastros
+  são desativados; contratos são encerrados. Nunca é editar por cima.
+- **Mede o que deveria entrar.** Cobranças por contrato e competência, com aging,
+  régua de cobrança, pagamento parcial e **Pix copia e cola com QR por cobrança**.
+- **Prova a própria integridade.** Cada registro da trilha de auditoria encadeia
+  o hash do anterior; editar o banco diretamente quebra a verificação. O
+  **diagnóstico da base** confere duplicidades, vínculos, valores e integridade
+  em um clique.
+- **Decide com horizonte.** Análises futuras projetam receita, resultado e caixa
+  com faixa de erro, riscos, simulador de cenário e **teste de estresse
+  automático com runway** — tudo no banco local.
+- **Assistente que conhece os números.** Perguntas em português (ou `Ctrl K`)
+  sobre inadimplência, caixa, repasses, contratos e ocupação são respondidas pelo
+  próprio banco, sem enviar dados a serviços externos.
+- **Segurança de verdade.** Sessão server-side com expiração por inatividade, CSRF, CSP,
+  rate limit, 2FA TOTP, upload privado, validação de CPF/CNPJ, LGPD e backup com
+  ensaio real de restauração.
+- **Dados de apoio que não se repetem.** Corretores (com CRECI e Pix),
+  fornecedores, clientes e **categorias financeiras extensíveis** — o formulário
+  deixa de depender de texto livre e o histórico não nasce com três grafias do
+  mesmo nome.
+- **Backup que se prova.** Snapshots automáticos com hash SHA-256 ao lado do
+  arquivo, retenção configurável e ensaio de restauração que compara todas as
+  tabelas — não apenas “o arquivo foi criado”.
+- **Funciona no celular.** Layout responsivo com cartões no lugar de tabelas
+  largas e gráficos SVG próprios, sem biblioteca externa.
+
 ## Uma volta pelo produto
 
 | Módulo | O que resolve |
 |---|---|
-| **Painel** | KPIs do mês, comparativos, composição de receitas, ocupação, inadimplência, alertas e atividade recente |
+| **Painel** | KPIs do mês, comparativos, composição de receitas, ocupação, inadimplência, fluxo de caixa projetado e atividade recente |
 | **Análises futuras** | Tendência, projeção com faixa de erro, riscos, recomendações, simulador de cenário e teste de estresse automático com runway |
 | **Carteira** | Proprietários, imóveis, inquilinos, contratos, garantias, reajustes e exceções de taxa |
-| **Cobranças** | Geração mensal em lote, baixa total/parcial, multa e juros, estorno, cancelamento, aging e régua, **Pix copia e cola com QR por cobrança** |
+| **Cobranças** | Geração mensal em lote, baixa total/parcial, multa e juros, estorno, cancelamento, aging e régua, Pix copia e cola com QR por cobrança |
 | **Conciliação** | Importação de OFX/CSV/Excel, sugestão de vínculo e confirmação humana |
 | **Contas** | Contas a pagar e a receber com recorrência semanal a anual, baixa que gera lançamento e previsão de caixa de 6–24 meses |
 | **Financeiro** | Dois caixas, lançamentos por competência, estornos, repasses com extrato e fechamento mensal |
@@ -141,8 +146,8 @@ Passo a passo em [docs/DEPLOY-DEMO.md](docs/DEPLOY-DEMO.md).
 | **Relatórios** | Oito relatórios em CSV, XLSX e PDF — incluindo **DRE por imóvel** — com cabeçalho, indicadores e paginação |
 | **Importação** | Modelos de planilha, prévia linha a linha e atualização de registros existentes |
 | **Comunicação** | WhatsApp por link `wa.me` ou API oficial (Cloud API), e e-mail SMTP com modelos, histórico e assinatura |
-| **Assistente** | Perguntas em linguagem natural sobre inadimplência, caixa, repasses, contratos, reajustes, ocupação, comissões e contas — com números e atalhos para a tela certa |
-| **Administração** | Usuários, papéis, auditoria encadeada, 2FA, LGPD, backup automático com hash, manutenção e configurações |
+| **Assistente** | Perguntas em linguagem natural sobre inadimplência, caixa, repasses, contratos, reajustes, ocupação, comissões e contas — com números e atalhos para a tela certa (`Ctrl K`) |
+| **Administração** | Usuários, papéis, auditoria encadeada com âncora de integridade, diagnóstico da base, 2FA, LGPD, backup automático com hash, manutenção e configurações |
 
 Detalhes de cada fluxo, regras e telas em [docs/FUNCIONALIDADES.md](docs/FUNCIONALIDADES.md).
 
@@ -208,7 +213,7 @@ demonstração. O seed **nunca** roda por omissão, mesmo em desenvolvimento.
 |---|---|
 | `npm start` | Sobe a aplicação |
 | `npm run dev` | Sobe com `--watch` |
-| `npm test` | 126 testes: API, regras, interface (jsdom), seed, relatórios, cadastros e assistente |
+| `npm test` | 131 testes em 17 suítes: API, regras, segurança, interface (jsdom), seed, relatórios, conciliação, cadastros, assistente, auditoria e diagnóstico |
 | `npm run check` | Verifica a sintaxe de todos os `.js`/`.mjs` |
 | `npm run deps:check` | Confere versão, origem e integrity da dependência `xlsx` (CDN) |
 | `npm run test:coverage` | Testes com cobertura experimental do Node |
@@ -218,6 +223,7 @@ demonstração. O seed **nunca** roda por omissão, mesmo em desenvolvimento.
 | `npm run demo:estatico` | Gera o retrato usado pela demo do GitHub Pages |
 | `npm run midia:capturar` | Gera as capturas de tela (requer Playwright) |
 | `npm run midia:video` | Grava o tour de 90 s (requer Playwright) |
+| `npm run backup:testar` | Ensaia a restauração do backup |
 | `npm run admin:reset` | Redefine a senha do admin pelo terminal |
 
 ## Arquitetura
@@ -240,13 +246,16 @@ O núcleo é um monólito com camadas claras:
 - `src/regras.js` — repasse, precedência de taxas, alertas, saldos e fechamento.
 - `src/cobrancas.js` — geração, baixa, multa/juros, régua e aging.
 - `src/conciliacao.js` — OFX/CSV, sugestões e confirmação.
-- `src/analytics.js` — KPIs, séries, composição e comparativos.
+- `src/analytics.js` — KPIs, séries, composição, comparativos e projeções.
+- `src/previsao.js` — projeção com faixa de erro, riscos e teste de estresse.
+- `src/auditoria.js` — trilha encadeada por hash, verificação e expurgo.
+- `src/diagnostico.js` — diagnóstico da base: duplicidades, vínculos e integridade.
 - `src/reports.js` — CSV, XLSX e PDF.
 - `src/importacao.js` — planilhas, prévia e modelos.
 - `src/cadastros.js` — parceiros (corretores, fornecedores e clientes) e categorias.
 - `src/backup.js` — snapshots, hash SHA-256, retenção e ensaio de restauração.
 - `src/db.js` — esquema, migrações, configurações e seed.
-- `public/*` — SPA, gráficos SVG, componentes e tema.
+- `public/*` — SPA, gráficos SVG, assistente local e tema.
 
 Leia [docs/ARQUITETURA.md](docs/ARQUITETURA.md) para os fluxos completos e
 [docs/MODELO-DE-DADOS.md](docs/MODELO-DE-DADOS.md) para o dicionário de dados.
@@ -270,7 +279,7 @@ O projeto adota, entre outras práticas:
 - **Upload:** limite de tamanho, extensões permitidas, nome aleatório, storage
   fora de `public/` e download autenticado.
 - **Auditoria:** login, CRUD, estornos, repasses, fechamento, importação, backup
-  e LGPD.
+  e LGPD — encadeada por hash com âncora de integridade.
 - **LGPD:** exportação do titular e anonimização preservando o histórico
   financeiro obrigatório.
 
@@ -313,23 +322,25 @@ npm run check
 npm test
 ```
 
-- `tests/api.test.mjs` — login, sessão, CSRF, CRUD, cobranças, repasses,
-  relatórios, backup, fechamento e proteção do último admin.
-- `tests/rules.test.mjs` — precedência de taxas, snapshot, senha, CSV, repasse e
-  importação.
-- `tests/seguranca.test.mjs` — TOTP (vetores do RFC 6238), base32, cifragem
-  AES-GCM, códigos de recuperação, política de senha e hash de sessão.
-- `tests/features.test.mjs` — Pix, WhatsApp, contas e recorrência, previsão de
-  caixa, reajuste em lote, rescisão, comissões e DRE por imóvel.
-- `tests/ui.test.mjs` — renderiza as 24 telas com dados reais em jsdom.
-- `tests/seed.test.mjs` — valida a base de demonstração da primeira execução.
-- `tests/relatorios.test.mjs` — CSV/XLSX/PDF, fórmulas, acentos, período vazio e DRE.
-- `tests/conciliacao.test.mjs` — OFX, CSV, sugestão, duplicidade, txid e confirmação.
-- `tests/analytics.test.mjs` — série, ocupação, composição, KPIs e cache de settings.
-- `tests/cadastros.test.mjs` — parceiros, categorias, vínculo de corretor,
-  fornecedor em contas, novas recorrências e hash de snapshot.
-- `tests/assistente.test.mjs` — interpretação de período, resumo, caixa,
-  ocupação, ajuda, busca por nome e inadimplência.
+| Suíte | Cobre |
+|---|---|
+| `tests/api.test.mjs` | Login, sessão, CSRF, CRUD, cobranças, repasses, relatórios, backup, fechamento e proteção do último admin |
+| `tests/rules.test.mjs` | Precedência de taxas, snapshot, senha, CSV, repasse e importação |
+| `tests/seguranca.test.mjs` | TOTP (vetores do RFC 6238), base32, cifragem AES-GCM, códigos de recuperação e política de senha |
+| `tests/seguranca-avancada.test.mjs` | RBAC, CSRF e injeção em filtros contra a API real |
+| `tests/features.test.mjs` | Pix, WhatsApp, contas e recorrência, previsão de caixa, reajuste em lote, rescisão, comissões e DRE por imóvel |
+| `tests/ui.test.mjs` | Renderiza as telas com dados reais em jsdom |
+| `tests/seed.test.mjs` | Valida a base de demonstração da primeira execução |
+| `tests/relatorios.test.mjs` | CSV/XLSX/PDF, fórmulas, acentos, período vazio e DRE |
+| `tests/conciliacao.test.mjs` | OFX, CSV, sugestão, duplicidade, txid e confirmação |
+| `tests/analytics.test.mjs` | Série, ocupação, composição, KPIs e cache de settings |
+| `tests/previsao.test.mjs` | Projeção, faixa de erro, riscos e teste de estresse |
+| `tests/auditoria.test.mjs` | Encadeamento de hash, verificação e expurgo |
+| `tests/backup.test.mjs` | Snapshot, hash, retenção e ensaio de restauração |
+| `tests/cadastros.test.mjs` | Parceiros, categorias, vínculo de corretor e hash de snapshot |
+| `tests/assistente.test.mjs` | Interpretação de período, resumo, caixa, ocupação e inadimplência |
+| `tests/validacao.test.mjs` | Validação de CPF/CNPJ e campos de formulário |
+| `tests/diagnostico.test.mjs` | Diagnóstico da base: duplicidades, vínculos e integridade |
 
 O CI roda em Node 22 e 24. A estratégia e as lacunas estão em
 [docs/QUALIDADE.md](docs/QUALIDADE.md).
@@ -342,6 +353,8 @@ O CI roda em Node 22 e 24. A estratégia e as lacunas estão em
   tiver mais de 24 h (configurável). Cada arquivo recebe um `.sha256` ao lado.
 - **Verificação:** Relatórios → “Verificar integridade” abre o banco gerado e
   confere tabelas, chaves estrangeiras, contagens e o hash dos snapshots.
+- **Ensaio:** `npm run backup:testar` restaura o snapshot em um diretório
+  temporário e compara todas as tabelas.
 - **Restauração:** pare o servidor, substitua `data/imobiliaria.db`, copie
   `documentos/` para `data/uploads` e `.app-key` para `data/.app-key`, remova
   `-wal`/`-shm` antigos e suba novamente.
@@ -412,20 +425,20 @@ Sem `SEED_DEMO=1` a base começa sempre vazia, inclusive fora de produção.
 
 ```text
 src/            HTTP, API, regras, banco, relatórios e integrações
-public/         SPA em JavaScript puro, estilos e gráficos SVG
-tests/          testes automatizados (node:test + jsdom)
+public/         SPA em JavaScript puro, estilos, gráficos e assistente
+tests/          17 suítes de teste (node:test + jsdom)
 docs/           produto, arquitetura, dados, API, qualidade, operação e ADRs
 deploy/         systemd, Caddy, backup e guia de publicação
-scripts/        verificação de sintaxe
+scripts/        captura de mídia e verificação de ambiente
 .github/        CI, templates de issue e pull request
 data/           banco e uploads (gerado; não versionar)
 ```
 
 ## Roadmap
 
-**Fase 1 — consolidação (concluída na 0.7.0):** reajuste em lote, rescisão, contas
-a pagar/receber com previsão de caixa, comissões e DRE por imóvel. Restam modelos
-de documento e notificações automáticas.
+**Fase 1 — consolidação (concluída na 0.11.0):** reajuste em lote, rescisão,
+contas a pagar/receber com previsão de caixa, comissões, DRE por imóvel, Pix,
+auditoria encadeada, cadastros de apoio e análises futuras com teste de estresse.
 
 **Fase 2 — transparência:** portal do proprietário, portal do inquilino, central
 de manutenção, histórico do imóvel e dashboard por bairro/tipo.
