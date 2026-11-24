@@ -22,6 +22,13 @@ semântico ([SemVer](https://semver.org/lang/pt-BR/)).
   só ao admin; outros perfis recebem apenas `imob_nome` e
   `indice_reajuste_padrao`. `GET /comunicacao/status` (remetente SMTP,
   WhatsApp corporativo e templates) passou a exigir permissão de escrita.
+- **2ª rodada de varredura**: travessia de caminho no download de documentos
+  (bloqueada), tokens de recuperação só em hash (sha256, uso único), sem
+  mutação em rotas GET, nenhuma chave de settings indefinida, 152 chamadas
+  do front-end conferidas contra o roteador da API — sem divergência.
+- Testes de regressão: perfil `consulta` recebe apenas as settings públicas,
+  recebe 403 em `/comunicacao/status`; admin vê tudo; `GET /api/backup`
+  não existe mais (404).
 - **Checklist de go-live** adicionado a `docs/OPERACAO.md` (HTTPS, `TRUST_PROXY=1`,
   settings de segurança, SMTP/`url_publica`, backup off-server) e nota
   documentada sobre `style-src 'unsafe-inline'` em `docs/SEGURANCA.md`.

@@ -307,6 +307,7 @@ terceiros durante a verificação. Após a correção, o caso é registrado no
 
 | Versão | Data | Mudança |
 |---|---|---|
+| 0.11.1 | 2026-11 | Auditoria pré-go-live: defaults de produção, `__Host-` cookie, scrypt versionado (N=32768), backup via POST confirmado, `ler` explícito em documentos, `GET /settings` por papel, comunicação restrita a quem escreve; varredura de segredos em todo o histórico do Git (limpa) e cruzadas de integração (rotas front↔back e chaves de settings) |
 | 0.8.1 | 2026-11 | Documento criado; capítulo Pix (P-01…P-14), validação de chave/tamanho EMV, txid como dica de conciliação e runbook |
 | 0.8.0 | 2026-11 | Endurecimento: troca de senha no servidor, seed opt-in, health real, fontes locais, guarda do `xlsx` |
 | 0.6.0 | 2026-11 | Revisão técnica inicial (A-01…A-14 e R-01…R-12) |

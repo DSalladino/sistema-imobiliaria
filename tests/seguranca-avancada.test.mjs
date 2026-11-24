@@ -173,6 +173,22 @@ test('rodada avançada de segurança e validação', async (t) => {
     assert.equal(auditoria.res.status, 403);
     const relatorio = await req('/api/reports/lancamentos.csv', { cookie });
     assert.equal(relatorio.res.status, 403);
+    // Configuração filtrada por papel: consulta recebe apenas as chaves
+    // públicas usadas pela interface comum.
+    const settingsConsulta = await req('/api/settings', { cookie });
+    assert.equal(settingsConsulta.res.status, 200);
+    const chaves = settingsConsulta.data.map(s => s.chave);
+    assert.deepEqual(chaves.sort(), ['imob_nome', 'indice_reajuste_padrao']);
+    const settingsAdmin = await req('/api/settings', { cookie: adminCookie });
+    assert.ok(settingsAdmin.data.length > chaves.length, 'admin vê a configuração completa');
+    // Status de comunicação (remetente SMTP, WhatsApp, templates) exige escrita.
+    const comunicacaoConsulta = await req('/api/comunicacao/status', { cookie });
+    assert.equal(comunicacaoConsulta.res.status, 403);
+    const comunicacaoAdmin = await req('/api/comunicacao/status', { cookie: adminCookie });
+    assert.equal(comunicacaoAdmin.res.status, 200);
+    // Backup antigo por GET foi removido: só existe via POST confirmado.
+    const backupGet = await req('/api/backup', { cookie: adminCookie });
+    assert.equal(backupGet.res.status, 404);
   });
 
   await t.test('filtros e buscas não sofrem injeção de SQL', async () => {
