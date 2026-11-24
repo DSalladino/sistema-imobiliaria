@@ -64,6 +64,12 @@ jobs:
         with:
           path: _site
 
+      # A API de artefatos indexa com atraso variável; sem esta espera, o
+      # deploy às vezes não encontra o artefato "github-pages" e falha com
+      # "No artifacts named \"github-pages\" were found".
+      - name: Aguardar registro do artefato
+        run: sleep 15
+
       - name: Publicar
         id: deployment
         uses: actions/deploy-pages@v5
