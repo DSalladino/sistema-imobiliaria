@@ -18,6 +18,10 @@ semântico ([SemVer](https://semver.org/lang/pt-BR/)).
   e a chave local, e era acessível por um simples link GET.
 - **Documentos**: as rotas de listagem, versões e download agora exigem a
   permissão `ler` explicitamente (antes dependiam só do portão global).
+- **Configuração por papel**: `GET /settings` devolve a configuração completa
+  só ao admin; outros perfis recebem apenas `imob_nome` e
+  `indice_reajuste_padrao`. `GET /comunicacao/status` (remetente SMTP,
+  WhatsApp corporativo e templates) passou a exigir permissão de escrita.
 - **Checklist de go-live** adicionado a `docs/OPERACAO.md` (HTTPS, `TRUST_PROXY=1`,
   settings de segurança, SMTP/`url_publica`, backup off-server) e nota
   documentada sobre `style-src 'unsafe-inline'` em `docs/SEGURANCA.md`.

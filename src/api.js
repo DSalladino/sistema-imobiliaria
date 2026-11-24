@@ -1215,7 +1215,13 @@ export async function handleApi(req, res, url, user, ip, body) {
     if (p === '/saldos' && m === 'GET') return json(res, 200, saldos());
 
     if (p === '/settings' && m === 'GET') {
-      return json(res, 200, db.prepare('SELECT * FROM settings ORDER BY grupo, ordem').all());
+      const todas = db.prepare('SELECT * FROM settings ORDER BY grupo, ordem').all();
+      if (user.papel === 'admin') return json(res, 200, todas);
+      // Perfis sem administração só recebem os valores usados pela interface
+      // comum; configuração operacional (e-mail de recuperação, WhatsApp,
+      // políticas de segurança) fica restrita ao admin.
+      const publicas = new Set(['imob_nome', 'indice_reajuste_padrao']);
+      return json(res, 200, todas.filter(s => publicas.has(s.chave)));
     }
     if (p === '/settings' && m === 'PUT') {
       exigir(user, 'admin');
@@ -1725,6 +1731,10 @@ export async function handleApi(req, res, url, user, ip, body) {
     }
 
     if (p === '/comunicacao/status' && m === 'GET') {
+      // Revela remetente de e-mail (inclui SMTP_USER no fallback) e número
+      // corporativo de WhatsApp: exige permissão de escrita, que é quem usa
+      // o modal de envio.
+      exigir(user, 'escrever');
       return json(res, 200, {
         email_configurado: emailConfigurado(),
         remetente: getSetting('email_remetente', '') || process.env.SMTP_FROM || process.env.SMTP_USER || '',

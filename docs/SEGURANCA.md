@@ -78,7 +78,7 @@ Imobiliária**, com análise específica do fluxo **Pix**. Ele complementa o
 | Política | Mínimo 8, bloqueio de senhas comuns e do e-mail; troca obrigatória aplicada no servidor | `src/seguranca.js`, `src/api.js` |
 | Sessão | Token de 256 bits, só hash no banco, `HttpOnly`, `SameSite=Lax`, `Secure` sob HTTPS com prefixo `__Host-` (impede injeção por subdomínio; HTTP puro usa `sid`), invalidação em troca/reset e no logout (limpa ambas as variantes) | `src/auth.js`, `src/server.js`, `src/api.js` |
 | 2FA | TOTP RFC 6238, segredo cifrado (AES-256-GCM), códigos de recuperação de uso único | `src/seguranca.js` |
-| Autorização | Papéis no servidor (`exigir`), proteção do último admin, escrita por perfil | `src/permissoes.js`, `src/api.js` |
+| Autorização | Papéis no servidor (`exigir`), proteção do último admin, escrita por perfil; `GET /settings` filtrado por papel e comunicação restrita a quem escreve | `src/permissoes.js`, `src/api.js` |
 | CSRF | `Origin` + `Host` + `Sec-Fetch-Site` + JSON obrigatório + `SameSite` | `src/server.js` |
 | XSS | Escape na renderização, `textContent` em mensagens, CSP sem script inline | `public/core.js`, `src/server.js` |
 | CSP (nota) | `style-src 'unsafe-inline'` permanece por decisão documentada: a interface usa estilos inline dinâmicos (larguras de gráficos/barras, cor de KPI, layout do QR Pix). O diretório crítico contra XSS é `script-src 'self'`, que permanece travado sem inline | `src/server.js` |
