@@ -984,10 +984,38 @@ export async function viewRelatorios(root) {
     const box = root.querySelector('[data-backup]');
     if (!isAdmin()) { box.remove(); return; }
     box.innerHTML = `<div class="card-head"><div><h2>Backup</h2><p>Banco + documentos em um .zip. Guarde fora do servidor.</p></div><div class="section-actions">
-      <a class="btn" href="/api/backup">${icon('download')} Baixar backup</a>
+      <button class="btn" data-baixar>${icon('download')} Baixar backup</button>
       <button class="btn" data-verificar>${icon('shield')} Verificar integridade</button>
     </div></div>
     <div class="card-body"><p class="small muted">Último backup registrado: ${esc(cfg('ultimo_backup', 'nunca'))}. A restauração deve ser testada mensalmente.</p></div>`;
+    box.querySelector('[data-baixar]').onclick = async () => {
+      // O ZIP traz banco, documentos e a chave local que decifra segredos.
+      // A confirmação no modal e no servidor é obrigatória e o download vira
+      // POST, evitando que um link GET disparado por engano gere o arquivo.
+      if (!await confirmar({
+        titulo: 'Baixar backup',
+        mensagem: 'O ZIP contém o banco, os documentos e a chave local (.app-key), que decifra segredos do sistema. Guarde-o criptografado e fora do servidor. Continuar?',
+        textoBotao: 'Baixar',
+      })) return;
+      try {
+        const r = await fetch('/api/backup', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmacao: 'BACKUP' }),
+        });
+        if (!r.ok) {
+          const dados = await r.json().catch(() => ({}));
+          throw new Error(dados.erro || `Erro ${r.status}`);
+        }
+        const blob = await r.blob();
+        const disp = r.headers.get('content-disposition') || '';
+        const nome = disp.match(/filename="([^"]+)"/)?.[1] || 'imobiliaria-backup.zip';
+        baixarArquivo(nome, blob, 'application/zip');
+        toast('Backup baixado.');
+        carregar();
+      } catch (e) { toast(e.message, 'err'); }
+    };
     box.querySelector('[data-verificar]').onclick = async () => {
       try {
         const r = await api('/backup/verificar');

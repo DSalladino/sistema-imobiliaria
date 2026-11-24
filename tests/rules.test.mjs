@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -65,9 +66,15 @@ function saldoIgual(rep) {
 
 test('senha usa scrypt e política mínima', () => {
   const hash = hashSenha('SenhaForte#2026');
-  assert.ok(hash.includes(':'));
+  assert.ok(hash.startsWith('scrypt2$'), 'hash novo usa formato versionado');
   assert.equal(verificaSenha('SenhaForte#2026', hash), true);
   assert.equal(verificaSenha('outra', hash), false);
+  // Compatibilidade: hash no formato antigo (salt:hash, parâmetros padrão)
+  // continua verificando.
+  const salt = crypto.randomBytes(16).toString('hex');
+  const antigo = `${salt}:${crypto.scryptSync('SenhaForte#2026', salt, 64).toString('hex')}`;
+  assert.equal(verificaSenha('SenhaForte#2026', antigo), true);
+  assert.equal(verificaSenha('SenhaForte#2026', 'scrypt2$abc$def'), false);
   assert.throws(() => validarSenha('12345678', 'a@b.com'), /senha|Senha/);
   assert.doesNotThrow(() => validarSenha('UmaSenhaBoa#2026', 'a@b.com'));
 });

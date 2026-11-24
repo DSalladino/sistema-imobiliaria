@@ -219,7 +219,10 @@ function criarSessao(req, res, u, ip) {
     .run(hashToken(token), u.id, expira, new Date().toISOString());
   auditar({ id: u.id, nome: u.nome }, 'login', 'usuarios', u.id, null, ip);
   const secure = cookieSeguro(req) ? '; Secure' : '';
-  res.setHeader('Set-Cookie', `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 7}${secure}`);
+  // Em HTTPS usa o prefixo __Host-: o navegador recusa o cookie se faltar
+  // Secure, Path=/ ou se houver Domain, impedindo injeção por subdomínio.
+  const nomeCookie = secure ? '__Host-sid' : 'sid';
+  res.setHeader('Set-Cookie', `${nomeCookie}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 7}${secure}`);
   return {
     usuario: {
       id: u.id, nome: u.nome, email: u.email, papel: u.papel,
@@ -298,7 +301,12 @@ function logout(req, res, user, ip) {
   if (req._sidHash) db.prepare('DELETE FROM sessoes WHERE token = ?').run(req._sidHash);
   if (user) auditar(user, 'logout', 'usuarios', user.id, null, ip);
   const secure = cookieSeguro(req) ? '; Secure' : '';
-  res.setHeader('Set-Cookie', `sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`);
+  // Limpa as duas variantes do cookie de sessão: quem logou antes da mudança
+  // ainda carrega sid (HTTP) e quem logou depois carrega __Host-sid (HTTPS).
+  res.setHeader('Set-Cookie', [
+    `sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`,
+    `__Host-sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0; Secure`,
+  ]);
   return json(res, 200, { ok: true });
 }
 
@@ -1777,6 +1785,7 @@ export async function handleApi(req, res, url, user, ip, body) {
     }
 
     if (seg[0] === 'documentos' && m === 'GET' && !seg[1]) {
+      exigir(user, 'ler');
       return json(res, 200, listarDocumentos({
         entidade: url.searchParams.get('entidade') || undefined,
         entidade_id: url.searchParams.get('entidade_id') || undefined,
@@ -1802,10 +1811,12 @@ export async function handleApi(req, res, url, user, ip, body) {
     }
 
     if (seg[0] === 'documentos' && seg[1] && seg[2] === 'versoes' && m === 'GET') {
+      exigir(user, 'ler');
       return json(res, 200, versoesDocumento(Number(seg[1])));
     }
 
     if (seg[0] === 'documentos' && seg[1] && seg[2] === 'download' && m === 'GET') {
+      exigir(user, 'ler');
       const doc = obterDocumento(Number(seg[1]));
       if (!doc) return erro(res, 404, 'Documento não encontrado.');
       const full = caminhoFisico(doc);
@@ -1953,8 +1964,12 @@ export async function handleApi(req, res, url, user, ip, body) {
       });
     }
 
-    if (p === '/backup' && m === 'GET') {
+    if (p === '/backup' && m === 'POST') {
       exigir(user, 'admin');
+      // Download do backup exige confirmação explícita: o ZIP traz o banco,
+      // os documentos e a chave local que decifra segredos. Sem isso, um link
+      // GET aberto por engano dispararia a geração do arquivo.
+      if (String(body.confirmacao || '') !== 'BACKUP') return erro(res, 400, 'Digite BACKUP para confirmar o download do backup.');
       const tmp = path.join(os.tmpdir(), `imobiliaria-backup-${Date.now()}.db`);
       db.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
       try { fs.chmodSync(tmp, 0o600); } catch {}

@@ -74,18 +74,20 @@ Imobiliária**, com análise específica do fluxo **Pix**. Ele complementa o
 
 | Camada | Controle | Evidência |
 |---|---|---|
-| Senha | `scrypt` com salt, `timingSafeEqual`, hash dummy para e-mail inexistente | `src/auth.js`, `src/api.js` |
+| Senha | `scrypt` com salt (formato `scrypt2$N$r$p` com N=32768 para hashes novos; hashes antigos continuam válidos), `timingSafeEqual`, hash dummy para e-mail inexistente | `src/auth.js`, `src/api.js` |
 | Política | Mínimo 8, bloqueio de senhas comuns e do e-mail; troca obrigatória aplicada no servidor | `src/seguranca.js`, `src/api.js` |
-| Sessão | Token de 256 bits, só hash no banco, `HttpOnly`, `SameSite=Lax`, `Secure` sob HTTPS, invalidação em troca/reset | `src/auth.js`, `src/server.js` |
+| Sessão | Token de 256 bits, só hash no banco, `HttpOnly`, `SameSite=Lax`, `Secure` sob HTTPS com prefixo `__Host-` (impede injeção por subdomínio; HTTP puro usa `sid`), invalidação em troca/reset e no logout (limpa ambas as variantes) | `src/auth.js`, `src/server.js`, `src/api.js` |
 | 2FA | TOTP RFC 6238, segredo cifrado (AES-256-GCM), códigos de recuperação de uso único | `src/seguranca.js` |
 | Autorização | Papéis no servidor (`exigir`), proteção do último admin, escrita por perfil | `src/permissoes.js`, `src/api.js` |
 | CSRF | `Origin` + `Host` + `Sec-Fetch-Site` + JSON obrigatório + `SameSite` | `src/server.js` |
 | XSS | Escape na renderização, `textContent` em mensagens, CSP sem script inline | `public/core.js`, `src/server.js` |
+| CSP (nota) | `style-src 'unsafe-inline'` permanece por decisão documentada: a interface usa estilos inline dinâmicos (larguras de gráficos/barras, cor de KPI, layout do QR Pix). O diretório crítico contra XSS é `script-src 'self'`, que permanece travado sem inline | `src/server.js` |
 | SQL | Consultas parametrizadas; filtros dinâmicos só com IDs numéricos | `src/*.js` |
 | Upload | 10 MB, extensões permitidas, nome aleatório, storage fora de `public/`, download autenticado, `nosniff` | `src/documentos.js` |
 | Planilhas | 12–16 MB, 5.000 linhas, 60 colunas | `src/importacao.js`, `src/conciliacao.js` |
 | Rate limit | Login, 2FA, API, importação, comunicação, recuperação e cadastro | `src/api.js` |
 | Cabeçalhos | CSP, HSTS, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, COOP/CORP | `src/server.js` |
+| Backup | Geração admin-only via POST com confirmação obrigatória (`BACKUP`); ZIP inclui `.app-key` e é tratado como segredo | `src/api.js`, `public/views-fin.js` |
 | Auditoria | Login, CRUD, baixa, estorno, repasse, fechamento, conciliação, importação, backup, LGPD | `src/permissoes.js` |
 | LGPD | Exportação do titular, anonimização preservando financeiro, mascaramento de CPF para `consulta` | `src/api.js` |
 | Operação | `secure_delete`, permissões `0700/0600`, backup com `VACUUM INTO` + integridade, desligamento gracioso | `src/db.js`, `src/server.js` |

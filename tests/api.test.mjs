@@ -236,7 +236,9 @@ test('fluxo principal da API', async (t) => {
     const verificar = await req('/api/backup/verificar');
     assert.equal(verificar.res.status, 200);
     assert.ok(verificar.data.contagens.usuarios >= 1);
-    const backup = await req('/api/backup');
+    const semConfirmacao = await req('/api/backup', { method: 'POST', body: {} });
+    assert.equal(semConfirmacao.res.status, 400);
+    const backup = await req('/api/backup', { method: 'POST', body: { confirmacao: 'BACKUP' } });
     assert.equal(backup.res.status, 200);
     assert.equal(backup.res.headers.get('content-type'), 'application/zip');
 

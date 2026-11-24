@@ -3,6 +3,26 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e versionamento
 semântico ([SemVer](https://semver.org/lang/pt-BR/)).
 
+## [0.11.1] — 2026-11
+
+### Segurança (auditoria pré-go-live)
+- **Defaults de produção**: `permitir_cadastro` e `primeiro_acesso` passam a
+  iniciar desativados em instalações novas; nada do e-mail do administrador
+  é revelado publicamente antes da primeira troca de senha.
+- **Cookie de sessão com prefixo `__Host-`** sob HTTPS (impede injeção por
+  subdomínio); logout limpa ambas as variantes (`__Host-sid` e `sid`).
+- **`scrypt` com custo elevado** (N=32768) em formato versionado
+  `scrypt2$N$r$p`; hashes antigos continuam válidos sem migração.
+- **Backup exige confirmação**: download passa a ser POST com confirmação
+  obrigatória (`BACKUP`), com modal no cliente; o ZIP traz banco, documentos
+  e a chave local, e era acessível por um simples link GET.
+- **Documentos**: as rotas de listagem, versões e download agora exigem a
+  permissão `ler` explicitamente (antes dependiam só do portão global).
+- **Checklist de go-live** adicionado a `docs/OPERACAO.md` (HTTPS, `TRUST_PROXY=1`,
+  settings de segurança, SMTP/`url_publica`, backup off-server) e nota
+  documentada sobre `style-src 'unsafe-inline'` em `docs/SEGURANCA.md`.
+- Testes atualizados (131): backup via POST com confirmação.
+
 ## [0.11.0] — 2026-11
 
 ### Adicionado

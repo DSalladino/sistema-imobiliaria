@@ -78,7 +78,9 @@ function ipCliente(req) {
 
 function usuarioDaRequisicao(req) {
   const cookies = parseCookies(req.headers.cookie || '');
-  const token = cookies.sid;
+  // Em HTTPS o cookie usa o prefixo __Host-; em desenvolvimento (HTTP puro),
+  // mantém o nome simples sid.
+  const token = cookies['__Host-sid'] || cookies.sid;
   if (!token) return { user: null, token: null, tokenHash: null };
   const tokenHash = hashToken(token);
   const row = db.prepare(`SELECT u.id, u.nome, u.email, u.papel, u.ativo, u.deve_trocar_senha, u.totp_ativo,

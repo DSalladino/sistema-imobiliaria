@@ -227,6 +227,30 @@ O comando gera senha temporária, desativa 2FA, invalida sessões e força troca
 - Guarde `APP_SECRET`/`.app-key` no gerenciador de senhas.
 - Trate o ZIP de backup como documento confidencial.
 
+### Checklist de go-live com cliente
+
+Antes de apontar um cliente real para o sistema, verifique:
+
+1. **HTTPS no proxy** (fly.io, Render ou Nginx com certificado) — o sistema
+   marca o cookie com o prefixo `__Host-` só em HTTPS; em HTTP puro ele
+   degrada para `sid`, o que não é aceitável em produção.
+2. **`TRUST_PROXY=1` no ambiente** — atrás de proxy confiável. Sem isso, o
+   rate limit de login agrega todos os clientes num único balde (bloqueio em
+   massa); com proxy não confiável, o cabeçalho é forjável e o limite é burlável.
+3. **Desativar `permitir_cadastro`** (Configurações → segurança) — o padrão
+   de instalação nova é desativado; confirme que a base do cliente está assim
+   se o acesso for fechado por convite do administrador.
+4. **Desativar `primeiro_acesso`** — a dica pública do e-mail do admin na
+   tela de login deve ficar desligada em produção (padrão de instalação nova
+   é desligado; bases antigas podem ter `1` gravado).
+5. **Trocar a senha do admin no primeiro login** — a troca é forçada pelo
+   servidor e encerra o hint automaticamente.
+6. **SMTP + `PUBLIC_URL`/`url_publica` configurados** — sem eles, os links de
+   redefinição de senha não são enviados.
+7. **Backup off-server agendado** — o ZIP da API exige confirmação e traz a
+   `.app-key`; trate como segredo.
+8. **Dois administradores ativos** — o sistema impede desativar o último.
+
 ## LGPD e retenção
 
 Configurações → LGPD define encarregado, e-mail e prazos de retenção. A
